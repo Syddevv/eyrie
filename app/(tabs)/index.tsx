@@ -1,6 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -111,6 +112,7 @@ const transactions = [
 ] as const;
 
 export default function HomeScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
 
@@ -163,7 +165,9 @@ export default function HomeScreen() {
                 <Feather name="bell" size={18} color={colors.mutedForeground} />
                 <View style={styles.notificationDot} />
               </Pressable>
-              <Pressable style={[styles.settingsButton, { backgroundColor: colors.primary }]}>
+              <Pressable
+                style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/settings')}>
                 <Feather name="settings" size={18} color={colors.primaryForeground} />
               </Pressable>
             </View>

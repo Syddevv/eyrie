@@ -9,7 +9,7 @@ import { fontFamilies } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type NavVariant = 'light' | 'dark';
-type ActiveTab = 'home' | 'budget' | 'goals' | 'assistant';
+type ActiveTab = 'home' | 'budget' | 'goals' | 'assistant' | 'none';
 
 interface AppBottomNavProps {
   activeTab: ActiveTab;

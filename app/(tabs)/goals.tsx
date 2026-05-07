@@ -108,8 +108,15 @@ export default function GoalsScreen() {
         backgroundColor: colorScheme === 'light' ? colors.primary : '#1495FF',
       },
       summaryCard: {
-        backgroundColor: colorScheme === 'light' ? colors.card : '#101722',
-        borderColor: colorScheme === 'light' ? withOpacity(colors.border, 0.96) : 'rgba(255,255,255,0.05)',
+        backgroundColor: '#10B47A',
+        borderColor: '#10B47A',
+      },
+      summaryLabelText: { color: '#D6FFF0' },
+      summaryTitleText: { color: '#FFFFFF' },
+      summaryTargetText: { color: '#FFE26F' },
+      summaryBadgeBackground: { backgroundColor: 'rgba(255,255,255,0.18)' },
+      summaryTrack: {
+        backgroundColor: 'rgba(255,255,255,0.25)',
       },
       goalCard: {
         backgroundColor: colorScheme === 'light' ? colors.card : '#101722',
@@ -137,10 +144,7 @@ export default function GoalsScreen() {
         backgroundColor: colorScheme === 'light' ? colors.card : '#101722',
         borderColor: colorScheme === 'light' ? withOpacity(colors.border, 0.96) : 'rgba(255,255,255,0.05)',
       },
-      progressText: { color: colorScheme === 'light' ? '#12A25D' : '#1DD86B' },
-      summaryTrack: {
-        backgroundColor: colorScheme === 'light' ? '#E9EDF4' : '#1B2433',
-      },
+      progressText: { color: '#FFFFFF' },
     }),
     [colorScheme, colors]
   );
@@ -162,28 +166,28 @@ export default function GoalsScreen() {
 
           <View style={[styles.summaryCard, pageStyles.summaryCard, shadows.card]}>
             <View style={styles.summaryTopRow}>
-              <Text style={[styles.summaryLabel, pageStyles.mutedText]}>Total Saved</Text>
-              <View style={styles.summaryBadge}>
+              <Text style={[styles.summaryLabel, pageStyles.summaryLabelText]}>Total Saved</Text>
+              <View style={[styles.summaryBadge, pageStyles.summaryBadgeBackground]}>
                 <Ionicons
                   name="sparkles-outline"
                   size={15}
-                  color={colorScheme === 'light' ? '#12A25D' : '#1DD86B'}
+                  color="#FFFFFF"
                 />
                 <Text style={[styles.summaryBadgeText, pageStyles.progressText]}>40% of goals</Text>
               </View>
             </View>
 
-            <Text style={[styles.summaryAmount, pageStyles.title]}>₱220,500</Text>
+            <Text style={[styles.summaryAmount, pageStyles.summaryTitleText]}>₱220,500</Text>
 
             <View style={styles.summaryProgressRow}>
-              <Text style={[styles.summaryProgressLabel, pageStyles.mutedText]}>Progress</Text>
-              <Text style={[styles.summaryProgressValue, pageStyles.title]}>₱220,500 / ₱555,000</Text>
+              <Text style={[styles.summaryProgressLabel, pageStyles.summaryLabelText]}>Progress</Text>
+              <Text style={[styles.summaryProgressValue, pageStyles.summaryTitleText]}>₱220,500 / ₱555,000</Text>
             </View>
 
             <View style={[styles.summaryTrack, pageStyles.summaryTrack]}>
               <View style={styles.summaryFillWrap}>
                 <LinearGradient
-                  colors={['#1495FF', '#17C964']}
+                  colors={['#FFFFFF', '#F5FFF8']}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
                   style={styles.summaryFill}
@@ -338,6 +342,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.full,
   },
   summaryBadgeText: {
     fontFamily: fontFamilies.sans,
