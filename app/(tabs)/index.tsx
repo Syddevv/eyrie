@@ -161,7 +161,7 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.headerActions}>
-              <Pressable style={[styles.headerButton, pageStyles.topButton]}>
+              <Pressable style={[styles.headerButton, pageStyles.topButton]} onPress={() => router.push('/notifications')}>
                 <Feather name="bell" size={18} color={colors.mutedForeground} />
                 <View style={styles.notificationDot} />
               </Pressable>
@@ -298,7 +298,7 @@ export default function HomeScreen() {
 
           <View style={[styles.sectionHeader, styles.recentHeader]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
-            <Pressable style={styles.linkRow}>
+            <Pressable style={styles.linkRow} onPress={() => router.push('/transactions')}>
               <Text style={[styles.sectionLink, pageStyles.linkText]}>See all</Text>
             </Pressable>
           </View>

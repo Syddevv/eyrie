@@ -229,8 +229,8 @@ export default function GoalsScreen() {
 
                 <Text style={[styles.recentLabel, pageStyles.mutedText]}>Recent contributions</Text>
                 <View style={styles.contributionsRow}>
-                  {goal.contributions.map((amount) => (
-                    <View key={amount} style={[styles.contributionChip, pageStyles.chip]}>
+                  {goal.contributions.map((amount, index) => (
+                    <View key={`${goal.title}-${amount}-${index}`} style={[styles.contributionChip, pageStyles.chip]}>
                       <Text style={[styles.contributionText, pageStyles.title]}>{amount}</Text>
                     </View>
                   ))}
