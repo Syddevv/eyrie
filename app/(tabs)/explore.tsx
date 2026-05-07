@@ -6,8 +6,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
+import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const categories = [
   {
@@ -92,30 +94,94 @@ const categories = [
   },
 ] as const;
 
+function withOpacity(hex: string, opacity: number) {
+  const normalized = hex.replace('#', '');
+  const full =
+    normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized;
+  const red = parseInt(full.slice(0, 2), 16);
+  const green = parseInt(full.slice(2, 4), 16);
+  const blue = parseInt(full.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
 export default function BudgetScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = themeColors[colorScheme];
+
+  const pageStyles = useMemo(
+    () => ({
+      background: { backgroundColor: colors.background },
+      title: { color: colors.foreground },
+      mutedText: { color: colorScheme === 'light' ? '#5B6980' : colors.mutedForeground },
+      monthButton: {
+        backgroundColor:
+          colorScheme === 'light' ? withOpacity(colors.secondary, 0.78) : withOpacity(colors.secondary, 0.42),
+        borderColor: colorScheme === 'light' ? withOpacity(colors.border, 0.9) : withOpacity(colors.border, 0.42),
+      },
+      monthIcon: { color: colors.foreground },
+      totalGradient:
+        colorScheme === 'light'
+          ? (['#1F9BFF', '#178BFF', '#117FFF'] as const)
+          : (['#127FF0', '#0E71E2', '#0D5CCA'] as const),
+      cycleCard: {
+        backgroundColor: colorScheme === 'light' ? colors.card : '#101722',
+        borderColor: colorScheme === 'light' ? withOpacity(colors.border, 0.96) : 'rgba(255,255,255,0.05)',
+      },
+      segmentInactive: {
+        backgroundColor: colorScheme === 'light' ? withOpacity(colors.secondary, 0.92) : '#1A2230',
+      },
+      tipCard: {
+        backgroundColor:
+          colorScheme === 'light' ? 'rgba(226, 251, 240, 0.95)' : 'rgba(2, 61, 48, 0.48)',
+        borderColor:
+          colorScheme === 'light' ? 'rgba(83, 214, 156, 0.28)' : 'rgba(53, 211, 165, 0.24)',
+      },
+      tipAvatarWrap: {
+        borderColor: colorScheme === 'light' ? '#BCEEDD' : '#CFEFE8',
+        backgroundColor: colorScheme === 'light' ? '#BCEEDD' : '#CFEFE8',
+      },
+      tipTitle: { color: colorScheme === 'light' ? '#13A76B' : '#70F4B4' },
+      tipText: { color: colorScheme === 'light' ? '#188A61' : '#69EEA9' },
+      addButton: { backgroundColor: colorScheme === 'light' ? colors.primary : '#1697FF' },
+      categoryCard: {
+        backgroundColor: colorScheme === 'light' ? colors.card : '#101722',
+        borderColor: colorScheme === 'light' ? withOpacity(colors.border, 0.96) : 'rgba(255,255,255,0.04)',
+      },
+      actionButton: {
+        backgroundColor:
+          colorScheme === 'light' ? withOpacity(colors.secondary, 0.92) : '#1A2230',
+      },
+      categorySpent: { color: colorScheme === 'light' ? '#6E7787' : '#9EA6B5' },
+      categoryLeftLabel: { color: colorScheme === 'light' ? '#7E8796' : '#8C93A3' },
+      progressTrack: { backgroundColor: colorScheme === 'light' ? '#E8EDF4' : '#1B2433' },
+    }),
+    [colorScheme, colors]
+  );
+
   const styles = useMemo(() => createStyles(), []);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.headerBlock}>
-            <Text style={styles.title}>Budget</Text>
-            <Text style={styles.subtitle}>Track your spending limits</Text>
+            <Text style={[styles.title, pageStyles.title]}>Budget</Text>
+            <Text style={[styles.subtitle, pageStyles.mutedText]}>Track your spending limits</Text>
           </View>
 
           <View style={styles.monthRow}>
-            <Pressable style={styles.monthButton}>
-              <Feather name="chevron-left" size={20} color="#FFFFFF" />
+            <Pressable style={[styles.monthButton, pageStyles.monthButton]}>
+              <Feather name="chevron-left" size={20} color={colors.foreground} />
             </Pressable>
-            <Text style={styles.monthLabel}>May 2026</Text>
-            <Pressable style={styles.monthButton}>
-              <Feather name="chevron-right" size={20} color="#FFFFFF" />
+            <Text style={[styles.monthLabel, pageStyles.title]}>May 2026</Text>
+            <Pressable style={[styles.monthButton, pageStyles.monthButton]}>
+              <Feather name="chevron-right" size={20} color={colors.foreground} />
             </Pressable>
           </View>
 
           <LinearGradient
-            colors={['#1F9BFF', '#178BFF', '#117FFF']}
+            colors={pageStyles.totalGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.totalCard}>
@@ -146,24 +212,24 @@ export default function BudgetScreen() {
             </View>
           </LinearGradient>
 
-          <View style={[styles.cycleCard, shadows.card]}>
-            <Text style={styles.cardTitle}>Budget Cycle</Text>
+          <View style={[styles.cycleCard, pageStyles.cycleCard, shadows.card]}>
+            <Text style={[styles.cardTitle, pageStyles.title]}>Budget Cycle</Text>
             <View style={styles.segmentedRow}>
-              <View style={styles.segmentInactive}>
-                <Text style={styles.segmentInactiveText}>Weekly</Text>
+              <View style={[styles.segmentInactive, pageStyles.segmentInactive]}>
+                <Text style={[styles.segmentInactiveText, pageStyles.title]}>Weekly</Text>
               </View>
-              <View style={styles.segmentInactive}>
-                <Text style={styles.segmentInactiveText}>Bi-Weekly</Text>
+              <View style={[styles.segmentInactive, pageStyles.segmentInactive]}>
+                <Text style={[styles.segmentInactiveText, pageStyles.title]}>Bi-Weekly</Text>
               </View>
               <View style={styles.segmentActive}>
                 <Text style={styles.segmentActiveText}>Monthly</Text>
               </View>
             </View>
-            <Text style={styles.cycleHint}>Your budgets will reset every month.</Text>
+            <Text style={[styles.cycleHint, pageStyles.mutedText]}>Your budgets will reset every month.</Text>
           </View>
 
-          <View style={styles.tipCard}>
-            <View style={styles.tipAvatarWrap}>
+          <View style={[styles.tipCard, pageStyles.tipCard]}>
+            <View style={[styles.tipAvatarWrap, pageStyles.tipAvatarWrap]}>
               <Image
                 contentFit="cover"
                 source={require('@/assets/images/Eyrie_Mascot_1.png')}
@@ -171,16 +237,16 @@ export default function BudgetScreen() {
               />
             </View>
             <View style={styles.tipTextBlock}>
-              <Text style={styles.tipTitle}>Budget Tip</Text>
-              <Text style={styles.tipText}>
+              <Text style={[styles.tipTitle, pageStyles.tipTitle]}>Budget Tip</Text>
+              <Text style={[styles.tipText, pageStyles.tipText]}>
                 Tap any category to edit its budget. Use the + button to add new categories!
               </Text>
             </View>
           </View>
 
           <View style={styles.categoriesHeader}>
-            <Text style={styles.categoriesTitle}>Categories</Text>
-            <Pressable style={styles.addButton}>
+            <Text style={[styles.categoriesTitle, pageStyles.title]}>Categories</Text>
+            <Pressable style={[styles.addButton, pageStyles.addButton]}>
               <Feather name="plus" size={18} color="#FFFFFF" />
               <Text style={styles.addButtonText}>Add</Text>
             </Pressable>
@@ -188,36 +254,36 @@ export default function BudgetScreen() {
 
           <View style={styles.categoryList}>
             {categories.map((item) => (
-              <View key={item.title} style={[styles.categoryCard, shadows.soft]}>
+              <View key={item.title} style={[styles.categoryCard, pageStyles.categoryCard, shadows.soft]}>
                 <View style={styles.categoryTopRow}>
                   <View style={styles.categoryIdentity}>
                     <View style={[styles.categoryIconWrap, { backgroundColor: item.iconBackground }]}>
                       {item.icon}
                     </View>
                     <View>
-                      <Text style={styles.categoryTitle}>{item.title}</Text>
-                      <Text style={styles.categoryTransactions}>{item.transactions}</Text>
+                      <Text style={[styles.categoryTitle, pageStyles.title]}>{item.title}</Text>
+                      <Text style={[styles.categoryTransactions, pageStyles.mutedText]}>{item.transactions}</Text>
                     </View>
                   </View>
 
                   <View style={styles.categoryActions}>
-                    <Pressable style={styles.actionButton}>
-                      <Feather name="edit-3" size={16} color="#FFFFFF" />
+                    <Pressable style={[styles.actionButton, pageStyles.actionButton]}>
+                      <Feather name="edit-3" size={16} color={colors.foreground} />
                     </Pressable>
-                    <Pressable style={styles.actionButton}>
-                      <Feather name="trash-2" size={16} color="#FFFFFF" />
+                    <Pressable style={[styles.actionButton, pageStyles.actionButton]}>
+                      <Feather name="trash-2" size={16} color={colors.foreground} />
                     </Pressable>
                   </View>
                 </View>
 
                 <View style={styles.categoryAmountsRow}>
-                  <Text style={styles.categorySpent}>{item.spent}</Text>
+                  <Text style={[styles.categorySpent, pageStyles.categorySpent]}>{item.spent}</Text>
                   <Text style={[styles.categoryRemaining, { color: item.accent }]}>
-                    {item.remaining} <Text style={styles.categoryLeftLabel}>left</Text>
+                    {item.remaining} <Text style={[styles.categoryLeftLabel, pageStyles.categoryLeftLabel]}>left</Text>
                   </Text>
                 </View>
 
-                <View style={styles.categoryProgressTrack}>
+                <View style={[styles.categoryProgressTrack, pageStyles.progressTrack]}>
                   <View
                     style={[
                       styles.categoryProgressFill,
@@ -230,7 +296,7 @@ export default function BudgetScreen() {
           </View>
         </ScrollView>
 
-        <AppBottomNav activeTab="budget" variant="dark" />
+        <AppBottomNav activeTab="budget" variant={colorScheme === 'dark' ? 'dark' : 'light'} />
       </View>
     </SafeAreaView>
   );
@@ -240,7 +306,6 @@ function createStyles() {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#060B16',
     },
     flex: {
       flex: 1,
@@ -265,7 +330,6 @@ function createStyles() {
       fontFamily: fontFamilies.sans,
       fontSize: 16,
       lineHeight: 22,
-      color: '#8C93A3',
     },
     monthRow: {
       marginTop: 22,
@@ -287,7 +351,6 @@ function createStyles() {
       fontSize: 18,
       lineHeight: 24,
       fontWeight: fontWeights.bold,
-      color: '#FFFFFF',
     },
     totalCard: {
       marginTop: 18,
@@ -398,7 +461,6 @@ function createStyles() {
       fontSize: 16,
       lineHeight: 22,
       fontWeight: fontWeights.bold,
-      color: '#FFFFFF',
     },
     segmentedRow: {
       marginTop: 16,
@@ -418,7 +480,6 @@ function createStyles() {
       fontSize: 14,
       lineHeight: 18,
       fontWeight: fontWeights.bold,
-      color: '#FFFFFF',
     },
     segmentActive: {
       flex: 1,
@@ -440,7 +501,6 @@ function createStyles() {
       fontFamily: fontFamilies.sans,
       fontSize: 14,
       lineHeight: 20,
-      color: '#8C93A3',
     },
     tipCard: {
       marginTop: 20,
@@ -498,7 +558,6 @@ function createStyles() {
       fontSize: 18,
       lineHeight: 24,
       fontWeight: fontWeights.bold,
-      color: '#FFFFFF',
     },
     addButton: {
       flexDirection: 'row',
@@ -551,14 +610,12 @@ function createStyles() {
       fontSize: 17,
       lineHeight: 22,
       fontWeight: fontWeights.bold,
-      color: '#FFFFFF',
     },
     categoryTransactions: {
       marginTop: 2,
       fontFamily: fontFamilies.sans,
       fontSize: 14,
       lineHeight: 18,
-      color: '#8C93A3',
     },
     categoryActions: {
       flexDirection: 'row',
@@ -583,7 +640,6 @@ function createStyles() {
       fontFamily: fontFamilies.sans,
       fontSize: 15,
       lineHeight: 20,
-      color: '#9EA6B5',
     },
     categoryRemaining: {
       fontFamily: fontFamilies.sans,
@@ -592,7 +648,6 @@ function createStyles() {
       fontWeight: fontWeights.bold,
     },
     categoryLeftLabel: {
-      color: '#8C93A3',
       fontWeight: fontWeights.regular,
     },
     categoryProgressTrack: {
