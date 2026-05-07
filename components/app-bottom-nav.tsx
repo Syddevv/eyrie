@@ -40,7 +40,7 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
   const activeColor = '#1495FF';
   const plusShadow = isDark ? shadows.glow : shadows.glow;
 
-  const navigate = (href: '/' | '/explore') => {
+  const navigate = (href: '/' | '/explore' | '/goals') => {
     if (pathname !== href) {
       router.replace(href);
     }
@@ -71,7 +71,7 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
           <Feather name="plus" size={28} color="#FFFFFF" />
         </Pressable>
 
-        <Pressable style={styles.navItem}>
+        <Pressable style={styles.navItem} onPress={() => navigate('/goals')}>
           <Octicons name="goal" size={20} color={activeTab === 'goals' ? activeColor : mutedColor} />
           <Text style={[styles.navLabel, { color: activeTab === 'goals' ? activeColor : mutedColor }]}>
             Goals

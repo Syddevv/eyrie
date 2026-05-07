@@ -324,7 +324,7 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <AppBottomNav activeTab="home" />
+        <AppBottomNav activeTab="home" variant={colorScheme === 'dark' ? 'dark' : 'light'} />
       </View>
     </SafeAreaView>
   );
