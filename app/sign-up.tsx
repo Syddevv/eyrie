@@ -78,7 +78,7 @@ function FormField({
   );
 }
 
-export default function SignInScreen() {
+export default function SignUpScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
@@ -86,6 +86,10 @@ export default function SignInScreen() {
   const pageStyles = useMemo(
     () => ({
       background: { backgroundColor: colors.background },
+      backButton: {
+        backgroundColor: withOpacity(colors.card, colorScheme === 'light' ? 0.62 : 0.16),
+        borderColor: withOpacity(colors.border, colorScheme === 'light' ? 0.45 : 0.8),
+      },
       heroBadge: {
         borderColor: withOpacity(colors.card, 0.96),
         backgroundColor: withOpacity(colors.primary, colorScheme === 'light' ? 0.12 : 0.18),
@@ -93,25 +97,25 @@ export default function SignInScreen() {
       primaryButton: {
         backgroundColor: colorScheme === 'light' ? '#75B1E8' : colors.primary,
       },
-      mutedText: { color: colorScheme === 'light' ? '#5B6980' : colors.mutedForeground },
-      linkText: { color: colorScheme === 'light' ? '#0E67F7' : colors.primary },
-      socialButton: {
-        backgroundColor: withOpacity(colors.secondary, colorScheme === 'light' ? 0.72 : 0.95),
-        borderColor: withOpacity(colors.border, colorScheme === 'light' ? 0.85 : 1),
+      agreementCircle: {
+        borderColor: withOpacity(colors.mutedForeground, 0.55),
       },
-      divider: {
-        backgroundColor: withOpacity(colors.border, 0.9),
-      },
-      infoCard: {
+      noteCard: {
         backgroundColor:
-          colorScheme === 'light' ? 'rgba(213, 231, 249, 0.86)' : withOpacity(colors.primary, 0.18),
+          colorScheme === 'light'
+            ? 'rgba(202, 234, 228, 0.82)'
+            : withOpacity(colors.success, 0.2),
         borderColor:
-          colorScheme === 'light' ? 'rgba(186, 214, 243, 0.98)' : withOpacity(colors.primary, 0.32),
+          colorScheme === 'light'
+            ? 'rgba(156, 211, 202, 0.92)'
+            : withOpacity(colors.success, 0.34),
       },
       noteIcon: {
         backgroundColor: withOpacity(colors.card, 0.92),
         borderColor: withOpacity(colors.card, 0.98),
       },
+      mutedText: { color: colorScheme === 'light' ? '#5B6980' : colors.mutedForeground },
+      linkText: { color: colorScheme === 'light' ? '#0E67F7' : colors.primary },
     }),
     [colorScheme, colors]
   );
@@ -125,74 +129,72 @@ export default function SignInScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <View style={styles.topContent}>
-            <View style={[styles.logoFrame, pageStyles.heroBadge, shadows.soft]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
+            onPress={() => router.back()}
+            style={[styles.backButton, pageStyles.backButton]}>
+            <Ionicons name="chevron-back" size={20} color={colors.foreground} />
+          </Pressable>
+
+          <View style={[styles.logoFrame, pageStyles.heroBadge, shadows.soft]}>
+            <Image
+              contentFit="cover"
+              source={require('@/assets/images/Eyrie_Logo.png')}
+              style={styles.logo}
+            />
+          </View>
+
+          <View style={styles.titleBlock}>
+            <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
+            <Text style={[styles.subtitle, pageStyles.mutedText]}>
+              Join Eyrie and take control of your finances
+            </Text>
+          </View>
+
+          <View style={styles.form}>
+            <FormField label="Full Name" placeholder="Enter your full name" icon="user" />
+            <FormField label="Email" placeholder="Enter your email" icon="mail" />
+            <FormField label="Password" placeholder="Create a password" icon="lock" secureTextEntry />
+            <FormField
+              label="Confirm Password"
+              placeholder="Confirm your password"
+              icon="lock"
+              secureTextEntry
+            />
+          </View>
+
+          <View style={styles.agreementRow}>
+            <View style={[styles.agreementCircle, pageStyles.agreementCircle]} />
+            <Text style={[styles.agreementText, pageStyles.mutedText]}>
+              I agree to the <Text style={pageStyles.linkText}>Terms of Service</Text> and{' '}
+              <Text style={pageStyles.linkText}>Privacy Policy</Text>
+            </Text>
+          </View>
+
+          <Pressable accessibilityRole="button" style={[styles.primaryButton, pageStyles.primaryButton]}>
+            <Text style={styles.primaryButtonText}>Create Account</Text>
+            <Ionicons name="arrow-forward" size={20} color={colors.primaryForeground} />
+          </Pressable>
+
+          <View style={[styles.noteCard, pageStyles.noteCard]}>
+            <View style={[styles.noteIconWrap, pageStyles.noteIcon]}>
               <Image
                 contentFit="cover"
                 source={require('@/assets/images/Eyrie_Logo.png')}
-                style={styles.logo}
+                style={styles.noteIcon}
               />
             </View>
-
-            <View style={styles.titleBlock}>
-              <Text style={[styles.title, { color: colors.foreground }]}>Welcome Back</Text>
-              <Text style={[styles.subtitle, pageStyles.mutedText]}>
-                Sign in to continue to Eyrie
-              </Text>
-            </View>
-
-            <View style={styles.form}>
-              <FormField label="Email" placeholder="Enter your email" icon="mail" />
-              <FormField label="Password" placeholder="Enter your password" icon="lock" secureTextEntry />
-            </View>
-
-            <Pressable accessibilityRole="button" style={styles.forgotWrap}>
-              <Text style={[styles.forgotText, pageStyles.linkText]}>Forgot password?</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.replace('/')}
-              style={[styles.primaryButton, pageStyles.primaryButton]}>
-              <Text style={styles.primaryButtonText}>Sign In</Text>
-              <Ionicons name="arrow-forward" size={20} color={colors.primaryForeground} />
-            </Pressable>
-
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, pageStyles.divider]} />
-              <Text style={[styles.dividerText, pageStyles.mutedText]}>or continue with</Text>
-              <View style={[styles.dividerLine, pageStyles.divider]} />
-            </View>
-
-            <View style={styles.socialRow}>
-              <Pressable accessibilityRole="button" style={[styles.socialButton, pageStyles.socialButton]}>
-                <Ionicons name="logo-google" size={20} color={colors.foreground} />
-                <Text style={[styles.socialText, { color: colors.foreground }]}>Google</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" style={[styles.socialButton, pageStyles.socialButton]}>
-                <Ionicons name="logo-github" size={20} color={colors.foreground} />
-                <Text style={[styles.socialText, { color: colors.foreground }]}>GitHub</Text>
-              </Pressable>
-            </View>
-
-            <View style={[styles.infoCard, pageStyles.infoCard]}>
-              <View style={[styles.noteIconWrap, pageStyles.noteIcon]}>
-                <Image
-                  contentFit="cover"
-                  source={require('@/assets/images/Eyrie_Logo.png')}
-                  style={styles.noteIcon}
-                />
-              </View>
-              <Text style={[styles.infoText, pageStyles.mutedText]}>
-                Your financial data is encrypted and secure. Eyrie never shares your information with third parties.
-              </Text>
-            </View>
+            <Text style={[styles.noteText, pageStyles.mutedText]}>
+              {"By joining Eyrie, you're taking the first step toward financial freedom. Let's soar together!"}
+            </Text>
           </View>
 
           <View style={styles.footer}>
-            <Text style={[styles.footerText, pageStyles.mutedText]}>Don&apos;t have an account? </Text>
-            <Link href="/sign-up" style={[styles.footerLink, pageStyles.linkText]}>
-              Sign up
+            <Text style={[styles.footerText, pageStyles.mutedText]}>Already have an account? </Text>
+            <Link href="/sign-in" style={[styles.footerLink, pageStyles.linkText]}>
+              Sign in
             </Link>
           </View>
         </ScrollView>
@@ -209,33 +211,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'space-between',
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    paddingBottom: spacing[8],
+    paddingTop: spacing[4],
+    paddingBottom: spacing[12],
   },
-  topContent: {
-    gap: 0,
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoFrame: {
-    width: 108,
-    height: 108,
+    width: 92,
+    height: 92,
     borderRadius: radius.full,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    marginTop: 12,
+    marginTop: 26,
   },
   logo: {
-    width: 90,
-    height: 90,
+    width: 76,
+    height: 76,
     borderRadius: radius.full,
   },
   titleBlock: {
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 24,
     gap: 8,
   },
   title: {
@@ -250,9 +255,10 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     lineHeight: lineHeights.lg,
     textAlign: 'center',
+    paddingHorizontal: 18,
   },
   form: {
-    marginTop: 36,
+    marginTop: 34,
     gap: 18,
   },
   fieldGroup: {
@@ -280,15 +286,26 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     paddingVertical: 16,
   },
-  forgotWrap: {
-    alignSelf: 'flex-end',
-    marginTop: 16,
+  agreementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 18,
+    marginBottom: 20,
+    paddingRight: 12,
   },
-  forgotText: {
+  agreementCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    flexShrink: 0,
+  },
+  agreementText: {
+    flex: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
-    lineHeight: 20,
-    fontWeight: fontWeights.medium,
+    lineHeight: 21,
   },
   primaryButton: {
     minHeight: 56,
@@ -297,7 +314,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    marginTop: 16,
     ...shadows.glow,
   },
   primaryButtonText: {
@@ -307,45 +323,8 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginTop: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 18,
-  },
-  socialButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  socialText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: fontWeights.medium,
-  },
-  infoCard: {
-    marginTop: 26,
+  noteCard: {
+    marginTop: 22,
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: 'row',
@@ -367,7 +346,7 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: radius.full,
   },
-  infoText: {
+  noteText: {
     flex: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
@@ -377,7 +356,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 42,
+    marginTop: 28,
   },
   footerText: {
     fontFamily: fontFamilies.sans,
