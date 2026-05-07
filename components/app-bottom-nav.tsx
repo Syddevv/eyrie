@@ -40,7 +40,7 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
   const activeColor = '#1495FF';
   const plusShadow = isDark ? shadows.glow : shadows.glow;
 
-  const navigate = (href: '/' | '/explore' | '/goals') => {
+  const navigate = (href: '/' | '/explore' | '/goals' | '/assistant') => {
     if (pathname !== href) {
       router.replace(href);
     }
@@ -78,7 +78,7 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navItem}>
+        <Pressable style={styles.navItem} onPress={() => navigate('/assistant')}>
           <Image
             contentFit="cover"
             source={require('@/assets/images/Eyrie_Mascot_3.png')}
