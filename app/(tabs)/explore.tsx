@@ -7,16 +7,24 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { themeColors } from '@/constants/colors';
+import { fontFamilies } from '@/constants/typography';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabTwoScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = themeColors[colorScheme];
+
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
+      headerBackgroundColor={{
+        light: themeColors.light.secondary,
+        dark: themeColors.dark.secondary,
+      }}
       headerImage={
         <IconSymbol
           size={310}
-          color="#808080"
+          color={colors.mutedForeground}
           name="chevron.left.forwardslash.chevron.right"
           style={styles.headerImage}
         />
@@ -25,7 +33,7 @@ export default function TabTwoScreen() {
         <ThemedText
           type="title"
           style={{
-            fontFamily: Fonts.rounded,
+            fontFamily: fontFamilies.sans,
           }}>
           Explore
         </ThemedText>
@@ -80,7 +88,7 @@ export default function TabTwoScreen() {
           This template includes an example of an animated component. The{' '}
           <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
           the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
+          <ThemedText type="defaultSemiBold" style={{ fontFamily: fontFamilies.mono }}>
             react-native-reanimated
           </ThemedText>{' '}
           library to create a waving hand animation.
@@ -100,7 +108,6 @@ export default function TabTwoScreen() {
 
 const styles = StyleSheet.create({
   headerImage: {
-    color: '#808080',
     bottom: -90,
     left: -35,
     position: 'absolute',
