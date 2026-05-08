@@ -246,7 +246,13 @@ export default function SettingsScreen() {
           <View style={[styles.sectionCard, pageStyles.sectionCard, shadows.soft]}>
             {supportItems.map((item, index) => (
               <View key={item.title}>
-                <Pressable style={styles.row}>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => {
+                    if (item.title === 'Privacy Policy') {
+                      router.push('/privacy-policy-modal');
+                    }
+                  }}>
                   <View style={styles.rowLeft}>
                     <View style={[styles.rowIconWrap, pageStyles.rowIconWrap]}>
                       <Feather
