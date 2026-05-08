@@ -16,6 +16,7 @@ import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type CategoryOption = {
   id: string;
@@ -49,10 +50,11 @@ export default function AddCategoryModal() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === 'dark';
 
-  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>(categoryOptions[0]);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryOption | null>(null);
   const [showCategoryList, setShowCategoryList] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const isAddEnabled = Boolean(selectedCategory) && Number(budgetAmount) > 0;
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -96,6 +98,9 @@ export default function AddCategoryModal() {
       closeIcon: { color: colors.mutedForeground },
       addButton: {
         backgroundColor: colors.primary,
+      },
+      addButtonDisabled: {
+        backgroundColor: isDark ? '#31577D' : '#A9CDED',
       },
       addButtonText: { color: '#FFFFFF' },
       dropdownSurface: {
@@ -151,7 +156,7 @@ export default function AddCategoryModal() {
             {showCategoryList ? (
               <View style={[styles.dropdownCard, ui.dropdownSurface, shadows.card]}>
                 {categoryOptions.map((option, index) => {
-                  const isSelected = option.id === selectedCategory.id;
+                  const isSelected = option.id === selectedCategory?.id;
                   const isLast = index === categoryOptions.length - 1;
 
                   return (
@@ -204,7 +209,16 @@ export default function AddCategoryModal() {
             </View>
           </View>
 
-          <Pressable style={[styles.addButton, ui.addButton]} onPress={() => router.back()}>
+          <Pressable
+            style={[styles.addButton, isAddEnabled ? ui.addButton : ui.addButtonDisabled]}
+            onPress={() => {
+              if (!isAddEnabled) {
+                showIncompleteFormAlert();
+                return;
+              }
+
+              router.back();
+            }}>
             <Text style={[styles.addButtonText, ui.addButtonText]}>Add Category</Text>
           </Pressable>
         </View>

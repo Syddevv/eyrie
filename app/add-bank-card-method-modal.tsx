@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type BankOption = {
   id: string;
@@ -43,8 +44,9 @@ export default function AddBankCardMethodModal() {
   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo || '/add-payment-method-modal';
   const parentTo = Array.isArray(params.parentTo) ? params.parentTo[0] : params.parentTo || '/payment-methods-modal';
 
-  const [selectedBank, setSelectedBank] = useState('bpi');
-  const [selectedCardType, setSelectedCardType] = useState('visa');
+  const [selectedBank, setSelectedBank] = useState<string | null>(null);
+  const [selectedCardType, setSelectedCardType] = useState<string | null>(null);
+  const isContinueEnabled = Boolean(selectedBank && selectedCardType);
 
   const ui = useMemo(
     () => ({
@@ -75,6 +77,7 @@ export default function AddBankCardMethodModal() {
       },
       optionText: { color: isDark ? '#F8FAFC' : '#202733' },
       button: { backgroundColor: '#6DB2EE' },
+      buttonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
       buttonText: { color: '#FFFFFF' },
       indicatorTrack: { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#D1D5DB' },
       indicatorThumb: { backgroundColor: isDark ? '#9CA3AF' : '#9CA3AF' },
@@ -150,16 +153,28 @@ export default function AddBankCardMethodModal() {
         </View>
 
         <Pressable
-          style={[styles.continueButton, ui.button]}
-          onPress={() =>
+          style={[styles.continueButton, isContinueEnabled ? ui.button : ui.buttonDisabled]}
+          onPress={() => {
+            if (!isContinueEnabled) {
+              const message =
+                !selectedBank && !selectedCardType
+                  ? 'Please select a bank and card type before continuing.'
+                  : !selectedBank
+                    ? 'Please select a bank before continuing.'
+                    : 'Please select a card type before continuing.';
+
+              showIncompleteFormAlert('Selection required', message);
+              return;
+            }
+
             router.replace({
               pathname: '/add-bank-account-modal',
               params: {
                 returnTo: '/add-bank-card-method-modal',
                 parentTo,
               },
-            })
-          }>
+            });
+          }}>
           <Text style={[styles.continueButtonText, ui.buttonText]}>Continue</Text>
         </Pressable>
       </View>

@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type WalletOption = {
   id: string;
@@ -31,7 +32,8 @@ export default function AddEWalletMethodModal() {
   const parentTo = Array.isArray(params.parentTo) ? params.parentTo[0] : params.parentTo || '/payment-methods-modal';
   const selectedWalletParam = Array.isArray(params.selectedWallet) ? params.selectedWallet[0] : params.selectedWallet;
 
-  const [selectedWallet, setSelectedWallet] = useState(selectedWalletParam || 'gcash');
+  const [selectedWallet, setSelectedWallet] = useState<string | null>(selectedWalletParam || null);
+  const isContinueEnabled = Boolean(selectedWallet);
 
   const ui = useMemo(
     () => ({
@@ -62,6 +64,7 @@ export default function AddEWalletMethodModal() {
       },
       walletText: { color: isDark ? '#F8FAFC' : '#202733' },
       button: { backgroundColor: '#6DB2EE' },
+      buttonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
       buttonText: { color: '#FFFFFF' },
     }),
     [isDark]
@@ -109,8 +112,13 @@ export default function AddEWalletMethodModal() {
         </View>
 
         <Pressable
-          style={[styles.continueButton, ui.button]}
-          onPress={() =>
+          style={[styles.continueButton, isContinueEnabled ? ui.button : ui.buttonDisabled]}
+          onPress={() => {
+            if (!isContinueEnabled || !selectedWallet) {
+              showIncompleteFormAlert();
+              return;
+            }
+
             router.replace({
               pathname: '/add-e-wallet-account-modal',
               params: {
@@ -118,8 +126,8 @@ export default function AddEWalletMethodModal() {
                 parentTo,
                 selectedWallet,
               },
-            })
-          }>
+            });
+          }}>
           <Text style={[styles.continueButtonText, ui.buttonText]}>Continue</Text>
         </Pressable>
       </View>

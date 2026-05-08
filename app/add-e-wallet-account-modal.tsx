@@ -15,6 +15,7 @@ import {
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type WalletDetails = {
   code: string;
@@ -97,10 +98,11 @@ export default function AddEWalletAccountModal() {
   const selectedWalletId = Array.isArray(params.selectedWallet) ? params.selectedWallet[0] : params.selectedWallet || 'gcash';
   const selectedWallet = walletMap[selectedWalletId] ?? walletMap.gcash;
 
-  const [accountName, setAccountName] = useState('Juan Dela Cruz');
+  const [accountName, setAccountName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [balance, setBalance] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const isConnectEnabled = accountName.trim().length > 0;
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -153,6 +155,7 @@ export default function AddEWalletAccountModal() {
       placeholder: { color: isDark ? '#8F9CAF' : '#8A94A6' },
       hint: { color: isDark ? '#A9B6C8' : '#6B7280' },
       button: { backgroundColor: '#6DB2EE' },
+      buttonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
       buttonText: { color: '#FFFFFF' },
       peso: { color: isDark ? '#A9B6C8' : '#6B7280' },
       note: { color: isDark ? '#A9B6C8' : '#6B7280' },
@@ -260,7 +263,16 @@ export default function AddEWalletAccountModal() {
             <Text style={[styles.hint, ui.hint]}>Enter your current balance to track spending</Text>
           </View>
 
-          <Pressable style={[styles.connectButton, ui.button]} onPress={() => router.replace(parentTo)}>
+          <Pressable
+            style={[styles.connectButton, isConnectEnabled ? ui.button : ui.buttonDisabled]}
+            onPress={() => {
+              if (!isConnectEnabled) {
+                showIncompleteFormAlert();
+                return;
+              }
+
+              router.replace(parentTo);
+            }}>
             <Text style={[styles.connectButtonText, ui.buttonText]}>{selectedWallet.buttonLabel}</Text>
           </Pressable>
         </View>

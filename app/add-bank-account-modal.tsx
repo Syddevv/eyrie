@@ -15,6 +15,7 @@ import {
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 function formatCardNumber(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 16);
@@ -46,8 +47,9 @@ export default function AddBankAccountModal() {
   const [cardNumber, setCardNumber] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [balance, setBalance] = useState('');
-  const [cardholderName, setCardholderName] = useState('JUAN DELA CRUZ');
+  const [cardholderName, setCardholderName] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const isAddEnabled = cardholderName.trim().length > 0;
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -93,6 +95,7 @@ export default function AddBankAccountModal() {
       fieldText: { color: isDark ? '#F8FAFC' : '#202733' },
       placeholder: { color: isDark ? '#8F9CAF' : '#8A94A6' },
       button: { backgroundColor: '#6DB2EE' },
+      buttonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
       buttonText: { color: '#FFFFFF' },
       peso: { color: isDark ? '#A9B6C8' : '#6B7280' },
       note: { color: isDark ? '#A9B6C8' : '#6B7280' },
@@ -198,7 +201,16 @@ export default function AddBankAccountModal() {
             </View>
           </View>
 
-          <Pressable style={[styles.addButton, ui.button]} onPress={() => router.replace(parentTo)}>
+          <Pressable
+            style={[styles.addButton, isAddEnabled ? ui.button : ui.buttonDisabled]}
+            onPress={() => {
+              if (!isAddEnabled) {
+                showIncompleteFormAlert();
+                return;
+              }
+
+              router.replace(parentTo);
+            }}>
             <Text style={[styles.addButtonText, ui.buttonText]}>Add Card</Text>
           </Pressable>
         </View>

@@ -17,6 +17,7 @@ import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type FeatherName = ComponentProps<typeof Feather>['name'];
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -208,6 +209,9 @@ export default function NewSavingsGoalModal() {
         backgroundColor: colors.secondary,
       },
       ctaText: { color: colors.mutedForeground },
+      ctaDisabled: {
+        backgroundColor: isDark ? '#31577D' : '#A9CDED',
+      },
       ctaActive: {
         backgroundColor: colors.primary,
       },
@@ -325,9 +329,19 @@ export default function NewSavingsGoalModal() {
           </View>
 
           <Pressable
-            style={[styles.createButton, ui.cta, isCreateEnabled && ui.ctaActive]}
-            disabled={!isCreateEnabled}
-            onPress={() => router.back()}>
+            style={[
+              styles.createButton,
+              ui.cta,
+              isCreateEnabled ? ui.ctaActive : ui.ctaDisabled,
+            ]}
+            onPress={() => {
+              if (!isCreateEnabled) {
+                showIncompleteFormAlert();
+                return;
+              }
+
+              router.back();
+            }}>
             <Text
               style={[
                 styles.createButtonText,

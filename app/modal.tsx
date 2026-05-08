@@ -17,6 +17,7 @@ import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 type EntryType = 'expense' | 'income';
 type FeatherIconName = ComponentProps<typeof Feather>['name'];
@@ -165,7 +166,7 @@ export default function AddTransactionModal() {
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState('salary');
   const [selectedMerchant, setSelectedMerchant] = useState<string | null>(null);
   const [source, setSource] = useState('');
-  const [amount, setAmount] = useState('0.00');
+  const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -193,6 +194,7 @@ export default function AddTransactionModal() {
   const activeCategories = entryType === 'expense' ? expenseCategories : incomeCategories;
   const activeCategory = entryType === 'expense' ? selectedExpenseCategory : selectedIncomeCategory;
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
+  const isSaveEnabled = Number(amount) > 0;
 
   const ui = useMemo(
     () => ({
@@ -243,6 +245,9 @@ export default function AddTransactionModal() {
       iconTint: colors.mutedForeground,
       saveButton: {
         backgroundColor: colors.primary,
+      },
+      saveButtonDisabled: {
+        backgroundColor: isDark ? '#31577D' : '#A9CDED',
       },
       divider: {
         borderTopColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(148, 163, 184, 0.16)',
@@ -459,7 +464,16 @@ export default function AddTransactionModal() {
           </ScrollView>
 
           <View style={[styles.footer, ui.divider]}>
-            <Pressable style={[styles.saveButton, ui.saveButton]} onPress={() => router.back()}>
+            <Pressable
+              style={[styles.saveButton, isSaveEnabled ? ui.saveButton : ui.saveButtonDisabled]}
+              onPress={() => {
+                if (!isSaveEnabled) {
+                  showIncompleteFormAlert();
+                  return;
+                }
+
+                router.back();
+              }}>
               <Text style={styles.saveButtonText}>{saveLabel}</Text>
             </Pressable>
           </View>

@@ -18,6 +18,7 @@ import { savingsGoals } from '@/constants/goals';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 const quickAmounts = [1000, 2500, 5000, 10000] as const;
 
@@ -186,8 +187,14 @@ export default function AddContributionModal() {
                 ui.primaryButton,
                 !isAddEnabled && ui.primaryButtonDisabled,
               ]}
-              disabled={!isAddEnabled}
-              onPress={returnToGoalDetails}>
+              onPress={() => {
+                if (!isAddEnabled) {
+                  showIncompleteFormAlert();
+                  return;
+                }
+
+                returnToGoalDetails();
+              }}>
               <Text style={[styles.footerButtonText, ui.primaryText]}>
                 {`Add ₱${amount || '0'}`}
               </Text>

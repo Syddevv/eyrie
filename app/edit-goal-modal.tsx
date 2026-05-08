@@ -17,6 +17,7 @@ import { savingsGoals } from '@/constants/goals';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
 
 const monthNames = [
   'January',
@@ -157,6 +158,7 @@ export default function EditGoalModal() {
         borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(226,232,240,0.92)',
       },
       primaryButton: { backgroundColor: colors.primary },
+      primaryButtonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
       secondaryButton: { backgroundColor: colors.secondary },
       secondaryText: { color: colors.foreground },
       primaryText: { color: '#FFFFFF' },
@@ -244,9 +246,18 @@ export default function EditGoalModal() {
               <Text style={[styles.footerButtonText, ui.secondaryText]}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={[styles.footerButton, ui.primaryButton, !isSaveEnabled && styles.disabledButton]}
-              disabled={!isSaveEnabled}
-              onPress={returnToGoalDetails}>
+              style={[
+                styles.footerButton,
+                isSaveEnabled ? ui.primaryButton : ui.primaryButtonDisabled,
+              ]}
+              onPress={() => {
+                if (!isSaveEnabled) {
+                  showIncompleteFormAlert();
+                  return;
+                }
+
+                returnToGoalDetails();
+              }}>
               <Text style={[styles.footerButtonText, ui.primaryText]}>Save Changes</Text>
             </Pressable>
           </View>
@@ -436,7 +447,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: fontWeights.bold,
   },
-  disabledButton: { opacity: 0.5 },
   calendarOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   calendarBackdrop: { ...StyleSheet.absoluteFillObject },
   calendarCard: {
