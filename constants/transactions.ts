@@ -1,6 +1,7 @@
 export type TransactionRecord = {
   id: string;
   sectionTitle: string;
+  dateKey: string;
   title: string;
   category: string;
   amount: string;
@@ -18,6 +19,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'jollibee-today',
     sectionTitle: 'Today',
+    dateKey: '2026-05-08',
     title: 'Jollibee',
     category: 'Food & Dining',
     amount: '-₱450',
@@ -33,6 +35,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'salary-deposit-today',
     sectionTitle: 'Today',
+    dateKey: '2026-05-08',
     title: 'Salary Deposit',
     category: 'Income',
     amount: '+₱45,000',
@@ -48,6 +51,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'grab-ride-yesterday',
     sectionTitle: 'Yesterday',
+    dateKey: '2026-05-07',
     title: 'Grab Ride',
     category: 'Transportation',
     amount: '-₱285',
@@ -63,6 +67,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'netflix-yesterday',
     sectionTitle: 'Yesterday',
+    dateKey: '2026-05-07',
     title: 'Netflix',
     category: 'Entertainment',
     amount: '-₱549',
@@ -78,6 +83,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'starbucks-may-5',
     sectionTitle: 'May 5',
+    dateKey: '2026-05-05',
     title: 'Starbucks',
     category: 'Food & Dining',
     amount: '-₱245',
@@ -93,6 +99,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'sm-store-may-5',
     sectionTitle: 'May 5',
+    dateKey: '2026-05-05',
     title: 'SM Store',
     category: 'Shopping',
     amount: '-₱2,350',
@@ -108,6 +115,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'meralco-may-4',
     sectionTitle: 'May 4',
+    dateKey: '2026-05-04',
     title: 'Meralco',
     category: 'Bills',
     amount: '-₱3,200',
@@ -123,6 +131,7 @@ export const transactionRecords: readonly TransactionRecord[] = [
   {
     id: 'watsons-may-4',
     sectionTitle: 'May 4',
+    dateKey: '2026-05-04',
     title: 'Watsons',
     category: 'Health',
     amount: '-₱820',
