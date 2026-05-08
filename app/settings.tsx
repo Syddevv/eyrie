@@ -34,8 +34,8 @@ const accountItems: readonly AccountItem[] = [
     icon: 'lock',
   },
   {
-    title: 'Payment Methods',
-    value: '4 cards',
+    title: 'Cards & Wallets',
+    value: '4 methods',
     icon: 'credit-card',
   },
 ] as const;
@@ -168,7 +168,7 @@ export default function SettingsScreen() {
                       router.push('/personal-details-modal');
                     } else if (item.title === 'Security & Password') {
                       router.push('/security-password-modal');
-                    } else if (item.title === 'Payment Methods') {
+                    } else if (item.title === 'Cards & Wallets') {
                       router.push('/payment-methods-modal');
                     }
                   }}>

@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
 import { themeColors } from '@/constants/colors';
-import { homePaymentMethods } from '@/constants/payment-methods';
+import { homeCards, homeWallets } from '@/constants/payment-methods';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -222,8 +222,11 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.cardsRow}>
-            {homePaymentMethods.map((card) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsRow}>
+            {homeCards.map((card) => (
               <Pressable
                 key={card.id}
                 style={styles.cardPressable}
@@ -255,11 +258,52 @@ export default function HomeScreen() {
                 </LinearGradient>
               </Pressable>
             ))}
+          </ScrollView>
+
+          <View style={[styles.sectionHeader, styles.walletsHeader]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>My Wallets</Text>
           </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsRow}>
+            {homeWallets.map((wallet) => (
+              <Pressable
+                key={wallet.id}
+                style={styles.cardPressable}
+                onPress={() =>
+                  router.push({
+                    pathname: '/payment-method-details-modal',
+                    params: { methodId: wallet.id },
+                  })
+                }>
+                <LinearGradient
+                  colors={wallet.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.accountCard}>
+                  <View style={[styles.cardBubbleLarge, { backgroundColor: withOpacity('#FFFFFF', 0.08) }]} />
+                  <View style={[styles.cardBubbleSmall, { backgroundColor: withOpacity('#FFFFFF', 0.05) }]} />
+                  <View style={styles.cardTopRow}>
+                    <View>
+                      <Text style={styles.cardLabel}>{wallet.label}</Text>
+                      <Text style={styles.cardName}>{wallet.name}</Text>
+                    </View>
+                    <View style={[styles.walletBadge, { backgroundColor: wallet.badgeColor }]}>
+                      <Text style={styles.walletBadgeText}>{wallet.name.charAt(0)}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.walletAmount}>{wallet.amount}</Text>
+                  <Text style={styles.walletType}>{wallet.cardTypeLabel}</Text>
+                </LinearGradient>
+              </Pressable>
+            ))}
+          </ScrollView>
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Budget Progress</Text>
-            <Pressable style={styles.linkRow}>
+            <Pressable style={styles.linkRow} onPress={() => router.push('/explore')}>
               <Text style={[styles.sectionLink, pageStyles.linkText]}>See all</Text>
               <Feather name="chevron-right" size={16} color={colorScheme === 'light' ? '#0E67F7' : colors.primary} />
             </Pressable>
@@ -292,6 +336,7 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
             <Pressable style={styles.linkRow} onPress={() => router.push('/transactions')}>
               <Text style={[styles.sectionLink, pageStyles.linkText]}>See all</Text>
+              <Feather name="chevron-right" size={16} color={colorScheme === 'light' ? '#0E67F7' : colors.primary} />
             </Pressable>
           </View>
 
@@ -410,7 +455,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   insightCard: {
-    marginTop: 18,
+    marginTop: 4,
     borderRadius: 28,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -549,6 +594,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  walletsHeader: {
+    marginTop: 20,
+  },
   sectionTitle: {
     fontFamily: fontFamilies.sans,
     fontSize: 18,
@@ -567,18 +615,19 @@ const styles = StyleSheet.create({
   },
   cardsRow: {
     marginTop: 14,
-    flexDirection: 'row',
+    flexGrow: 1,
+    justifyContent: 'center',
     gap: 12,
   },
   cardPressable: {
-    flex: 1,
+    width: 164,
   },
   accountCard: {
     minHeight: 120,
     borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
+    paddingHorizontal: 12,
+    paddingTop: 11,
+    paddingBottom: 12,
     overflow: 'hidden',
   },
   cardBubbleLarge: {
@@ -612,8 +661,8 @@ const styles = StyleSheet.create({
   cardName: {
     marginTop: 2,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
@@ -622,26 +671,40 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 6,
   },
-  cardAmount: {
-    marginTop: 24,
+  walletBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walletBadgeText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  cardAmount: {
+    marginTop: 18,
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
   cardBottomRow: {
-    marginTop: 12,
+    marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   cardDigits: {
     fontFamily: fontFamilies.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: fontWeights.medium,
-    letterSpacing: 1.2,
+    letterSpacing: 1,
     color: withOpacity('#FFFFFF', 0.8),
   },
   cardType: {
@@ -650,6 +713,22 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: fontWeights.medium,
     color: withOpacity('#FFFFFF', 0.68),
+  },
+  walletAmount: {
+    marginTop: 18,
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  walletType: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: fontWeights.medium,
+    color: withOpacity('#FFFFFF', 0.74),
   },
   linkRow: {
     flexDirection: 'row',

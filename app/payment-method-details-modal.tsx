@@ -90,10 +90,14 @@ export default function PaymentMethodDetailsModal() {
 
           <Text style={styles.cardAmount}>{method.amount}</Text>
 
-          <View style={styles.cardBottomRow}>
-            <Text style={styles.cardDigits}>•••• •••• •••• {method.digits}</Text>
-            <Text style={styles.cardType}>{method.cardTypeLabel}</Text>
-          </View>
+          {method.kind === 'card' ? (
+            <View style={styles.cardBottomRow}>
+              <Text style={styles.cardDigits}>•••• •••• •••• {method.digits}</Text>
+              <Text style={styles.cardType}>{method.cardTypeLabel}</Text>
+            </View>
+          ) : (
+            <Text style={styles.walletType}>{method.cardTypeLabel}</Text>
+          )}
         </LinearGradient>
 
         <View style={styles.detailList}>
@@ -233,6 +237,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.medium,
     color: withOpacity('#FFFFFF', 0.68),
+  },
+  walletType: {
+    marginTop: 18,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+    color: withOpacity('#FFFFFF', 0.74),
   },
   detailList: {
     marginTop: 16,

@@ -669,10 +669,12 @@ const styles = StyleSheet.create({
   },
   calendarCard: {
     width: '88%',
+    maxWidth: 360,
     borderRadius: 22,
     borderWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -708,10 +710,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    rowGap: 4,
   },
   dayCell: {
     width: '14.2857%',
-    aspectRatio: 1,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
@@ -730,8 +733,11 @@ const styles = StyleSheet.create({
   },
   clearDateButton: {
     marginTop: 14,
+    width: '100%',
     height: 38,
     borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   clearDateText: {
     fontFamily: fontFamilies.sans,

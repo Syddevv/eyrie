@@ -65,7 +65,7 @@ export default function PaymentMethodsModal() {
         <View style={[styles.handle, ui.handle]} />
 
         <View style={styles.headerRow}>
-          <Text style={[styles.title, ui.title]}>Payment Methods</Text>
+          <Text style={[styles.title, ui.title]}>Cards & Wallets</Text>
           <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
             <Feather name="x" size={20} color={ui.closeIcon.color} />
           </Pressable>
@@ -123,7 +123,7 @@ export default function PaymentMethodsModal() {
               })
             }>
             <Feather name="plus" size={18} color={ui.addButtonText.color} />
-            <Text style={[styles.addButtonText, ui.addButtonText]}>Add Payment Method</Text>
+            <Text style={[styles.addButtonText, ui.addButtonText]}>Add Card or Wallet</Text>
           </Pressable>
         </ScrollView>
       </View>

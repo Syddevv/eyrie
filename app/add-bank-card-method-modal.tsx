@@ -90,7 +90,7 @@ export default function AddBankCardMethodModal() {
         <View style={[styles.handle, ui.handle]} />
 
         <View style={styles.headerRow}>
-          <Text style={[styles.title, ui.title]}>Add Payment Method</Text>
+          <Text style={[styles.title, ui.title]}>Add Card</Text>
           <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.replace(parentTo)}>
             <Feather name="x" size={20} color={ui.closeIcon.color} />
           </Pressable>
