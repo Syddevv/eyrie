@@ -1,6 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -96,6 +97,7 @@ function withOpacity(hex: string, opacity: number) {
 }
 
 export default function GoalsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
 
@@ -159,7 +161,9 @@ export default function GoalsScreen() {
               <Text style={[styles.subtitle, pageStyles.mutedText]}>Keep reaching for the sky</Text>
             </View>
 
-            <Pressable style={[styles.headerAction, pageStyles.headerAction]}>
+            <Pressable
+              style={[styles.headerAction, pageStyles.headerAction]}
+              onPress={() => router.push('/new-savings-goal-modal')}>
               <Feather name="plus" size={24} color="#000000" />
             </Pressable>
           </View>
