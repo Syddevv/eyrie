@@ -1,4 +1,5 @@
 import { makeRedirectUri } from "expo-auth-session";
+import * as QueryParams from "expo-auth-session/build/QueryParams";
 import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
@@ -41,6 +42,52 @@ function getGoogleErrorMessage(error: unknown) {
   }
 
   return error.message;
+}
+
+async function createSessionFromRedirectUrl(url: string) {
+  const { params, errorCode } = QueryParams.getQueryParams(url);
+
+  if (errorCode) {
+    throw new Error(errorCode);
+  }
+
+  const accessToken = Array.isArray(params.access_token)
+    ? params.access_token[0]
+    : params.access_token;
+  const refreshToken = Array.isArray(params.refresh_token)
+    ? params.refresh_token[0]
+    : params.refresh_token;
+
+  // Google OAuth in Supabase mobile flows often returns tokens directly in the callback URL.
+  // In that case there is no authorization code to exchange, so we restore the session from
+  // the returned tokens instead of requiring a PKCE code.
+  if (accessToken && refreshToken) {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data.session ?? null;
+  }
+
+  const codeParam = params.code;
+  const code = Array.isArray(codeParam) ? codeParam[0] : codeParam;
+
+  if (!code || typeof code !== "string") {
+    return null;
+  }
+
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    throw error;
+  }
+
+  return data.session ?? null;
 }
 
 function getSignInErrorMessage(error: unknown) {
@@ -207,8 +254,6 @@ export async function signInWithGoogle() {
     }
 
     const { queryParams } = Linking.parse(result.url);
-    const codeParam = queryParams?.code;
-    const code = Array.isArray(codeParam) ? codeParam[0] : codeParam;
     const oauthError = Array.isArray(queryParams?.error_description)
       ? queryParams.error_description[0]
       : queryParams?.error_description;
@@ -217,20 +262,17 @@ export async function signInWithGoogle() {
       throw new Error(String(oauthError));
     }
 
-    if (!code || typeof code !== "string") {
-      throw new Error("Google sign-in did not return an authorization code.");
-    }
+    const session = await createSessionFromRedirectUrl(result.url);
 
-    const { data: sessionData, error: exchangeError } =
-      await supabase.auth.exchangeCodeForSession(code);
-
-    if (exchangeError) {
-      throw exchangeError;
+    if (!session) {
+      throw new Error(
+        "Google sign-in completed, but Supabase did not return a session in the callback.",
+      );
     }
 
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     store.showSnackbar("Signed in with Google.", "success");
-    return sessionData.session ?? null;
+    return session;
   } catch (error) {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     store.showSnackbar(getGoogleErrorMessage(error), "error");
