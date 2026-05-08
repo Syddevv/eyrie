@@ -1,6 +1,6 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import {
   Keyboard,
@@ -136,15 +136,23 @@ function GoalIcon({ option, color }: { option: GoalIconOption; color: string }) 
 
 export default function NewSavingsGoalModal() {
   const router = useRouter();
+  const { suggestedName, suggestedIconId } = useLocalSearchParams<{
+    suggestedName?: string;
+    suggestedIconId?: string;
+  }>();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === 'dark';
 
-  const [goalName, setGoalName] = useState('');
+  const initialIconId =
+    typeof suggestedIconId === 'string' && goalIcons.some((item) => item.id === suggestedIconId)
+      ? suggestedIconId
+      : goalIcons[0].id;
+  const [goalName, setGoalName] = useState(typeof suggestedName === 'string' ? suggestedName : '');
   const [targetAmount, setTargetAmount] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date(2026, 4, 8));
   const [calendarMonth, setCalendarMonth] = useState(new Date(2026, 4, 1));
-  const [selectedIconId, setSelectedIconId] = useState(goalIcons[0].id);
+  const [selectedIconId, setSelectedIconId] = useState(initialIconId);
   const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isCreateEnabled = goalName.trim().length > 0 && Number(targetAmount) > 0;

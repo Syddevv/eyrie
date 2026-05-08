@@ -16,16 +16,19 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const suggestedGoals = [
   {
     title: 'House Fund',
+    iconId: 'home',
     iconBackground: '#1495FF',
     icon: <Feather name="home" size={18} color="#FFFFFF" />,
   },
   {
     title: 'Christmas',
+    iconId: 'gift',
     iconBackground: '#E11D48',
     icon: <Feather name="gift" size={18} color="#FFFFFF" />,
   },
   {
     title: 'Travel',
+    iconId: 'travel',
     iconBackground: '#7E7CFF',
     icon: <Ionicons name="airplane-outline" size={18} color="#FFFFFF" />,
   },
@@ -213,7 +216,11 @@ export default function GoalsScreen() {
               </View>
             </View>
 
-            <Pressable style={[styles.coachButton, pageStyles.coachButton]}>
+            <Pressable
+              style={[styles.coachButton, pageStyles.coachButton]}
+              onPress={() =>
+                router.push({ pathname: '/goal-details-modal', params: { goalId: 'emergency-fund' } })
+              }>
               <Text style={styles.coachButtonText}>Add Contribution</Text>
             </Pressable>
           </View>
@@ -225,10 +232,18 @@ export default function GoalsScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggestedRow}>
               {suggestedGoals.map((item) => (
-                <View key={item.title} style={[styles.suggestedChip, pageStyles.chipCard]}>
+                <Pressable
+                  key={item.title}
+                  style={[styles.suggestedChip, pageStyles.chipCard]}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/new-savings-goal-modal',
+                      params: { suggestedName: item.title, suggestedIconId: item.iconId },
+                    })
+                  }>
                   <View style={[styles.suggestedIconWrap, { backgroundColor: item.iconBackground }]}>{item.icon}</View>
                   <Text style={[styles.suggestedChipText, pageStyles.title]}>{item.title}</Text>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </View>
