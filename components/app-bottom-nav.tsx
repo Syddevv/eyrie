@@ -46,6 +46,12 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
     }
   };
 
+  const openAddTransaction = () => {
+    if (pathname !== '/modal') {
+      router.push('/modal');
+    }
+  };
+
   return (
     <View style={styles.wrap}>
       <View style={[styles.navBar, { backgroundColor, borderColor }, shadows.floating]}>
@@ -67,7 +73,9 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
           </Text>
         </Pressable>
 
-        <Pressable style={[styles.plusButton, { backgroundColor: activeColor }, plusShadow]}>
+        <Pressable
+          style={[styles.plusButton, { backgroundColor: activeColor }, plusShadow]}
+          onPress={openAddTransaction}>
           <Feather name="plus" size={28} color="#FFFFFF" />
         </Pressable>
 
