@@ -5,104 +5,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { themeColors } from '@/constants/colors';
+import { transactionSections, type TransactionRecord } from '@/constants/transactions';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
-const sections = [
-  {
-    title: 'Today',
-    items: [
-      {
-        title: 'Jollibee',
-        category: 'Food & Dining',
-        amount: '-₱450',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <MaterialCommunityIcons name="silverware-fork-knife" size={22} color="#5B6475" />,
-      },
-      {
-        title: 'Salary Deposit',
-        category: 'Income',
-        amount: '+₱45,000',
-        amountColor: 'income' as const,
-        iconBackgroundLight: '#CDEFE4',
-        iconBackgroundDark: '#0D2B22',
-        icon: <Feather name="arrow-down-left" size={20} color="#00A76F" />,
-      },
-    ],
-  },
-  {
-    title: 'Yesterday',
-    items: [
-      {
-        title: 'Grab Ride',
-        category: 'Transportation',
-        amount: '-₱285',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <MaterialCommunityIcons name="car-outline" size={22} color="#7A8290" />,
-      },
-      {
-        title: 'Netflix',
-        category: 'Entertainment',
-        amount: '-₱549',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <MaterialCommunityIcons name="filmstrip-box-multiple" size={22} color="#7A8290" />,
-      },
-    ],
-  },
-  {
-    title: 'May 5',
-    items: [
-      {
-        title: 'Starbucks',
-        category: 'Food & Dining',
-        amount: '-₱245',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <MaterialCommunityIcons name="coffee-outline" size={22} color="#7A8290" />,
-      },
-      {
-        title: 'SM Store',
-        category: 'Shopping',
-        amount: '-₱2,350',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <Feather name="shopping-bag" size={20} color="#7A8290" />,
-      },
-    ],
-  },
-  {
-    title: 'May 4',
-    items: [
-      {
-        title: 'Meralco',
-        category: 'Bills',
-        amount: '-₱3,200',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <Feather name="zap" size={20} color="#7A8290" />,
-      },
-      {
-        title: 'Watsons',
-        category: 'Health',
-        amount: '-₱820',
-        amountColor: 'default' as const,
-        iconBackgroundLight: '#E9EDF3',
-        iconBackgroundDark: '#181F2B',
-        icon: <Feather name="heart" size={20} color="#7A8290" />,
-      },
-    ],
-  },
-] as const;
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
@@ -113,6 +19,26 @@ function withOpacity(hex: string, opacity: number) {
   const blue = parseInt(full.slice(4, 6), 16);
 
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+function renderTransactionIcon(transaction: TransactionRecord) {
+  if (transaction.iconLibrary === 'material') {
+    return (
+      <MaterialCommunityIcons
+        name={transaction.iconName as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+        size={22}
+        color={transaction.iconColor}
+      />
+    );
+  }
+
+  return (
+    <Feather
+      name={transaction.iconName as React.ComponentProps<typeof Feather>['name']}
+      size={20}
+      color={transaction.iconColor}
+    />
+  );
 }
 
 export default function TransactionsScreen() {
@@ -148,7 +74,6 @@ export default function TransactionsScreen() {
         backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : withOpacity(colors.border, 0.84),
       },
       incomeAmount: { color: '#00C665' },
-      expenseAmount: { color: '#FF1843' },
       defaultAmount: { color: isDark ? '#FFFFFF' : colors.foreground },
       chevron: { color: isDark ? '#7F8897' : '#8C94A3' },
     }),
@@ -196,18 +121,22 @@ export default function TransactionsScreen() {
           </View>
         </View>
 
-        <ScrollView
-          style={styles.recordsScroll}
-          contentContainerStyle={styles.recordsContent}
-          showsVerticalScrollIndicator={false}>
-          {sections.map((section) => (
+        <ScrollView style={styles.recordsScroll} contentContainerStyle={styles.recordsContent} showsVerticalScrollIndicator={false}>
+          {transactionSections.map((section) => (
             <View key={section.title} style={styles.sectionBlock}>
               <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>{section.title}</Text>
 
               <View style={[styles.groupCard, pageStyles.groupCard, shadows.soft]}>
                 {section.items.map((item, index) => (
-                  <View key={item.title}>
-                    <Pressable style={styles.recordRow}>
+                  <View key={item.id}>
+                    <Pressable
+                      style={styles.recordRow}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/transaction-details-modal',
+                          params: { transactionId: item.id },
+                        })
+                      }>
                       <View style={styles.recordLeft}>
                         <View
                           style={[
@@ -216,7 +145,7 @@ export default function TransactionsScreen() {
                               backgroundColor: isDark ? item.iconBackgroundDark : item.iconBackgroundLight,
                             },
                           ]}>
-                          {item.icon}
+                          {renderTransactionIcon(item)}
                         </View>
 
                         <View>
