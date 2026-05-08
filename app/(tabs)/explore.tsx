@@ -2,8 +2,8 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
@@ -12,88 +12,107 @@ import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-const categories = [
+type BudgetCategory = {
+  id: string;
+  title: string;
+  transactions: string;
+  spentAmount: number;
+  budgetAmount: number;
+  iconBackground: string;
+  accent: string;
+  icon: React.ReactNode;
+};
+
+const initialCategories: BudgetCategory[] = [
   {
+    id: 'food',
     title: 'Food & Dining',
     transactions: '24 transactions',
-    spent: '₱8,500 / ₱12,000',
-    remaining: '₱3,500',
-    progress: 0.7,
+    spentAmount: 8500,
+    budgetAmount: 12000,
     iconBackground: '#FFEEBC',
     accent: '#1495FF',
     icon: <MaterialCommunityIcons name="silverware-fork-knife" size={22} color="#D97706" />,
   },
   {
+    id: 'transport',
     title: 'Transportation',
     transactions: '15 transactions',
-    spent: '₱3,200 / ₱5,000',
-    remaining: '₱1,800',
-    progress: 0.64,
+    spentAmount: 3200,
+    budgetAmount: 5000,
     iconBackground: '#DDEAFF',
     accent: '#1495FF',
     icon: <MaterialCommunityIcons name="car-outline" size={22} color="#2563EB" />,
   },
   {
+    id: 'shopping',
     title: 'Shopping',
     transactions: '8 transactions',
-    spent: '₱6,800 / ₱8,000',
-    remaining: '₱1,200',
-    progress: 0.85,
+    spentAmount: 6800,
+    budgetAmount: 8000,
     iconBackground: '#FCE2F4',
     accent: '#1495FF',
     icon: <Feather name="shopping-bag" size={20} color="#DB2777" />,
   },
   {
+    id: 'bills',
     title: 'Bills & Utilities',
     transactions: '5 transactions',
-    spent: '₱4,500 / ₱5,000',
-    remaining: '₱500',
-    progress: 0.9,
+    spentAmount: 4500,
+    budgetAmount: 5000,
     iconBackground: '#FFF4B8',
     accent: '#FF9F0A',
     icon: <Feather name="zap" size={20} color="#F59E0B" />,
   },
   {
+    id: 'entertainment',
     title: 'Entertainment',
     transactions: '12 transactions',
-    spent: '₱2,100 / ₱3,000',
-    remaining: '₱900',
-    progress: 0.7,
+    spentAmount: 2100,
+    budgetAmount: 3000,
     iconBackground: '#EFE9FF',
     accent: '#1495FF',
     icon: <MaterialCommunityIcons name="filmstrip-box-multiple" size={22} color="#7C3AED" />,
   },
   {
+    id: 'housing',
     title: 'Housing',
     transactions: '1 transactions',
-    spent: '₱15,000 / ₱15,000',
-    remaining: '₱0',
-    progress: 1,
+    spentAmount: 15000,
+    budgetAmount: 15000,
     iconBackground: '#D8F6E7',
     accent: '#FF9F0A',
     icon: <Feather name="home" size={20} color="#059669" />,
   },
   {
+    id: 'health',
     title: 'Health',
     transactions: '3 transactions',
-    spent: '₱1,200 / ₱3,000',
-    remaining: '₱1,800',
-    progress: 0.4,
+    spentAmount: 1200,
+    budgetAmount: 3000,
     iconBackground: '#FFE2E2',
     accent: '#1495FF',
     icon: <Feather name="heart" size={20} color="#EF4444" />,
   },
   {
+    id: 'education',
     title: 'Education',
     transactions: '6 transactions',
-    spent: '₱2,400 / ₱4,000',
-    remaining: '₱1,600',
-    progress: 0.6,
+    spentAmount: 2400,
+    budgetAmount: 4000,
     iconBackground: '#E6E9FF',
     accent: '#1495FF',
     icon: <Ionicons name="school-outline" size={22} color="#4F46E5" />,
   },
 ] as const;
+
+function formatCurrency(value: number) {
+  return `₱${value.toLocaleString('en-PH')}`;
+}
+
+function sanitizeBudgetInput(value: string) {
+  return value.replace(/[^0-9]/g, '');
+}
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
@@ -110,6 +129,9 @@ export default function BudgetScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
+  const [categories, setCategories] = useState(initialCategories);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [draftBudgetValue, setDraftBudgetValue] = useState('');
 
   const pageStyles = useMemo(
     () => ({
@@ -154,14 +176,48 @@ export default function BudgetScreen() {
         backgroundColor:
           colorScheme === 'light' ? withOpacity(colors.secondary, 0.92) : '#1A2230',
       },
+      actionButtonActive: {
+        backgroundColor: colors.primary,
+      },
       categorySpent: { color: colorScheme === 'light' ? '#6E7787' : '#9EA6B5' },
       categoryLeftLabel: { color: colorScheme === 'light' ? '#7E8796' : '#8C93A3' },
       progressTrack: { backgroundColor: colorScheme === 'light' ? '#E8EDF4' : '#1B2433' },
+      budgetInput: {
+        backgroundColor: colorScheme === 'light' ? colors.card : '#172132',
+        borderColor: colorScheme === 'light' ? '#9FD0FF' : '#2E8FFF',
+      },
+      budgetInputText: { color: colors.foreground },
     }),
     [colorScheme, colors]
   );
 
   const styles = useMemo(() => createStyles(), []);
+
+  const startEditingCategory = (category: BudgetCategory) => {
+    setEditingCategoryId(category.id);
+    setDraftBudgetValue(String(category.budgetAmount));
+  };
+
+  const cancelEditingCategory = () => {
+    setEditingCategoryId(null);
+    setDraftBudgetValue('');
+  };
+
+  const saveEditingCategory = (categoryId: string) => {
+    const nextBudgetAmount = Number(draftBudgetValue);
+
+    if (!nextBudgetAmount) {
+      cancelEditingCategory();
+      return;
+    }
+
+    setCategories((current) =>
+      current.map((item) =>
+        item.id === categoryId ? { ...item, budgetAmount: nextBudgetAmount } : item
+      )
+    );
+    cancelEditingCategory();
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -257,8 +313,13 @@ export default function BudgetScreen() {
           </View>
 
           <View style={styles.categoryList}>
-            {categories.map((item) => (
-              <View key={item.title} style={[styles.categoryCard, pageStyles.categoryCard, shadows.soft]}>
+            {categories.map((item) => {
+              const isEditing = editingCategoryId === item.id;
+              const remainingAmount = Math.max(item.budgetAmount - item.spentAmount, 0);
+              const progress = Math.min(item.spentAmount / item.budgetAmount, 1);
+
+              return (
+              <View key={item.id} style={[styles.categoryCard, pageStyles.categoryCard, shadows.soft]}>
                 <View style={styles.categoryTopRow}>
                   <View style={styles.categoryIdentity}>
                     <View style={[styles.categoryIconWrap, { backgroundColor: item.iconBackground }]}>
@@ -271,8 +332,13 @@ export default function BudgetScreen() {
                   </View>
 
                   <View style={styles.categoryActions}>
-                    <Pressable style={[styles.actionButton, pageStyles.actionButton]}>
-                      <Feather name="edit-3" size={16} color={colors.foreground} />
+                    <Pressable
+                      style={[
+                        styles.actionButton,
+                        isEditing ? pageStyles.actionButtonActive : pageStyles.actionButton,
+                      ]}
+                      onPress={() => (isEditing ? cancelEditingCategory() : startEditingCategory(item))}>
+                      <Feather name="edit-3" size={16} color={isEditing ? '#FFFFFF' : colors.foreground} />
                     </Pressable>
                     <Pressable style={[styles.actionButton, pageStyles.actionButton]}>
                       <Feather name="trash-2" size={16} color={colors.foreground} />
@@ -280,23 +346,58 @@ export default function BudgetScreen() {
                   </View>
                 </View>
 
-                <View style={styles.categoryAmountsRow}>
-                  <Text style={[styles.categorySpent, pageStyles.categorySpent]}>{item.spent}</Text>
-                  <Text style={[styles.categoryRemaining, { color: item.accent }]}>
-                    {item.remaining} <Text style={[styles.categoryLeftLabel, pageStyles.categoryLeftLabel]}>left</Text>
-                  </Text>
-                </View>
+                {isEditing ? (
+                  <View style={styles.categoryEditRow}>
+                    <View style={styles.categoryEditAmountRow}>
+                      <Text style={[styles.categorySpent, pageStyles.categorySpent]}>
+                        {formatCurrency(item.spentAmount)} / ₱
+                      </Text>
+                      <View style={[styles.budgetInputWrap, pageStyles.budgetInput]}>
+                        <TextInput
+                          value={draftBudgetValue}
+                          onChangeText={(value) => setDraftBudgetValue(sanitizeBudgetInput(value))}
+                          keyboardType="number-pad"
+                          selectionColor={colors.primary}
+                          style={[styles.budgetInput, pageStyles.budgetInputText]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.categoryEditActions}>
+                      <Pressable
+                        style={[styles.confirmButton, { backgroundColor: colors.primary }]}
+                        onPress={() => saveEditingCategory(item.id)}>
+                        <Feather name="check" size={18} color="#FFFFFF" />
+                      </Pressable>
+                      <Pressable
+                        style={[styles.cancelButton, pageStyles.actionButton]}
+                        onPress={cancelEditingCategory}>
+                        <Feather name="x" size={18} color={colors.foreground} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.categoryAmountsRow}>
+                    <Text style={[styles.categorySpent, pageStyles.categorySpent]}>
+                      {formatCurrency(item.spentAmount)} / {formatCurrency(item.budgetAmount)}
+                    </Text>
+                    <Text style={[styles.categoryRemaining, { color: item.accent }]}>
+                      {formatCurrency(remainingAmount)}{' '}
+                      <Text style={[styles.categoryLeftLabel, pageStyles.categoryLeftLabel]}>left</Text>
+                    </Text>
+                  </View>
+                )}
 
                 <View style={[styles.categoryProgressTrack, pageStyles.progressTrack]}>
                   <View
                     style={[
                       styles.categoryProgressFill,
-                      { width: `${item.progress * 100}%`, backgroundColor: item.accent },
+                      { width: `${progress * 100}%`, backgroundColor: item.accent },
                     ]}
                   />
                 </View>
               </View>
-            ))}
+            )})}
           </View>
         </ScrollView>
 
@@ -640,6 +741,19 @@ function createStyles() {
       justifyContent: 'space-between',
       alignItems: 'center',
     },
+    categoryEditRow: {
+      marginTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    categoryEditAmountRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: 6,
+    },
     categorySpent: {
       fontFamily: fontFamilies.sans,
       fontSize: 15,
@@ -653,6 +767,40 @@ function createStyles() {
     },
     categoryLeftLabel: {
       fontWeight: fontWeights.regular,
+    },
+    budgetInputWrap: {
+      minWidth: 98,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      paddingHorizontal: 12,
+      justifyContent: 'center',
+    },
+    budgetInput: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: fontWeights.medium,
+      paddingVertical: 0,
+    },
+    categoryEditActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    confirmButton: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButton: {
+      width: 38,
+      height: 38,
+      borderRadius: radius.full,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     categoryProgressTrack: {
       marginTop: 10,
