@@ -302,7 +302,9 @@ export default function AssistantScreen() {
         </View>
 
         {activeTab === 'analytics' ? (
-          <ScrollView contentContainerStyle={styles.analyticsContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.analyticsContent}
+            showsVerticalScrollIndicator={false}>
             <View style={[styles.card, pageStyles.card, shadows.soft]}>
               <View style={styles.cardHeadRow}>
                 <Text style={[styles.cardTitle, pageStyles.title]}>Budget Health</Text>
@@ -487,6 +489,7 @@ const styles = StyleSheet.create({
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 10,
+    paddingBottom: 16,
   },
   headerIdentity: {
     flexDirection: 'row',
@@ -560,7 +563,7 @@ const styles = StyleSheet.create({
   },
   analyticsContent: {
     paddingHorizontal: 14,
-    paddingTop: 22,
+    paddingTop: 12,
     paddingBottom: 144,
     gap: 18,
   },
@@ -801,7 +804,7 @@ const styles = StyleSheet.create({
   },
   assistantContent: {
     paddingHorizontal: 14,
-    paddingTop: 18,
+    paddingTop: 10,
     paddingBottom: 20,
   },
   messageRow: {

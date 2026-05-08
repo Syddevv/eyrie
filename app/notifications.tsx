@@ -201,6 +201,7 @@ const styles = StyleSheet.create({
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 8,
+    paddingBottom: 16,
   },
   topRow: {
     flexDirection: 'row',
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 14,
-    paddingTop: 18,
+    paddingTop: 10,
     paddingBottom: 24,
   },
   infoCard: {

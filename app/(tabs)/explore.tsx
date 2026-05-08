@@ -222,12 +222,14 @@ export default function BudgetScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerBlock}>
-            <Text style={[styles.title, pageStyles.title]}>Budget</Text>
-            <Text style={[styles.subtitle, pageStyles.mutedText]}>Track your spending limits</Text>
-          </View>
+        <View style={styles.headerBlock}>
+          <Text style={[styles.title, pageStyles.title]}>Budget</Text>
+          <Text style={[styles.subtitle, pageStyles.mutedText]}>Track your spending limits</Text>
+        </View>
 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}>
           <View style={styles.monthRow}>
             <Pressable style={[styles.monthButton, pageStyles.monthButton]}>
               <Feather name="chevron-left" size={20} color={colors.foreground} />
@@ -415,13 +417,16 @@ function createStyles() {
     flex: {
       flex: 1,
     },
+    headerBlock: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 16,
+      marginTop: 4,
+    },
     scrollContent: {
       paddingHorizontal: 14,
-      paddingTop: 8,
+      paddingTop: 10,
       paddingBottom: 150,
-    },
-    headerBlock: {
-      marginTop: 4,
     },
     title: {
       fontFamily: fontFamilies.sans,
@@ -437,7 +442,7 @@ function createStyles() {
       lineHeight: 22,
     },
     monthRow: {
-      marginTop: 22,
+      marginTop: 0,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

@@ -103,7 +103,7 @@ export default function GoalsScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerBlock}>
           <View style={styles.headerRow}>
             <View>
               <Text style={[styles.title, pageStyles.title]}>Savings Goals</Text>
@@ -116,7 +116,9 @@ export default function GoalsScreen() {
               <Feather name="plus" size={24} color="#000000" />
             </Pressable>
           </View>
+        </View>
 
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryCard, pageStyles.summaryCard, shadows.card]}>
             <View style={styles.summaryTopRow}>
               <Text style={[styles.summaryLabel, pageStyles.summaryLabelText]}>Total Saved</Text>
@@ -262,9 +264,14 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  headerBlock: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
   scrollContent: {
     paddingHorizontal: 14,
-    paddingTop: 8,
+    paddingTop: 10,
     paddingBottom: 150,
   },
   headerRow: {

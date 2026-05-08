@@ -196,7 +196,10 @@ export default function TransactionsScreen() {
           </View>
         </View>
 
-        <ScrollView style={styles.recordsScroll} contentContainerStyle={styles.recordsContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.recordsScroll}
+          contentContainerStyle={styles.recordsContent}
+          showsVerticalScrollIndicator={false}>
           {sections.map((section) => (
             <View key={section.title} style={styles.sectionBlock}>
               <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>{section.title}</Text>
@@ -256,6 +259,7 @@ const styles = StyleSheet.create({
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 8,
+    paddingBottom: 16,
   },
   topRow: {
     flexDirection: 'row',
@@ -354,10 +358,11 @@ const styles = StyleSheet.create({
   },
   recordsScroll: {
     flex: 1,
-    marginTop: 10,
+    marginTop: 2,
   },
   recordsContent: {
     paddingHorizontal: 14,
+    paddingTop: 8,
     paddingBottom: 24,
   },
   sectionBlock: {

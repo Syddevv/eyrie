@@ -115,7 +115,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
-
   const pageStyles = useMemo(
     () => ({
       background: { backgroundColor: colors.background },
@@ -142,9 +141,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+        <View style={styles.headerBlock}>
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
               <View style={styles.avatarFrame}>
@@ -172,7 +169,11 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           </View>
+        </View>
 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}>
           <LinearGradient
             colors={pageStyles.insightGradient}
             start={{ x: 0, y: 0 }}
@@ -340,6 +341,11 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  headerBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 16,
   },
   scrollContent: {
     paddingHorizontal: 16,
