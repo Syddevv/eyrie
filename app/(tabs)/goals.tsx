@@ -1,4 +1,4 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -7,65 +7,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
+import { savingsGoals } from '@/constants/goals';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
-const goals = [
-  {
-    title: 'Emergency Fund',
-    target: 'Target: Aug 2026',
-    saved: '₱112,500',
-    goal: '₱150,000',
-    achieved: '75% achieved',
-    remaining: '₱37,500 to go',
-    progress: 0.75,
-    accent: '#17C964',
-    iconBackground: '#0FBD59',
-    icon: <Ionicons name="shield-checkmark-outline" size={24} color="#FFFFFF" />,
-    contributions: ['+₱10,000', '+₱15,000', '+₱10,000'],
-  },
-  {
-    title: 'New MacBook',
-    target: 'Target: Dec 2026',
-    saved: '₱45,000',
-    goal: '₱85,000',
-    achieved: '53% achieved',
-    remaining: '₱40,000 to go',
-    progress: 0.53,
-    accent: '#1495FF',
-    iconBackground: '#1495FF',
-    icon: <Feather name="monitor" size={22} color="#FFFFFF" />,
-    contributions: ['+₱5,000', '+₱8,000'],
-  },
-  {
-    title: 'Japan Trip',
-    target: 'Target: Mar 2027',
-    saved: '₱35,000',
-    goal: '₱120,000',
-    achieved: '29% achieved',
-    remaining: '₱85,000 to go',
-    progress: 0.29,
-    accent: '#7E7CFF',
-    iconBackground: '#7E7CFF',
-    icon: <Ionicons name="airplane-outline" size={22} color="#FFFFFF" />,
-    contributions: ['+₱5,000', '+₱10,000'],
-  },
-  {
-    title: 'Car Down Payment',
-    target: 'Target: Jun 2027',
-    saved: '₱28,000',
-    goal: '₱200,000',
-    achieved: '14% achieved',
-    remaining: '₱172,000 to go',
-    progress: 0.14,
-    accent: '#F09A2A',
-    iconBackground: '#F09A2A',
-    icon: <MaterialCommunityIcons name="car-outline" size={22} color="#FFFFFF" />,
-    contributions: ['+₱8,000'],
-  },
-] as const;
 
 const suggestedGoals = [
   {
@@ -201,14 +147,17 @@ export default function GoalsScreen() {
           </View>
 
           <View style={styles.goalsList}>
-            {goals.map((goal) => (
-              <View key={goal.title} style={[styles.goalCard, pageStyles.goalCard, shadows.soft]}>
+            {savingsGoals.map((goal) => (
+              <Pressable
+                key={goal.id}
+                style={[styles.goalCard, pageStyles.goalCard, shadows.soft]}
+                onPress={() => router.push({ pathname: '/goal-details-modal', params: { goalId: goal.id } })}>
                 <View style={styles.goalTopRow}>
                   <View style={styles.goalIdentity}>
                     <View style={[styles.goalIconWrap, { backgroundColor: goal.iconBackground }]}>{goal.icon}</View>
                     <View style={styles.goalTextBlock}>
                       <Text style={[styles.goalTitle, pageStyles.title]}>{goal.title}</Text>
-                      <Text style={[styles.goalTarget, pageStyles.mutedText]}>{goal.target}</Text>
+                      <Text style={[styles.goalTarget, pageStyles.mutedText]}>{goal.targetLabel}</Text>
                     </View>
                   </View>
 
@@ -216,8 +165,12 @@ export default function GoalsScreen() {
                 </View>
 
                 <View style={styles.goalAmountsRow}>
-                  <Text style={[styles.goalSaved, pageStyles.title]}>{goal.saved}</Text>
-                  <Text style={[styles.goalAmountTarget, pageStyles.mutedText]}>{goal.goal}</Text>
+                  <Text style={[styles.goalSaved, pageStyles.title]}>
+                    {`₱${goal.savedAmount.toLocaleString('en-PH')}`}
+                  </Text>
+                  <Text style={[styles.goalAmountTarget, pageStyles.mutedText]}>
+                    {`₱${goal.goalAmount.toLocaleString('en-PH')}`}
+                  </Text>
                 </View>
 
                 <View style={[styles.goalTrack, pageStyles.track]}>
@@ -225,8 +178,8 @@ export default function GoalsScreen() {
                 </View>
 
                 <View style={styles.goalStatusRow}>
-                  <Text style={[styles.goalAchieved, pageStyles.mutedText]}>{goal.achieved}</Text>
-                  <Text style={[styles.goalRemaining, pageStyles.mutedText]}>{goal.remaining}</Text>
+                  <Text style={[styles.goalAchieved, pageStyles.mutedText]}>{goal.achievedLabel}</Text>
+                  <Text style={[styles.goalRemaining, pageStyles.mutedText]}>{goal.remainingLabel}</Text>
                 </View>
 
                 <View style={[styles.goalDivider, pageStyles.divider]} />
@@ -234,12 +187,12 @@ export default function GoalsScreen() {
                 <Text style={[styles.recentLabel, pageStyles.mutedText]}>Recent contributions</Text>
                 <View style={styles.contributionsRow}>
                   {goal.contributions.map((amount, index) => (
-                    <View key={`${goal.title}-${amount}-${index}`} style={[styles.contributionChip, pageStyles.chip]}>
+                    <View key={`${goal.id}-${amount}-${index}`} style={[styles.contributionChip, pageStyles.chip]}>
                       <Text style={[styles.contributionText, pageStyles.title]}>{amount}</Text>
                     </View>
                   ))}
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
 
