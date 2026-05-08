@@ -166,6 +166,8 @@ export default function SettingsScreen() {
                   onPress={() => {
                     if (item.title === 'Personal Details') {
                       router.push('/personal-details-modal');
+                    } else if (item.title === 'Security & Password') {
+                      router.push('/security-password-modal');
                     }
                   }}>
                   <View style={styles.rowLeft}>
