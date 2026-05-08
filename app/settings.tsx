@@ -1,5 +1,6 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +25,7 @@ type SupportItem = {
 
 const accountItems: readonly AccountItem[] = [
   {
-    title: 'Personal Information',
+    title: 'Personal Details',
     value: 'Juan dela Cruz',
     icon: 'user',
   },
@@ -67,6 +68,7 @@ function withOpacity(hex: string, opacity: number) {
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -159,7 +161,13 @@ export default function SettingsScreen() {
           <View style={[styles.sectionCard, pageStyles.sectionCard, shadows.soft]}>
             {accountItems.map((item, index) => (
               <View key={item.title}>
-                <Pressable style={styles.row}>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => {
+                    if (item.title === 'Personal Details') {
+                      router.push('/personal-details-modal');
+                    }
+                  }}>
                   <View style={styles.rowLeft}>
                     <View style={[styles.rowIconWrap, pageStyles.rowIconWrap]}>
                       <Feather name={item.icon as 'user' | 'lock' | 'credit-card'} size={18} color={colors.foreground} />
