@@ -1,69 +1,18 @@
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { settingsPaymentMethods } from '@/constants/settings-payment-methods';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
-type PaymentMethod = {
-  id: string;
-  brand: string;
-  title: string;
-  details: string;
-  balance: string;
-  color: string;
-  defaultLabel: string;
-};
-
-const initialPaymentMethods: PaymentMethod[] = [
-  {
-    id: 'bpi-debit',
-    brand: 'VISA',
-    title: 'BPI Debit Card',
-    details: '**** 4521 • 12/26',
-    balance: '₱25,000',
-    color: '#2563EB',
-    defaultLabel: 'Default',
-  },
-  {
-    id: 'bdo-credit',
-    brand: 'MC',
-    title: 'BDO Credit Card',
-    details: '**** 8832 • 08/27',
-    balance: '₱50,000',
-    color: '#F97316',
-    defaultLabel: 'Set Default',
-  },
-  {
-    id: 'gcash',
-    brand: 'G',
-    title: 'GCash',
-    details: 'Connected',
-    balance: '₱5,500',
-    color: '#3B82F6',
-    defaultLabel: 'Set Default',
-  },
-  {
-    id: 'maya',
-    brand: 'M',
-    title: 'Maya',
-    details: 'Connected',
-    balance: '₱3,200',
-    color: '#22C55E',
-    defaultLabel: 'Set Default',
-  },
-];
 
 export default function PaymentMethodsModal() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
-
-  const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods);
-  const [defaultMethodId, setDefaultMethodId] = useState('bpi-debit');
 
   const ui = useMemo(
     () => ({
@@ -86,7 +35,7 @@ export default function PaymentMethodsModal() {
         backgroundColor: isDark ? 'rgba(96, 165, 250, 0.12)' : '#DCEEFE',
         borderColor: isDark ? 'rgba(96, 165, 250, 0.2)' : '#B7D7FB',
       },
-      infoText: { color: isDark ? '#D6E8FF' : '#607185' },
+      infoText: { color: isDark ? '#607185' : '#607185' },
       methodCard: {
         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.52)',
         borderColor: isDark ? 'rgba(255,255,255,0.05)' : '#E2E8F0',
@@ -98,8 +47,7 @@ export default function PaymentMethodsModal() {
         backgroundColor: isDark ? 'rgba(96, 165, 250, 0.18)' : '#D9ECFF',
       },
       defaultPillText: { color: '#1495FF' },
-      setDefaultText: { color: isDark ? '#E2E8F0' : '#1F2937' },
-      trashIcon: { color: isDark ? '#D4DCE6' : '#111827' },
+      chevron: { color: isDark ? '#A9B6C8' : '#6B7280' },
       addButton: {
         borderColor: isDark ? 'rgba(255,255,255,0.16)' : '#D0D7E2',
         backgroundColor: 'transparent',
@@ -108,18 +56,6 @@ export default function PaymentMethodsModal() {
     }),
     [isDark]
   );
-
-  function handleDeleteMethod(methodId: string) {
-    setPaymentMethods((current) => {
-      const nextMethods = current.filter((method) => method.id !== methodId);
-
-      if (defaultMethodId === methodId) {
-        setDefaultMethodId(nextMethods[0]?.id ?? '');
-      }
-
-      return nextMethods;
-    });
-  }
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
@@ -135,11 +71,7 @@ export default function PaymentMethodsModal() {
           </Pressable>
         </View>
 
-        <ScrollView
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
-          contentContainerStyle={styles.content}>
+        <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
           <View style={[styles.infoCard, ui.infoCard]}>
             <View style={styles.infoAvatarFrame}>
               <Image
@@ -151,45 +83,36 @@ export default function PaymentMethodsModal() {
             <Text style={[styles.infoText, ui.infoText]}>Your payment methods are securely stored and encrypted.</Text>
           </View>
 
-          {paymentMethods.map((method) => {
-            const isDefault = method.id === defaultMethodId;
-
-            return (
-              <View key={method.id} style={[styles.methodCard, ui.methodCard]}>
-                <View style={[styles.brandBubble, { backgroundColor: method.color }]}>
-                  <Text style={styles.brandText}>{method.brand}</Text>
-                </View>
-
-                <View style={styles.methodInfo}>
-                  <Text style={[styles.methodTitle, ui.methodTitle]}>{method.title}</Text>
-                  <Text style={[styles.methodDetails, ui.methodDetails]}>{method.details}</Text>
-                  <Text style={[styles.methodBalance, ui.methodBalance]}>{method.balance}</Text>
-                </View>
-
-                <View style={styles.methodActions}>
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => {
-                      if (!isDefault) {
-                        setDefaultMethodId(method.id);
-                      }
-                    }}>
-                    {isDefault ? (
-                      <View style={[styles.defaultPill, ui.defaultPill]}>
-                        <Text style={[styles.defaultPillText, ui.defaultPillText]}>{method.defaultLabel}</Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.setDefaultText, ui.setDefaultText]}>{method.defaultLabel}</Text>
-                    )}
-                  </Pressable>
-
-                  <Pressable hitSlop={8} onPress={() => handleDeleteMethod(method.id)}>
-                    <Feather name="trash-2" size={18} color={ui.trashIcon.color} />
-                  </Pressable>
-                </View>
+          {settingsPaymentMethods.map((method) => (
+            <Pressable
+              key={method.id}
+              style={[styles.methodCard, ui.methodCard]}
+              onPress={() =>
+                router.replace({
+                  pathname: method.kind === 'card' ? '/payment-card-details-modal' : '/payment-wallet-details-modal',
+                  params: { methodId: method.id },
+                })
+              }>
+              <View style={[styles.brandBubble, { backgroundColor: method.color }]}>
+                <Text style={styles.brandText}>{method.brand}</Text>
               </View>
-            );
-          })}
+
+              <View style={styles.methodInfo}>
+                <Text style={[styles.methodTitle, ui.methodTitle]}>{method.title}</Text>
+                <Text style={[styles.methodDetails, ui.methodDetails]}>{method.details}</Text>
+                <Text style={[styles.methodBalance, ui.methodBalance]}>{method.balance}</Text>
+              </View>
+
+              <View style={styles.methodRight}>
+                {method.isDefault ? (
+                  <View style={[styles.defaultPill, ui.defaultPill]}>
+                    <Text style={[styles.defaultPillText, ui.defaultPillText]}>Default</Text>
+                  </View>
+                ) : null}
+                <Feather name="chevron-right" size={18} color={ui.chevron.color} />
+              </View>
+            </Pressable>
+          ))}
 
           <Pressable
             style={[styles.addButton, ui.addButton]}
@@ -223,6 +146,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 10,
     paddingBottom: 24,
+    maxHeight: '86%',
   },
   handle: {
     alignSelf: 'center',
@@ -235,6 +159,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingBottom: 14,
   },
   title: {
     fontFamily: fontFamilies.sans,
@@ -250,8 +175,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    paddingTop: 18,
-    gap: 10,
+    gap: 14,
+    paddingBottom: 8,
   },
   infoCard: {
     borderRadius: 22,
@@ -260,11 +185,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   infoAvatarFrame: {
-    width: 34,
-    height: 34,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
@@ -272,8 +197,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   infoAvatar: {
-    width: 27,
-    height: 27,
+    width: 30,
+    height: 30,
     borderRadius: radius.full,
   },
   infoText: {
@@ -286,14 +211,14 @@ const styles = StyleSheet.create({
   methodCard: {
     borderRadius: 24,
     borderWidth: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 13,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
   brandBubble: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -301,14 +226,14 @@ const styles = StyleSheet.create({
   },
   brandText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 16,
+    fontSize: 16,
+    lineHeight: 18,
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
   methodInfo: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 10,
   },
   methodTitle: {
     fontFamily: fontFamilies.sans,
@@ -330,8 +255,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.bold,
   },
-  methodActions: {
-    alignItems: 'flex-end',
+  methodRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   defaultPill: {
@@ -346,12 +272,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: fontWeights.medium,
-  },
-  setDefaultText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
     fontWeight: fontWeights.medium,
   },
   addButton: {

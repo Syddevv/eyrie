@@ -96,6 +96,42 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="payment-card-details-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
+          name="payment-wallet-details-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
+          name="edit-payment-card-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
+          name="edit-payment-wallet-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
           name="add-payment-method-modal"
           options={{
             headerShown: false,
@@ -160,6 +196,15 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="help-center-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
+          name="payment-method-details-modal"
           options={{
             headerShown: false,
             presentation: "transparentModal",

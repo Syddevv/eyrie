@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
 import { themeColors } from '@/constants/colors';
+import { homePaymentMethods } from '@/constants/payment-methods';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -22,25 +23,6 @@ function withOpacity(hex: string, opacity: number) {
 
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
-
-const cards = [
-  {
-    label: 'MAIN ACCOUNT',
-    name: 'BPI',
-    amount: '₱45,250.75',
-    digits: '4521',
-    badgeColor: '#F7B400',
-    colors: ['#3553D8', '#2A49CF', '#2445C9'],
-  },
-  {
-    label: 'E-WALLET',
-    name: 'GCash',
-    amount: '₱5,234.00',
-    digits: '8832',
-    badgeColor: 'rgba(255,255,255,0.18)',
-    colors: ['#16B76D', '#0FA785', '#119E8D'],
-  },
-] as const;
 
 const budgets = [
   {
@@ -241,28 +223,37 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.cardsRow}>
-            {cards.map((card) => (
-              <LinearGradient
-                key={card.name}
-                colors={card.colors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.accountCard}>
-                <View style={[styles.cardBubbleLarge, { backgroundColor: withOpacity('#FFFFFF', 0.08) }]} />
-                <View style={[styles.cardBubbleSmall, { backgroundColor: withOpacity('#FFFFFF', 0.05) }]} />
-                <View style={styles.cardTopRow}>
-                  <View>
-                    <Text style={styles.cardLabel}>{card.label}</Text>
-                    <Text style={styles.cardName}>{card.name}</Text>
+            {homePaymentMethods.map((card) => (
+              <Pressable
+                key={card.id}
+                style={styles.cardPressable}
+                onPress={() =>
+                  router.push({
+                    pathname: '/payment-method-details-modal',
+                    params: { methodId: card.id },
+                  })
+                }>
+                <LinearGradient
+                  colors={card.colors}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.accountCard}>
+                  <View style={[styles.cardBubbleLarge, { backgroundColor: withOpacity('#FFFFFF', 0.08) }]} />
+                  <View style={[styles.cardBubbleSmall, { backgroundColor: withOpacity('#FFFFFF', 0.05) }]} />
+                  <View style={styles.cardTopRow}>
+                    <View>
+                      <Text style={styles.cardLabel}>{card.label}</Text>
+                      <Text style={styles.cardName}>{card.name}</Text>
+                    </View>
+                    <View style={[styles.cardBadge, { backgroundColor: card.badgeColor }]} />
                   </View>
-                  <View style={[styles.cardBadge, { backgroundColor: card.badgeColor }]} />
-                </View>
-                <Text style={styles.cardAmount}>{card.amount}</Text>
-                <View style={styles.cardBottomRow}>
-                  <Text style={styles.cardDigits}>•••• {card.digits}</Text>
-                  <Text style={styles.cardType}>DEBIT</Text>
-                </View>
-              </LinearGradient>
+                  <Text style={styles.cardAmount}>{card.amount}</Text>
+                  <View style={styles.cardBottomRow}>
+                    <Text style={styles.cardDigits}>•••• {card.digits}</Text>
+                    <Text style={styles.cardType}>{card.cardTypeLabel}</Text>
+                  </View>
+                </LinearGradient>
+              </Pressable>
             ))}
           </View>
 
@@ -579,8 +570,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  accountCard: {
+  cardPressable: {
     flex: 1,
+  },
+  accountCard: {
     minHeight: 120,
     borderRadius: 24,
     paddingHorizontal: 16,
