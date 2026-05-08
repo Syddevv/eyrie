@@ -164,12 +164,19 @@ export default function HomeScreen() {
             <View style={styles.insightContent}>
               <View style={styles.insightTextBlock}>
                 <View style={styles.insightTitleRow}>
-                  <Ionicons name="sparkles-outline" size={16} color="#FFFFFF" />
+                  <View style={styles.insightIconWrap}>
+                    <Ionicons name="sparkles-outline" size={13} color="#FFFFFF" />
+                  </View>
                   <Text style={styles.insightTitle}>Eyrie Insight</Text>
                 </View>
-                <Text style={styles.insightBody}>
-                  You&apos;ve spent 18% less on dining this week compared to last week. Great progress! Keep it up to reach your savings goal faster.
-                </Text>
+                <Text style={styles.insightHeadline}>18% less spent on dining</Text>
+                <Text style={styles.insightBody}>Compared to last week. You&apos;re staying under budget.</Text>
+                <View style={styles.insightFooterRow}>
+                  <View style={styles.insightPill}>
+                    <Feather name="trending-down" size={12} color="#0E7C74" />
+                    <Text style={styles.insightPillText}>Weekly progress</Text>
+                  </View>
+                </View>
               </View>
               <View style={[styles.insightMascotWrap, { backgroundColor: pageStyles.insightBubble }]}>
                 <Image
@@ -456,18 +463,18 @@ const styles = StyleSheet.create({
   },
   insightCard: {
     marginTop: 4,
-    borderRadius: 28,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     overflow: 'hidden',
   },
   insightContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   insightTextBlock: {
     flex: 1,
-    paddingRight: 12,
+    paddingRight: 10,
   },
   insightTitleRow: {
     flexDirection: 'row',
@@ -475,29 +482,69 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
   },
-  insightTitle: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: fontWeights.bold,
-    color: '#FFFFFF',
-  },
-  insightBody: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 28,
-    color: '#EDFEFF',
-  },
-  insightMascotWrap: {
-    width: 104,
-    height: 104,
-    borderRadius: radius.full,
+  insightIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: withOpacity('#FFFFFF', 0.18),
     alignItems: 'center',
     justifyContent: 'center',
   },
+  insightTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    color: '#FFFFFF',
+  },
+  insightHeadline: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: fontWeights.bold,
+    letterSpacing: -0.2,
+    color: '#FFFFFF',
+  },
+  insightBody: {
+    marginTop: 4,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#EDFEFF',
+  },
+  insightFooterRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  insightPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    backgroundColor: '#D8FFF4',
+  },
+  insightPillText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    color: '#0E7C74',
+  },
+  insightMascotWrap: {
+    width: 82,
+    height: 82,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
   insightMascot: {
-    width: 96,
-    height: 96,
+    width: 76,
+    height: 76,
     borderRadius: radius.full,
   },
   balanceCard: {
