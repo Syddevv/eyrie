@@ -1,7 +1,8 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState, type ComponentProps } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -169,6 +170,25 @@ export default function AddTransactionModal() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const activeCategories = entryType === 'expense' ? expenseCategories : incomeCategories;
   const activeCategory = entryType === 'expense' ? selectedExpenseCategory : selectedIncomeCategory;
@@ -244,11 +264,18 @@ export default function AddTransactionModal() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
-        <View style={[styles.sheet, ui.sheet, shadows.floating]}>
+        <View
+          style={[
+            styles.sheet,
+            ui.sheet,
+            shadows.floating,
+            keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) },
+          ]}>
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
@@ -296,7 +323,11 @@ export default function AddTransactionModal() {
             </Pressable>
           </View>
 
-          <View style={styles.body}>
+          <ScrollView
+            style={styles.bodyScroll}
+            contentContainerStyle={styles.bodyContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
             <View style={styles.amountBlock}>
               <Text style={[styles.amountLabel, ui.amountLabel]}>Amount</Text>
               <View style={styles.amountRow}>
@@ -425,7 +456,7 @@ export default function AddTransactionModal() {
                 selectionColor={colors.primary}
               />
             </View>
-          </View>
+          </ScrollView>
 
           <View style={[styles.footer, ui.divider]}>
             <Pressable style={[styles.saveButton, ui.saveButton]} onPress={() => router.back()}>
@@ -583,6 +614,13 @@ const styles = StyleSheet.create({
   },
   body: {
     paddingTop: 10,
+  },
+  bodyScroll: {
+    marginTop: 10,
+    maxHeight: '68%',
+  },
+  bodyContent: {
+    paddingBottom: 4,
   },
   amountBlock: {
     alignItems: 'center',
