@@ -106,6 +106,10 @@ export default function HomeScreen() {
         backgroundColor: colors.card,
         borderColor: withOpacity(colors.border, 0.94),
       },
+      balanceStatCard: {
+        backgroundColor: colorScheme === 'light' ? '#F7F9FC' : withOpacity(colors.secondary, 0.44),
+        borderColor: withOpacity(colors.border, 0.78),
+      },
       topButton: {
         backgroundColor: withOpacity(colors.secondary, 0.72),
         borderColor: withOpacity(colors.border, 0.84),
@@ -194,16 +198,19 @@ export default function HomeScreen() {
                 <Text style={[styles.balanceLabel, pageStyles.mutedText]}>Total Balance</Text>
                 <Feather name="eye" size={16} color={colors.mutedForeground} />
               </View>
-              <View style={styles.growthPill}>
+              <View style={[styles.growthPill, colorScheme === 'light' ? styles.growthPillLight : styles.growthPillDark]}>
                 <Text style={styles.growthText}>+12.5%</Text>
+                <Text style={styles.growthSubtext}>vs last month</Text>
               </View>
             </View>
 
-            <Text style={[styles.balanceAmount, { color: colors.foreground }]}>₱54,771.25</Text>
-            <Text style={[styles.balanceSubtext, pageStyles.mutedText]}>vs last month</Text>
+            <View style={styles.balanceAmountBlock}>
+              <Text style={styles.balanceCurrency}>₱</Text>
+              <Text style={[styles.balanceAmount, { color: colors.foreground }]}>54,771.25</Text>
+            </View>
 
             <View style={styles.metricsRow}>
-              <View style={styles.metricBlock}>
+              <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
                 <View style={styles.metricLabelRow}>
                   <View style={[styles.metricDot, { backgroundColor: '#14B86A' }]} />
                   <Text style={[styles.metricLabel, pageStyles.mutedText]}>Income</Text>
@@ -211,7 +218,7 @@ export default function HomeScreen() {
                 <Text style={styles.incomeAmount}>₱85,000.00</Text>
               </View>
 
-              <View style={styles.metricBlock}>
+              <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
                 <View style={styles.metricLabelRow}>
                   <View style={[styles.metricDot, { backgroundColor: '#F05454' }]} />
                   <Text style={[styles.metricLabel, pageStyles.mutedText]}>Expenses</Text>
@@ -549,10 +556,10 @@ const styles = StyleSheet.create({
   },
   balanceCard: {
     marginTop: 22,
-    borderRadius: 28,
+    borderRadius: 30,
     borderWidth: 1,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   balanceTopRow: {
     flexDirection: 'row',
@@ -566,72 +573,100 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  growthPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: '#D6F5E7',
-  },
-  growthText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 18,
-    fontWeight: fontWeights.bold,
-    color: '#12A25D',
-  },
-  balanceAmount: {
-    marginTop: 18,
-    fontFamily: fontFamilies.sans,
-    fontSize: 27,
-    lineHeight: 33,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.6,
-  },
-  balanceSubtext: {
-    marginTop: 4,
-    fontFamily: fontFamilies.sans,
     fontSize: 15,
     lineHeight: 20,
   },
+  growthPill: {
+    minWidth: 96,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  growthPillLight: {
+    backgroundColor: '#E6F8ED',
+  },
+  growthPillDark: {
+    backgroundColor: withOpacity('#0AA55E', 0.18),
+  },
+  growthText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: fontWeights.bold,
+    color: '#12A25D',
+  },
+  growthSubtext: {
+    marginTop: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    color: '#4D8D6A',
+  },
+  balanceAmountBlock: {
+    marginTop: 10,
+    marginBottom: 6,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  balanceCurrency: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: fontWeights.bold,
+    color: '#0E67F7',
+    paddingBottom: 2,
+  },
+  balanceAmount: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: fontWeights.bold,
+    letterSpacing: -1,
+  },
   metricsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 18,
-    gap: 16,
+    marginTop: 14,
+    gap: 8,
   },
   metricBlock: {
     flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
   },
   metricLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 7,
     marginBottom: 6,
   },
   metricDot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: radius.full,
   },
   metricLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 16,
   },
   incomeAmount: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 21,
     fontWeight: fontWeights.bold,
     color: '#0AA55E',
   },
   expenseAmount: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 21,
     fontWeight: fontWeights.bold,
     color: '#FF4D4F',
   },
