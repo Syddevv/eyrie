@@ -91,6 +91,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   closeOtpModal: () =>
     set({
       otpModal: initialOtpModal,
+      isSendingOtp: false,
       isVerifyingOtp: false,
     }),
   setOtpModalStatus: (status) =>

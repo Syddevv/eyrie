@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { OtpVerificationModal } from '@/components/auth/OtpVerificationModal';
 import { AuthSnackbar } from '@/components/auth/AuthSnackbar';
 import { themeColors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <>
       {children}
+      <OtpVerificationModal />
       <AuthSnackbar />
     </>
   );

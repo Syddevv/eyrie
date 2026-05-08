@@ -4,6 +4,7 @@ import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -12,6 +13,10 @@ WebBrowser.maybeCompleteAuthSession();
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function getOtpResendAvailableAt() {
+  return Date.now() + 60_000;
 }
 
 function getGoogleRedirectUri() {
@@ -102,7 +107,7 @@ function getSignInErrorMessage(error: unknown) {
   }
 
   if (lower.includes("email not confirmed")) {
-    return "Please confirm your email before signing in.";
+    return "Verify your email with the 6-digit code before signing in.";
   }
 
   return error.message;
@@ -123,6 +128,54 @@ function getSignUpErrorMessage(error: unknown) {
     return error.message;
   }
 
+  if (lower.includes("rate limit")) {
+    return "Too many signup attempts. Please wait before trying again.";
+  }
+
+  return error.message;
+}
+
+function getVerifyOtpErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unable to verify that code right now. Please try again.";
+  }
+
+  const lower = error.message.toLowerCase();
+
+  if (lower.includes("token has expired") || lower.includes("expired")) {
+    return "That verification code has expired. Request a new code and try again.";
+  }
+
+  if (lower.includes("token") || lower.includes("otp") || lower.includes("invalid")) {
+    return "That verification code is invalid. Check the 6 digits and try again.";
+  }
+
+  if (lower.includes("rate limit")) {
+    return "Too many attempts. Wait a moment before requesting another code.";
+  }
+
+  if (lower.includes("already") && lower.includes("confirmed")) {
+    return "This email is already verified. Sign in to continue.";
+  }
+
+  return error.message;
+}
+
+function getResendOtpErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unable to resend the verification code right now. Please try again.";
+  }
+
+  const lower = error.message.toLowerCase();
+
+  if (lower.includes("rate limit")) {
+    return "You requested codes too quickly. Please wait before trying again.";
+  }
+
+  if (lower.includes("already") && lower.includes("confirmed")) {
+    return "This email is already verified. Sign in to continue.";
+  }
+
   return error.message;
 }
 
@@ -134,11 +187,12 @@ export async function signInWithEmailPassword({
   password: string;
 }) {
   const store = useAuthStore.getState();
+  const normalizedEmail = normalizeEmail(email);
   store.setSigningIn(true);
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: normalizeEmail(email),
+      email: normalizedEmail,
       password,
     });
 
@@ -148,8 +202,20 @@ export async function signInWithEmailPassword({
 
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     store.showSnackbar("Signed in successfully.", "success");
+
     return data;
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.toLowerCase().includes("email not confirmed")
+    ) {
+      store.openOtpModal({
+        email: normalizedEmail,
+        mode: "sign-up",
+        resendAvailableAt: getOtpResendAvailableAt(),
+      });
+    }
+
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     store.showSnackbar(getSignInErrorMessage(error), "error");
     throw error;
@@ -168,11 +234,12 @@ export async function signUpWithEmailPassword({
   password: string;
 }) {
   const store = useAuthStore.getState();
+  const normalizedEmail = normalizeEmail(email);
   store.setSigningUp(true);
 
   try {
     const { data, error } = await supabase.auth.signUp({
-      email: normalizeEmail(email),
+      email: normalizedEmail,
       password,
       options: {
         data: {
@@ -185,16 +252,18 @@ export async function signUpWithEmailPassword({
       throw error;
     }
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    store.openOtpModal({
+      email: normalizedEmail,
+      fullName: fullName.trim(),
+      mode: "sign-up",
+      resendAvailableAt: getOtpResendAvailableAt(),
+    });
 
-    if (data.user && !data.session) {
-      store.showSnackbar(
-        "Account created. Check your email to confirm your account before signing in.",
-        "success",
-      );
-    } else {
-      store.showSnackbar("Account created successfully.", "success");
-    }
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    store.showSnackbar(
+      "Account created. Enter the 6-digit verification code sent to your email.",
+      "success",
+    );
 
     return data;
   } catch (error) {
@@ -203,6 +272,71 @@ export async function signUpWithEmailPassword({
     throw error;
   } finally {
     useAuthStore.getState().setSigningUp(false);
+  }
+}
+
+export async function verifySignupOtp({
+  email,
+  token,
+}: {
+  email: string;
+  token: string;
+}): Promise<Session | null> {
+  const store = useAuthStore.getState();
+  store.setVerifyingOtp(true);
+  store.setOtpModalStatus("idle");
+
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token,
+      type: "signup",
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    store.setOtpModalStatus("success");
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    store.showSnackbar("Email verified successfully.", "success");
+
+    return data.session ?? null;
+  } catch (error) {
+    store.setOtpModalStatus("error");
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    store.showSnackbar(getVerifyOtpErrorMessage(error), "error");
+    throw error;
+  } finally {
+    useAuthStore.getState().setVerifyingOtp(false);
+  }
+}
+
+export async function resendSignupOtp(email: string) {
+  const store = useAuthStore.getState();
+  store.setSendingOtp(true);
+  store.setOtpModalStatus("idle");
+
+  try {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: normalizeEmail(email),
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    store.setOtpResendAvailableAt(getOtpResendAvailableAt());
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    store.showSnackbar("A new verification code has been sent.", "success");
+  } catch (error) {
+    store.setOtpModalStatus("error");
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    store.showSnackbar(getResendOtpErrorMessage(error), "error");
+    throw error;
+  } finally {
+    useAuthStore.getState().setSendingOtp(false);
   }
 }
 

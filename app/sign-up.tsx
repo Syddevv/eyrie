@@ -201,7 +201,6 @@ export default function SignUpScreen() {
         email,
         password,
       });
-      router.replace('/sign-in');
     } catch {
       // Global feedback is handled by the auth service/store.
     }
@@ -244,7 +243,7 @@ export default function SignUpScreen() {
           <View style={styles.titleBlock}>
             <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
             <Text style={[styles.subtitle, pageStyles.mutedText]}>
-              Create your Eyrie account and confirm it from your email
+              Create your Eyrie account and verify it with the 6-digit code from your email
             </Text>
           </View>
 
@@ -328,7 +327,7 @@ export default function SignUpScreen() {
               />
             </View>
             <Text style={[styles.noteText, pageStyles.mutedText]}>
-              After sign-up, Supabase will send a confirmation email link before first sign-in.
+              After sign-up, Supabase sends a 6-digit verification code instead of a confirmation link.
             </Text>
           </View>
 
