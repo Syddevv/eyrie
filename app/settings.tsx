@@ -168,6 +168,8 @@ export default function SettingsScreen() {
                       router.push('/personal-details-modal');
                     } else if (item.title === 'Security & Password') {
                       router.push('/security-password-modal');
+                    } else if (item.title === 'Payment Methods') {
+                      router.push('/payment-methods-modal');
                     }
                   }}>
                   <View style={styles.rowLeft}>
