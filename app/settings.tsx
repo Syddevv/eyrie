@@ -9,7 +9,9 @@ import { AppBottomNav } from '@/components/app-bottom-nav';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { signOut } from '@/services/auth';
 
 type AccountItem = {
   title: string;
@@ -71,6 +73,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
+  const { isSigningOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const isDark = colorScheme === 'dark';
@@ -280,9 +283,16 @@ export default function SettingsScreen() {
             ))}
           </View>
 
-          <Pressable style={[styles.signOutButton, pageStyles.signOutButton]}>
+          <Pressable
+            disabled={isSigningOut}
+            onPress={() => {
+              signOut().catch(() => {
+                // Global feedback is handled by the auth service/store.
+              });
+            }}
+            style={[styles.signOutButton, pageStyles.signOutButton, isSigningOut && { opacity: 0.7 }]}>
             <Feather name="log-out" size={18} color="#FF2440" />
-            <Text style={styles.signOutText}>Sign Out</Text>
+            <Text style={styles.signOutText}>{isSigningOut ? 'Signing Out...' : 'Sign Out'}</Text>
           </Pressable>
 
           <View style={styles.footerBrand}>

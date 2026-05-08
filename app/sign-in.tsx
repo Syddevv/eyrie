@@ -1,8 +1,9 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Link, useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,10 +15,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows, spacing } from '@/constants/theme';
-import { fontFamilies, fontSizes, fontWeights, lineHeights } from '@/constants/typography';
+import { fontFamilies, fontWeights } from '@/constants/typography';
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { signInWithEmailPassword, signInWithGoogle } from '@/services/auth';
+import { useAuthStore } from '@/store/useAuthStore';
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
@@ -30,15 +35,25 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 function FormField({
   label,
   placeholder,
   icon,
+  value,
+  onChangeText,
+  keyboardType = 'default',
   secureTextEntry = false,
 }: {
   label: string;
   placeholder: string;
   icon: React.ComponentProps<typeof Feather>['name'];
+  value: string;
+  onChangeText: (value: string) => void;
+  keyboardType?: 'default' | 'email-address';
   secureTextEntry?: boolean;
 }) {
   const colorScheme = useColorScheme() ?? 'light';
@@ -56,21 +71,22 @@ function FormField({
             borderColor: withOpacity(colors.border, colorScheme === 'light' ? 0.85 : 1),
           },
         ]}>
-        <Feather name={icon} size={20} color={colors.mutedForeground} />
+        <Feather name={icon} size={18} color={colors.mutedForeground} />
         <TextInput
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType={keyboardType}
+          onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={withOpacity(colors.mutedForeground, 0.9)}
           secureTextEntry={hidden}
-          style={[styles.input, { color: colors.foreground }]}
           selectionColor={colors.primary}
+          style={[styles.input, { color: colors.foreground }]}
+          value={value}
         />
         {secureTextEntry ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
-            hitSlop={8}
-            onPress={() => setHidden((value) => !value)}>
-            <Feather name={hidden ? 'eye' : 'eye-off'} size={20} color={colors.mutedForeground} />
+          <Pressable hitSlop={8} onPress={() => setHidden((current) => !current)}>
+            <Feather name={hidden ? 'eye' : 'eye-off'} size={18} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
       </View>
@@ -79,9 +95,12 @@ function FormField({
 }
 
 export default function SignInScreen() {
-  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
+  const showSnackbar = useAuthStore((state) => state.showSnackbar);
+  const { isSigningIn, isGoogleLoading } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const pageStyles = useMemo(
     () => ({
@@ -93,20 +112,19 @@ export default function SignInScreen() {
       primaryButton: {
         backgroundColor: colorScheme === 'light' ? '#75B1E8' : colors.primary,
       },
+      primaryButtonDisabled: {
+        backgroundColor: colorScheme === 'light' ? '#A9CDED' : '#31577D',
+      },
       mutedText: { color: colorScheme === 'light' ? '#5B6980' : colors.mutedForeground },
       linkText: { color: colorScheme === 'light' ? '#0E67F7' : colors.primary },
-      socialButton: {
-        backgroundColor: withOpacity(colors.secondary, colorScheme === 'light' ? 0.72 : 0.95),
-        borderColor: withOpacity(colors.border, colorScheme === 'light' ? 0.85 : 1),
-      },
       divider: {
         backgroundColor: withOpacity(colors.border, 0.9),
       },
       infoCard: {
         backgroundColor:
-          colorScheme === 'light' ? 'rgba(213, 231, 249, 0.86)' : withOpacity(colors.primary, 0.18),
+          colorScheme === 'light' ? 'rgba(213, 231, 249, 0.82)' : withOpacity(colors.primary, 0.15),
         borderColor:
-          colorScheme === 'light' ? 'rgba(186, 214, 243, 0.98)' : withOpacity(colors.primary, 0.32),
+          colorScheme === 'light' ? 'rgba(186, 214, 243, 0.94)' : withOpacity(colors.primary, 0.28),
       },
       noteIcon: {
         backgroundColor: withOpacity(colors.card, 0.92),
@@ -115,6 +133,39 @@ export default function SignInScreen() {
     }),
     [colorScheme, colors]
   );
+
+  const canSubmit = email.trim().length > 0 && password.length > 0;
+
+  const handleSignIn = async () => {
+    if (!email.trim()) {
+      showSnackbar('Enter your email to continue.', 'error');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      showSnackbar('Enter a valid email address.', 'error');
+      return;
+    }
+
+    if (!password) {
+      showSnackbar('Enter your password to continue.', 'error');
+      return;
+    }
+
+    try {
+      await signInWithEmailPassword({ email, password });
+    } catch {
+      // Global feedback is handled by the auth service/store.
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      await signInWithGoogle();
+    } catch {
+      // Global feedback is handled by the auth service/store.
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -137,25 +188,48 @@ export default function SignInScreen() {
             <View style={styles.titleBlock}>
               <Text style={[styles.title, { color: colors.foreground }]}>Welcome Back</Text>
               <Text style={[styles.subtitle, pageStyles.mutedText]}>
-                Sign in to continue to Eyrie
+                Sign in securely with your email and password
               </Text>
             </View>
 
             <View style={styles.form}>
-              <FormField label="Email" placeholder="Enter your email" icon="mail" />
-              <FormField label="Password" placeholder="Enter your password" icon="lock" secureTextEntry />
+              <FormField
+                label="Email"
+                placeholder="Enter your email"
+                icon="mail"
+                keyboardType="email-address"
+                onChangeText={setEmail}
+                value={email}
+              />
+              <FormField
+                label="Password"
+                placeholder="Enter your password"
+                icon="lock"
+                onChangeText={setPassword}
+                secureTextEntry
+                value={password}
+              />
             </View>
 
-            <Pressable accessibilityRole="button" style={styles.forgotWrap}>
+            <Pressable style={styles.forgotWrap}>
               <Text style={[styles.forgotText, pageStyles.linkText]}>Forgot password?</Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.replace('/')}
-              style={[styles.primaryButton, pageStyles.primaryButton]}>
-              <Text style={styles.primaryButtonText}>Sign In</Text>
-              <Ionicons name="arrow-forward" size={20} color={colors.primaryForeground} />
+              onPress={handleSignIn}
+              style={[
+                styles.primaryButton,
+                canSubmit ? pageStyles.primaryButton : pageStyles.primaryButtonDisabled,
+              ]}>
+              {isSigningIn ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <>
+                  <Text style={styles.primaryButtonText}>Sign In</Text>
+                  <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
+                </>
+              )}
             </Pressable>
 
             <View style={styles.dividerRow}>
@@ -164,16 +238,7 @@ export default function SignInScreen() {
               <View style={[styles.dividerLine, pageStyles.divider]} />
             </View>
 
-            <View style={styles.socialRow}>
-              <Pressable accessibilityRole="button" style={[styles.socialButton, pageStyles.socialButton]}>
-                <Ionicons name="logo-google" size={20} color={colors.foreground} />
-                <Text style={[styles.socialText, { color: colors.foreground }]}>Google</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" style={[styles.socialButton, pageStyles.socialButton]}>
-                <Ionicons name="logo-github" size={20} color={colors.foreground} />
-                <Text style={[styles.socialText, { color: colors.foreground }]}>GitHub</Text>
-              </Pressable>
-            </View>
+            <GoogleButton loading={isGoogleLoading} onPress={handleGoogle} />
 
             <View style={[styles.infoCard, pageStyles.infoCard]}>
               <View style={[styles.noteIconWrap, pageStyles.noteIcon]}>
@@ -187,13 +252,13 @@ export default function SignInScreen() {
                 Your financial data is encrypted and secure. Eyrie never shares your information with third parties.
               </Text>
             </View>
-          </View>
 
-          <View style={styles.footer}>
-            <Text style={[styles.footerText, pageStyles.mutedText]}>Don&apos;t have an account? </Text>
-            <Link href="/sign-up" style={[styles.footerLink, pageStyles.linkText]}>
-              Sign up
-            </Link>
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, pageStyles.mutedText]}>Don&apos;t have an account? </Text>
+              <Link href="/sign-up" style={[styles.footerLink, pageStyles.linkText]}>
+                Sign up
+              </Link>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -210,108 +275,110 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    paddingBottom: spacing[8],
+    paddingTop: spacing[5],
+    paddingBottom: spacing[5],
   },
   topContent: {
     gap: 0,
   },
   logoFrame: {
-    width: 108,
-    height: 108,
+    width: 82,
+    height: 82,
     borderRadius: radius.full,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    marginTop: 12,
+    marginTop: 8,
   },
   logo: {
-    width: 90,
-    height: 90,
+    width: 68,
+    height: 68,
     borderRadius: radius.full,
   },
   titleBlock: {
     alignItems: 'center',
-    marginTop: 28,
-    gap: 8,
+    marginTop: 18,
+    gap: 6,
   },
   title: {
     fontFamily: fontFamilies.sans,
-    fontSize: 40,
-    lineHeight: 46,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: fontWeights.bold,
     letterSpacing: -0.8,
   },
   subtitle: {
     fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.lg,
-    lineHeight: lineHeights.lg,
+    fontSize: 16,
+    lineHeight: 22,
     textAlign: 'center',
+    paddingHorizontal: 12,
   },
   form: {
-    marginTop: 36,
-    gap: 18,
+    marginTop: 22,
+    gap: 12,
   },
   fieldGroup: {
-    gap: 10,
+    gap: 8,
   },
   fieldLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: fontWeights.medium,
   },
   inputShell: {
-    minHeight: 56,
-    borderRadius: 18,
+    minHeight: 50,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 18,
+    gap: 12,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    paddingVertical: 16,
+    fontSize: 15,
+    lineHeight: 20,
+    paddingVertical: 12,
   },
   forgotWrap: {
     alignSelf: 'flex-end',
-    marginTop: 16,
+    marginTop: 10,
   },
   forgotText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: fontWeights.medium,
   },
   primaryButton: {
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    marginTop: 16,
+    marginTop: 14,
     ...shadows.glow,
   },
   primaryButtonText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    marginTop: 24,
+    gap: 12,
+    marginTop: 18,
+    marginBottom: 14,
   },
   dividerLine: {
     flex: 1,
@@ -319,75 +386,53 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
   },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 18,
-  },
-  socialButton: {
-    flex: 1,
-    minHeight: 48,
+  infoCard: {
+    marginTop: 16,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  socialText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: fontWeights.medium,
-  },
-  infoCard: {
-    marginTop: 26,
-    borderRadius: 22,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   noteIconWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
   },
   noteIcon: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     borderRadius: radius.full,
   },
   infoText: {
     flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 19,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 42,
+    paddingTop: 18,
   },
   footerText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
   },
   footerLink: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: fontWeights.semibold,
   },
 });

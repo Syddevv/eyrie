@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,10 +15,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows, spacing } from '@/constants/theme';
-import { fontFamilies, fontSizes, fontWeights, lineHeights } from '@/constants/typography';
+import { fontFamilies, fontWeights } from '@/constants/typography';
+import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { signInWithGoogle, signUpWithEmailPassword } from '@/services/auth';
+import { useAuthStore } from '@/store/useAuthStore';
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
@@ -30,15 +35,27 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 function FormField({
   label,
   placeholder,
   icon,
+  value,
+  onChangeText,
+  autoCapitalize = 'sentences',
+  keyboardType = 'default',
   secureTextEntry = false,
 }: {
   label: string;
   placeholder: string;
   icon: React.ComponentProps<typeof Feather>['name'];
+  value: string;
+  onChangeText: (value: string) => void;
+  autoCapitalize?: 'none' | 'sentences' | 'words';
+  keyboardType?: 'default' | 'email-address';
   secureTextEntry?: boolean;
 }) {
   const colorScheme = useColorScheme() ?? 'light';
@@ -56,21 +73,22 @@ function FormField({
             borderColor: withOpacity(colors.border, colorScheme === 'light' ? 0.85 : 1),
           },
         ]}>
-        <Feather name={icon} size={20} color={colors.mutedForeground} />
+        <Feather name={icon} size={18} color={colors.mutedForeground} />
         <TextInput
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          keyboardType={keyboardType}
+          onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={withOpacity(colors.mutedForeground, 0.9)}
           secureTextEntry={hidden}
-          style={[styles.input, { color: colors.foreground }]}
           selectionColor={colors.primary}
+          style={[styles.input, { color: colors.foreground }]}
+          value={value}
         />
         {secureTextEntry ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={hidden ? 'Show password' : 'Hide password'}
-            hitSlop={8}
-            onPress={() => setHidden((value) => !value)}>
-            <Feather name={hidden ? 'eye' : 'eye-off'} size={20} color={colors.mutedForeground} />
+          <Pressable hitSlop={8} onPress={() => setHidden((current) => !current)}>
+            <Feather name={hidden ? 'eye' : 'eye-off'} size={18} color={colors.mutedForeground} />
           </Pressable>
         ) : null}
       </View>
@@ -82,6 +100,13 @@ export default function SignUpScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
+  const showSnackbar = useAuthStore((state) => state.showSnackbar);
+  const { isSigningUp, isGoogleLoading } = useAuth();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const pageStyles = useMemo(
     () => ({
@@ -97,18 +122,22 @@ export default function SignUpScreen() {
       primaryButton: {
         backgroundColor: colorScheme === 'light' ? '#75B1E8' : colors.primary,
       },
+      primaryButtonDisabled: {
+        backgroundColor: colorScheme === 'light' ? '#A9CDED' : '#31577D',
+      },
       agreementCircle: {
-        borderColor: withOpacity(colors.mutedForeground, 0.55),
+        borderColor: acceptedTerms ? colors.primary : withOpacity(colors.mutedForeground, 0.55),
+        backgroundColor: acceptedTerms ? colors.primary : 'transparent',
       },
       noteCard: {
         backgroundColor:
           colorScheme === 'light'
-            ? 'rgba(202, 234, 228, 0.82)'
-            : withOpacity(colors.success, 0.2),
+            ? 'rgba(202, 234, 228, 0.8)'
+            : withOpacity(colors.success, 0.18),
         borderColor:
           colorScheme === 'light'
-            ? 'rgba(156, 211, 202, 0.92)'
-            : withOpacity(colors.success, 0.34),
+            ? 'rgba(156, 211, 202, 0.9)'
+            : withOpacity(colors.success, 0.3),
       },
       noteIcon: {
         backgroundColor: withOpacity(colors.card, 0.92),
@@ -116,9 +145,75 @@ export default function SignUpScreen() {
       },
       mutedText: { color: colorScheme === 'light' ? '#5B6980' : colors.mutedForeground },
       linkText: { color: colorScheme === 'light' ? '#0E67F7' : colors.primary },
+      divider: {
+        backgroundColor: withOpacity(colors.border, 0.9),
+      },
     }),
-    [colorScheme, colors]
+    [acceptedTerms, colorScheme, colors]
   );
+
+  const canSubmit =
+    fullName.trim().length > 1 &&
+    email.trim().length > 0 &&
+    password.length > 0 &&
+    confirmPassword.length > 0 &&
+    acceptedTerms;
+
+  const handleCreateAccount = async () => {
+    if (!fullName.trim()) {
+      showSnackbar('Enter your full name to continue.', 'error');
+      return;
+    }
+
+    if (!email.trim()) {
+      showSnackbar('Enter your email to continue.', 'error');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      showSnackbar('Enter a valid email address.', 'error');
+      return;
+    }
+
+    if (!password) {
+      showSnackbar('Create a password to continue.', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      showSnackbar('Password must be at least 6 characters.', 'error');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showSnackbar('Passwords do not match.', 'error');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      showSnackbar('Accept the Terms of Service and Privacy Policy to continue.', 'error');
+      return;
+    }
+
+    try {
+      await signUpWithEmailPassword({
+        fullName,
+        email,
+        password,
+      });
+      router.replace('/sign-in');
+    } catch {
+      // Global feedback is handled by the auth service/store.
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      await signInWithGoogle();
+    } catch {
+      // Global feedback is handled by the auth service/store.
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -149,34 +244,80 @@ export default function SignUpScreen() {
           <View style={styles.titleBlock}>
             <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
             <Text style={[styles.subtitle, pageStyles.mutedText]}>
-              Join Eyrie and take control of your finances
+              Create your Eyrie account and confirm it from your email
             </Text>
           </View>
 
           <View style={styles.form}>
-            <FormField label="Full Name" placeholder="Enter your full name" icon="user" />
-            <FormField label="Email" placeholder="Enter your email" icon="mail" />
-            <FormField label="Password" placeholder="Create a password" icon="lock" secureTextEntry />
+            <FormField
+              label="Full Name"
+              placeholder="Enter your full name"
+              icon="user"
+              autoCapitalize="words"
+              onChangeText={setFullName}
+              value={fullName}
+            />
+            <FormField
+              label="Email"
+              placeholder="Enter your email"
+              icon="mail"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              value={email}
+            />
+            <FormField
+              label="Password"
+              placeholder="Create a password"
+              icon="lock"
+              onChangeText={setPassword}
+              secureTextEntry
+              value={password}
+            />
             <FormField
               label="Confirm Password"
               placeholder="Confirm your password"
-              icon="lock"
+              icon="shield"
+              onChangeText={setConfirmPassword}
               secureTextEntry
+              value={confirmPassword}
             />
           </View>
 
-          <View style={styles.agreementRow}>
-            <View style={[styles.agreementCircle, pageStyles.agreementCircle]} />
+          <Pressable style={styles.agreementRow} onPress={() => setAcceptedTerms((value) => !value)}>
+            <View style={[styles.agreementCircle, pageStyles.agreementCircle]}>
+              {acceptedTerms ? <Feather name="check" size={12} color="#FFFFFF" /> : null}
+            </View>
             <Text style={[styles.agreementText, pageStyles.mutedText]}>
               I agree to the <Text style={pageStyles.linkText}>Terms of Service</Text> and{' '}
               <Text style={pageStyles.linkText}>Privacy Policy</Text>
             </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleCreateAccount}
+            style={[
+              styles.primaryButton,
+              canSubmit ? pageStyles.primaryButton : pageStyles.primaryButtonDisabled,
+            ]}>
+            {isSigningUp ? (
+              <ActivityIndicator color={colors.primaryForeground} />
+            ) : (
+              <>
+                <Text style={styles.primaryButtonText}>Create Account</Text>
+                <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
+              </>
+            )}
+          </Pressable>
+
+          <View style={styles.dividerRow}>
+            <View style={[styles.dividerLine, pageStyles.divider]} />
+            <Text style={[styles.dividerText, pageStyles.mutedText]}>or continue with</Text>
+            <View style={[styles.dividerLine, pageStyles.divider]} />
           </View>
 
-          <Pressable accessibilityRole="button" style={[styles.primaryButton, pageStyles.primaryButton]}>
-            <Text style={styles.primaryButtonText}>Create Account</Text>
-            <Ionicons name="arrow-forward" size={20} color={colors.primaryForeground} />
-          </Pressable>
+          <GoogleButton label="Continue with Google" loading={isGoogleLoading} onPress={handleGoogle} />
 
           <View style={[styles.noteCard, pageStyles.noteCard]}>
             <View style={[styles.noteIconWrap, pageStyles.noteIcon]}>
@@ -187,7 +328,7 @@ export default function SignUpScreen() {
               />
             </View>
             <Text style={[styles.noteText, pageStyles.mutedText]}>
-              {"By joining Eyrie, you're taking the first step toward financial freedom. Let's soar together!"}
+              After sign-up, Supabase will send a confirmation email link before first sign-in.
             </Text>
           </View>
 
@@ -211,87 +352,90 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: spacing[6],
     paddingTop: spacing[4],
-    paddingBottom: spacing[12],
+    paddingBottom: spacing[4],
   },
   backButton: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 6,
   },
   logoFrame: {
-    width: 92,
-    height: 92,
+    width: 78,
+    height: 78,
     borderRadius: radius.full,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    marginTop: 26,
+    marginTop: 10,
   },
   logo: {
-    width: 76,
-    height: 76,
+    width: 64,
+    height: 64,
     borderRadius: radius.full,
   },
   titleBlock: {
     alignItems: 'center',
-    marginTop: 24,
-    gap: 8,
+    marginTop: 16,
+    gap: 6,
   },
   title: {
     fontFamily: fontFamilies.sans,
-    fontSize: 40,
-    lineHeight: 46,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: fontWeights.bold,
     letterSpacing: -0.8,
   },
   subtitle: {
     fontFamily: fontFamilies.sans,
-    fontSize: fontSizes.lg,
-    lineHeight: lineHeights.lg,
+    fontSize: 16,
+    lineHeight: 22,
     textAlign: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
   },
   form: {
-    marginTop: 34,
-    gap: 18,
+    marginTop: 20,
+    gap: 10,
   },
   fieldGroup: {
-    gap: 10,
+    gap: 8,
   },
   fieldLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: fontWeights.medium,
   },
   inputShell: {
-    minHeight: 56,
-    borderRadius: 18,
+    minHeight: 48,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 18,
+    gap: 12,
+    paddingHorizontal: 16,
   },
   input: {
     flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    paddingVertical: 16,
+    fontSize: 15,
+    lineHeight: 20,
+    paddingVertical: 11,
   },
   agreementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 18,
-    marginBottom: 20,
+    gap: 10,
+    marginTop: 14,
+    marginBottom: 14,
     paddingRight: 12,
   },
   agreementCircle: {
@@ -299,16 +443,18 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: radius.full,
     borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   },
   agreementText: {
     flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
   },
   primaryButton: {
-    minHeight: 56,
+    minHeight: 50,
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -318,55 +464,71 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: fontWeights.bold,
     color: '#FFFFFF',
   },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   noteCard: {
-    marginTop: 22,
-    borderRadius: 22,
+    marginTop: 14,
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   noteIconWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
   },
   noteIcon: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     borderRadius: radius.full,
   },
   noteText: {
     flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 13,
+    lineHeight: 19,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 16,
   },
   footerText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
   },
   footerLink: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: fontWeights.semibold,
   },
 });
