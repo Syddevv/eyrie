@@ -249,7 +249,9 @@ export default function SettingsScreen() {
                 <Pressable
                   style={styles.row}
                   onPress={() => {
-                    if (item.title === 'Privacy Policy') {
+                    if (item.title === 'Help Center') {
+                      router.push('/help-center-modal');
+                    } else if (item.title === 'Privacy Policy') {
                       router.push('/privacy-policy-modal');
                     }
                   }}>
