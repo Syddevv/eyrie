@@ -1,6 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -106,6 +107,7 @@ function withOpacity(hex: string, opacity: number) {
 }
 
 export default function BudgetScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
 
@@ -246,7 +248,9 @@ export default function BudgetScreen() {
 
           <View style={styles.categoriesHeader}>
             <Text style={[styles.categoriesTitle, pageStyles.title]}>Categories</Text>
-            <Pressable style={[styles.addButton, pageStyles.addButton]}>
+            <Pressable
+              style={[styles.addButton, pageStyles.addButton]}
+              onPress={() => router.push('/add-category-modal')}>
               <Feather name="plus" size={18} color="#FFFFFF" />
               <Text style={styles.addButtonText}>Add</Text>
             </Pressable>

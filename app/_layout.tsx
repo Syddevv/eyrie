@@ -24,6 +24,15 @@ export default function RootLayout() {
         <Stack.Screen name="transactions" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen
+          name="add-category-modal"
+          options={{
+            headerShown: false,
+            presentation: 'transparentModal',
+            animation: 'fade',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
+        <Stack.Screen
           name="modal"
           options={{
             headerShown: false,
