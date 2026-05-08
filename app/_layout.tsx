@@ -141,6 +141,15 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="currency-modal"
+          options={{
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "fade",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
+        <Stack.Screen
           name="modal"
           options={{
             headerShown: false,

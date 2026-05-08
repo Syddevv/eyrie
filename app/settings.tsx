@@ -227,7 +227,7 @@ export default function SettingsScreen() {
 
             <View style={[styles.rowDivider, pageStyles.rowDivider]} />
 
-            <Pressable style={styles.row}>
+            <Pressable style={styles.row} onPress={() => router.push('/currency-modal')}>
               <View style={styles.rowLeft}>
                 <View style={[styles.rowIconWrap, pageStyles.rowIconWrap]}>
                   <MaterialCommunityIcons name="earth" size={18} color={colors.foreground} />
