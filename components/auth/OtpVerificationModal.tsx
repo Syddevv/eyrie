@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -61,9 +63,16 @@ export function OtpVerificationModal() {
   const setOtpModalStatus = useAuthStore((state) => state.setOtpModalStatus);
   const [code, setCode] = useState<string[]>(Array.from({ length: OTP_LENGTH }, () => ""));
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [codeRowWidth, setCodeRowWidth] = useState(0);
+  const hiddenInputRef = useRef<TextInput | null>(null);
+  const refocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const verifyRequestIdRef = useRef(0);
+  const lastSubmittedCodeRef = useRef("");
   const progress = useSharedValue(0);
+  const caretOpacity = useSharedValue(1);
 
   useEffect(() => {
     progress.value = withTiming(otpModal.visible ? 1 : 0, {
@@ -73,13 +82,50 @@ export function OtpVerificationModal() {
   }, [otpModal.visible, progress]);
 
   useEffect(() => {
+    caretOpacity.value = withTiming(isInputFocused ? 1 : 0, {
+      duration: 160,
+      easing: Easing.out(Easing.ease),
+    });
+  }, [caretOpacity, isInputFocused]);
+
+  useEffect(() => {
     if (!otpModal.visible) {
+      if (refocusTimeoutRef.current) {
+        clearTimeout(refocusTimeoutRef.current);
+        refocusTimeoutRef.current = null;
+      }
       setCode(Array.from({ length: OTP_LENGTH }, () => ""));
+      setIsInputFocused(false);
+      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
+      lastSubmittedCodeRef.current = "";
       return;
     }
 
-    const timer = setTimeout(() => inputRefs.current[0]?.focus(), 220);
+    const timer = setTimeout(() => hiddenInputRef.current?.focus(), 220);
     return () => clearTimeout(timer);
+  }, [otpModal.visible]);
+
+  useEffect(() => {
+    if (!otpModal.visible) {
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
+      setIsKeyboardVisible(true);
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      hiddenInputRef.current?.blur();
+      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
+      setIsInputFocused(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
   }, [otpModal.visible]);
 
   useEffect(() => {
@@ -102,12 +148,18 @@ export function OtpVerificationModal() {
   const joinedCode = code.join("");
 
   useEffect(() => {
-    if (!otpModal.visible || joinedCode.length !== OTP_LENGTH || isVerifyingOtp) {
+    if (
+      !otpModal.visible ||
+      joinedCode.length !== OTP_LENGTH ||
+      isVerifyingOtp ||
+      joinedCode === lastSubmittedCodeRef.current
+    ) {
       return;
     }
 
     const requestId = verifyRequestIdRef.current + 1;
     verifyRequestIdRef.current = requestId;
+    lastSubmittedCodeRef.current = joinedCode;
 
     void (async () => {
       try {
@@ -121,7 +173,8 @@ export function OtpVerificationModal() {
         }
 
         setCode(Array.from({ length: OTP_LENGTH }, () => ""));
-        inputRefs.current[0]?.focus();
+        lastSubmittedCodeRef.current = "";
+        hiddenInputRef.current?.focus();
       }
     })();
   }, [isVerifyingOtp, joinedCode, otpModal.email, otpModal.visible]);
@@ -133,9 +186,15 @@ export function OtpVerificationModal() {
   const animatedCardStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
-      { translateY: interpolate(progress.value, [0, 1], [24, 0]) },
+      {
+        translateY: interpolate(progress.value, [0, 1], [24, isKeyboardVisible ? -Math.min(keyboardHeight * 0.22, 72) : 0]),
+      },
       { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
     ],
+  }), [isKeyboardVisible, keyboardHeight]);
+
+  const animatedCaretStyle = useAnimatedStyle(() => ({
+    opacity: caretOpacity.value,
   }));
 
   const visualState = useMemo(() => {
@@ -162,76 +221,64 @@ export function OtpVerificationModal() {
     };
   }, [colorScheme, colors.border, colors.destructive, colors.primary, colors.success, otpModal.status]);
 
-  function handleChange(index: number, value: string) {
-    const digits = value.replace(/\D/g, "");
+  function focusHiddenInput() {
+    if (refocusTimeoutRef.current) {
+      clearTimeout(refocusTimeoutRef.current);
+    }
+
+    hiddenInputRef.current?.blur();
+
+    refocusTimeoutRef.current = setTimeout(() => {
+      hiddenInputRef.current?.focus();
+      refocusTimeoutRef.current = null;
+    }, Platform.OS === "android" ? 60 : 0);
+  }
+
+  function handleCodeRowLayout(event: LayoutChangeEvent) {
+    setCodeRowWidth(event.nativeEvent.layout.width);
+  }
+
+  function handleCodeChange(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+    lastSubmittedCodeRef.current = "";
+    setOtpModalStatus("idle");
 
     if (!digits.length) {
-      setOtpModalStatus("idle");
-      setCode((current) => {
-        const next = [...current];
-        next[index] = "";
-        return next;
-      });
+      setCode(Array.from({ length: OTP_LENGTH }, () => ""));
       return;
     }
 
     if (digits.length > 1) {
-      handlePaste(digits);
-      return;
-    }
-
-    const nextCharacter = digits.slice(-1);
-
-    setOtpModalStatus("idle");
-    setCode((current) => {
-      const next = [...current];
-      next[index] = nextCharacter;
-      return next;
-    });
-
-    if (nextCharacter && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
+      const nextDigits = digits.split("");
+      setCode(Array.from({ length: OTP_LENGTH }, (_, index) => nextDigits[index] ?? ""));
+    } else {
+      setCode((current) => {
+        const next = [...current];
+        const nextIndex = current.findIndex((digit) => !digit);
+        const targetIndex = nextIndex === -1 ? OTP_LENGTH - 1 : nextIndex;
+        next[targetIndex] = digits;
+        return next;
+      });
     }
   }
 
-  function handleKeyPress(index: number, key: string) {
+  function handleKeyPress(key: string) {
     if (key !== "Backspace") {
       return;
     }
 
-    if (code[index]) {
-      setCode((current) => {
-        const next = [...current];
-        next[index] = "";
-        return next;
-      });
-      return;
-    }
-
-    if (index > 0) {
-      inputRefs.current[index - 1]?.focus();
-      setCode((current) => {
-        const next = [...current];
-        next[index - 1] = "";
-        return next;
-      });
-    }
-  }
-
-  function handlePaste(text: string) {
-    const digits = text.replace(/\D/g, "").slice(0, OTP_LENGTH).split("");
-
-    if (!digits.length) {
-      return;
-    }
-
+    lastSubmittedCodeRef.current = "";
     setOtpModalStatus("idle");
-    setCode((current) =>
-      current.map((_, index) => digits[index] ?? "")
-    );
+    setCode((current) => {
+      const next = [...current];
+      const lastFilledIndex = next.findLastIndex((digit) => digit !== "");
 
-    const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-    inputRefs.current[focusIndex]?.focus();
+      if (lastFilledIndex >= 0) {
+        next[lastFilledIndex] = "";
+      }
+
+      return next;
+    });
   }
 
   async function handleResend() {
@@ -240,12 +287,13 @@ export function OtpVerificationModal() {
     }
 
     setCode(Array.from({ length: OTP_LENGTH }, () => ""));
+    lastSubmittedCodeRef.current = "";
 
     try {
       await resendSignupOtp(otpModal.email);
-      inputRefs.current[0]?.focus();
+      hiddenInputRef.current?.focus();
     } catch {
-      inputRefs.current[0]?.focus();
+      hiddenInputRef.current?.focus();
     }
   }
 
@@ -263,7 +311,7 @@ export function OtpVerificationModal() {
       visible={otpModal.visible}>
       <Animated.View style={[styles.overlay, animatedBackdropStyle]}>
         <BlurView
-          intensity={colorScheme === "light" ? 28 : 42}
+          intensity={colorScheme === "light" ? 42 : 56}
           tint={colorScheme}
           style={StyleSheet.absoluteFill}
         />
@@ -272,19 +320,25 @@ export function OtpVerificationModal() {
             StyleSheet.absoluteFill,
             {
               backgroundColor:
-                colorScheme === "light" ? "rgba(15, 23, 42, 0.18)" : "rgba(2, 6, 23, 0.45)",
+                colorScheme === "light" ? "rgba(15, 23, 42, 0.28)" : "rgba(2, 6, 23, 0.58)",
             },
           ]}
         />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
           style={styles.centerWrap}>
-          <Animated.View style={[styles.cardWrap, animatedCardStyle]}>
+          <Animated.View
+            style={[
+              styles.cardWrap,
+              animatedCardStyle,
+              isKeyboardVisible ? styles.cardWrapKeyboard : null,
+            ]}>
             <View
               style={[
                 styles.cardGlow,
-                { backgroundColor: withOpacity(visualState.glowColor, 0.14) },
+                { backgroundColor: withOpacity(visualState.glowColor, 0.08) },
               ]}
             />
             <View
@@ -319,7 +373,7 @@ export function OtpVerificationModal() {
                       borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.72 : 1),
                     },
                   ]}>
-                  <Feather color={colors.mutedForeground} name="x" size={18} />
+                  <Feather color={colors.mutedForeground} name="x" size={16} />
                 </Pressable>
               </View>
 
@@ -329,27 +383,38 @@ export function OtpVerificationModal() {
                 {otpModal.mode === "sign-up" ? "creating your account." : "signing in."}
               </Text>
 
-              <View style={styles.codeRow}>
+              <Pressable onLayout={handleCodeRowLayout} onPress={focusHiddenInput} style={styles.codeRow}>
+                <TextInput
+                  ref={hiddenInputRef}
+                  autoCapitalize="none"
+                  autoComplete="one-time-code"
+                  autoCorrect={false}
+                  caretHidden
+                  contextMenuHidden={false}
+                  importantForAutofill="yes"
+                  keyboardType="number-pad"
+                  maxLength={OTP_LENGTH}
+                  onBlur={() => setIsInputFocused(false)}
+                  onChangeText={handleCodeChange}
+                  onFocus={() => setIsInputFocused(true)}
+                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key)}
+                  selection={{ start: joinedCode.length, end: joinedCode.length }}
+                  selectionColor="transparent"
+                  showSoftInputOnFocus
+                  style={[styles.hiddenInput, { width: codeRowWidth || "100%" }]}
+                  value={joinedCode}
+                />
                 {code.map((digit, index) => {
                   const isError = otpModal.status === "error";
+                  const isActiveSlot =
+                    isInputFocused &&
+                    (index === joinedCode.length || (joinedCode.length === OTP_LENGTH && index === OTP_LENGTH - 1)) &&
+                    !digit;
 
                   return (
-                    <TextInput
-                      ref={(ref) => {
-                        inputRefs.current[index] = ref;
-                      }}
-                      autoCapitalize="none"
-                      autoComplete="one-time-code"
-                      contextMenuHidden={false}
-                      importantForAutofill="yes"
+                    <Pressable
                       key={index}
-                      keyboardType="number-pad"
-                      maxLength={1}
-                      onChangeText={(value) => handleChange(index, value)}
-                      onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-                      placeholder="•"
-                      placeholderTextColor={withOpacity(colors.mutedForeground, 0.48)}
-                      selectionColor={colors.primary}
+                      onPress={focusHiddenInput}
                       style={[
                         styles.codeInput,
                         {
@@ -362,13 +427,39 @@ export function OtpVerificationModal() {
                             ? withOpacity(colors.destructive, 0.62)
                             : withOpacity(colors.border, colorScheme === "light" ? 0.84 : 1),
                         },
-                      ]}
-                      textAlign="center"
-                      value={digit}
-                    />
+                        isActiveSlot
+                          ? {
+                              borderColor: withOpacity(colors.primary, 0.72),
+                              backgroundColor:
+                                colorScheme === "light"
+                                  ? "rgba(255, 255, 255, 0.82)"
+                                  : "rgba(30, 41, 59, 0.86)",
+                            }
+                          : null,
+                      ]}>
+                      {digit ? (
+                        <Text style={[styles.codeDigit, { color: colors.foreground }]}>{digit}</Text>
+                      ) : isActiveSlot ? (
+                        <Animated.View
+                          style={[
+                            styles.fakeCaret,
+                            animatedCaretStyle,
+                            { backgroundColor: colors.primary },
+                          ]}
+                        />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.codePlaceholder,
+                            { color: withOpacity(colors.mutedForeground, 0.48) },
+                          ]}>
+                          •
+                        </Text>
+                      )}
+                    </Pressable>
                   );
                 })}
-              </View>
+              </Pressable>
 
               <View style={styles.feedbackRow}>
                 {isVerifyingOtp ? (
@@ -393,14 +484,6 @@ export function OtpVerificationModal() {
               </View>
 
               <View style={styles.footerRow}>
-                <View>
-                  <Text style={[styles.timerLabel, { color: colors.mutedForeground }]}>
-                    {remainingSeconds > 0
-                      ? `Resend available in 00:${String(remainingSeconds).padStart(2, "0")}`
-                      : "Didn’t receive a code?"}
-                  </Text>
-                </View>
-
                 <Pressable
                   accessibilityRole="button"
                   disabled={remainingSeconds > 0 || isSendingOtp}
@@ -419,6 +502,15 @@ export function OtpVerificationModal() {
                     <Text style={[styles.resendText, { color: colors.primary }]}>Resend code</Text>
                   )}
                 </Pressable>
+                <Text
+                  style={[
+                    styles.timerLabel,
+                    { color: withOpacity(colors.mutedForeground, colorScheme === "light" ? 0.82 : 0.9) },
+                  ]}>
+                  {remainingSeconds > 0
+                    ? `Available again in 00:${String(remainingSeconds).padStart(2, "0")}`
+                    : "Didn’t receive a code?"}
+                </Text>
               </View>
             </View>
           </Animated.View>
@@ -432,7 +524,8 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: "center",
-    padding: spacing[6],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[4],
   },
   centerWrap: {
     flex: 1,
@@ -440,13 +533,17 @@ const styles = StyleSheet.create({
   },
   cardWrap: {
     position: "relative",
+    width: "100%",
+  },
+  cardWrapKeyboard: {
+    justifyContent: "flex-start",
   },
   cardGlow: {
     position: "absolute",
-    top: -10,
-    right: -10,
-    bottom: -10,
-    left: -10,
+    top: -6,
+    right: -6,
+    bottom: -6,
+    left: -6,
     borderRadius: radius["3xl"],
   },
   card: {
@@ -454,8 +551,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
     paddingHorizontal: spacing[5],
-    paddingTop: spacing[5],
-    paddingBottom: spacing[6],
+    paddingTop: spacing[4],
+    paddingBottom: spacing[5],
   },
   headerRow: {
     flexDirection: "row",
@@ -470,8 +567,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   closeButton: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: radius.full,
     borderWidth: 1,
     alignItems: "center",
@@ -493,25 +590,53 @@ const styles = StyleSheet.create({
   },
   codeRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    alignSelf: "center",
     gap: spacing[2],
-    marginTop: spacing[6],
+    marginTop: spacing[5],
+    position: "relative",
+  },
+  hiddenInput: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.02,
+    color: "transparent",
+    backgroundColor: "transparent",
   },
   codeInput: {
-    flex: 1,
-    minWidth: 44,
-    height: 58,
+    width: 46,
+    height: 52,
     borderRadius: radius.lg,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  codeDigit: {
     fontFamily: fontFamilies.sans,
     fontSize: 24,
-    lineHeight: 28,
+    lineHeight: 24,
     fontWeight: fontWeights.bold,
+    includeFontPadding: false,
+    fontVariant: ["tabular-nums"],
+  },
+  codePlaceholder: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 24,
+    lineHeight: 24,
+    fontWeight: fontWeights.bold,
+    includeFontPadding: false,
+  },
+  fakeCaret: {
+    width: 2,
+    height: 22,
+    borderRadius: radius.full,
   },
   feedbackRow: {
-    minHeight: 46,
+    minHeight: 40,
     justifyContent: "center",
-    marginTop: spacing[4],
+    marginTop: spacing[3],
   },
   inlineState: {
     flexDirection: "row",
@@ -524,17 +649,15 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   footerRow: {
-    marginTop: spacing[3],
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: spacing[3],
+    marginTop: spacing[2],
+    alignItems: "flex-end",
+    gap: spacing[2],
   },
   timerLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: fontWeights.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.regular,
   },
   resendButton: {
     minWidth: 112,
