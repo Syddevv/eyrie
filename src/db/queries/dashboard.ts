@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
@@ -11,12 +11,21 @@ export async function getTotalBalance(userId: string) {
       total: sql<number>`coalesce(sum(${accounts.balance}), 0)`,
     })
     .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.isHidden, false)));
+    .where(
+      and(
+        eq(accounts.userId, userId),
+        inArray(accounts.type, ["bank", "ewallet", "cash"]),
+      ),
+    );
 
   return roundMoney(result?.total ?? 0);
 }
 
-export async function getTotalIncome(userId: string, startDate?: string, endDate?: string) {
+export async function getTotalIncome(
+  userId: string,
+  startDate?: string,
+  endDate?: string,
+) {
   const [result] = await db
     .select({
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
@@ -27,14 +36,18 @@ export async function getTotalIncome(userId: string, startDate?: string, endDate
         eq(transactions.userId, userId),
         eq(transactions.type, "income"),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
-        endDate ? lte(transactions.transactionDate, endDate) : undefined
-      )
+        endDate ? lte(transactions.transactionDate, endDate) : undefined,
+      ),
     );
 
   return roundMoney(result?.total ?? 0);
 }
 
-export async function getTotalExpenses(userId: string, startDate?: string, endDate?: string) {
+export async function getTotalExpenses(
+  userId: string,
+  startDate?: string,
+  endDate?: string,
+) {
   const [result] = await db
     .select({
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
@@ -45,8 +58,8 @@ export async function getTotalExpenses(userId: string, startDate?: string, endDa
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
-        endDate ? lte(transactions.transactionDate, endDate) : undefined
-      )
+        endDate ? lte(transactions.transactionDate, endDate) : undefined,
+      ),
     );
 
   return roundMoney(result?.total ?? 0);
@@ -76,7 +89,10 @@ export async function getBudgetProgress(userId: string) {
 
   return rows.map((budget) => {
     const remaining = roundMoney(budget.amount - budget.spent);
-    const progress = budget.amount > 0 ? clamp((budget.spent / budget.amount) * 100, 0, 999) : 0;
+    const progress =
+      budget.amount > 0
+        ? clamp((budget.spent / budget.amount) * 100, 0, 999)
+        : 0;
 
     return {
       ...budget,
@@ -87,7 +103,11 @@ export async function getBudgetProgress(userId: string) {
   });
 }
 
-export async function getSpendingBreakdown(userId: string, startDate?: string, endDate?: string) {
+export async function getSpendingBreakdown(
+  userId: string,
+  startDate?: string,
+  endDate?: string,
+) {
   const rows = await db
     .select({
       categoryId: transactions.categoryId,
@@ -102,8 +122,8 @@ export async function getSpendingBreakdown(userId: string, startDate?: string, e
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
-        endDate ? lte(transactions.transactionDate, endDate) : undefined
-      )
+        endDate ? lte(transactions.transactionDate, endDate) : undefined,
+      ),
     )
     .groupBy(transactions.categoryId, categories.name, categories.color)
     .orderBy(sql`total desc`);
@@ -129,8 +149,8 @@ export async function getWeeklySpending(userId: string, anchorDate = nowIso()) {
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
         gte(transactions.transactionDate, startDate),
-        lte(transactions.transactionDate, endDate)
-      )
+        lte(transactions.transactionDate, endDate),
+      ),
     )
     .groupBy(sql`substr(${transactions.transactionDate}, 1, 10)`)
     .orderBy(sql`day asc`);
@@ -141,10 +161,21 @@ export async function getWeeklySpending(userId: string, anchorDate = nowIso()) {
   }));
 }
 
-export async function getMonthlyAnalytics(userId: string, anchorDate = nowIso()) {
+export async function getMonthlyAnalytics(
+  userId: string,
+  anchorDate = nowIso(),
+) {
   const monthPrefix = anchorDate.slice(0, 7);
   const startDate = `${monthPrefix}-01T00:00:00.000Z`;
-  const endDate = endOfDayIso(new Date(Date.UTC(Number(monthPrefix.slice(0, 4)), Number(monthPrefix.slice(5, 7)), 0)));
+  const endDate = endOfDayIso(
+    new Date(
+      Date.UTC(
+        Number(monthPrefix.slice(0, 4)),
+        Number(monthPrefix.slice(5, 7)),
+        0,
+      ),
+    ),
+  );
 
   const [income, expenses, breakdown] = await Promise.all([
     getTotalIncome(userId, startDate, endDate),
@@ -171,7 +202,9 @@ export async function getGoalsProgress(userId: string) {
     ...goal,
     remaining: roundMoney(goal.targetAmount - goal.currentAmount),
     progress:
-      goal.targetAmount > 0 ? clamp((goal.currentAmount / goal.targetAmount) * 100, 0, 100) : 0,
+      goal.targetAmount > 0
+        ? clamp((goal.currentAmount / goal.targetAmount) * 100, 0, 100)
+        : 0,
   }));
 }
 
@@ -188,7 +221,11 @@ export async function getBudgetHealthScore(userId: string) {
         return total + 100;
       }
 
-      const remainingRatio = clamp((budget.amount - budget.spent) / budget.amount, -1, 1);
+      const remainingRatio = clamp(
+        (budget.amount - budget.spent) / budget.amount,
+        -1,
+        1,
+      );
       return total + clamp(remainingRatio * 100, 0, 100);
     }, 0) / progress.length;
 

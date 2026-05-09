@@ -18,6 +18,10 @@ export default function PaymentMethodsModal() {
   const isDark = colorScheme === "dark";
   const { accounts, isLoading: accountsLoading } = useAccounts();
   const { total, isLoading: totalLoading } = useTotalAssets();
+  const visibleAccounts = useMemo(
+    () => accounts.filter((account) => !account.isHidden),
+    [accounts],
+  );
 
   const ui = useMemo(
     () => ({
@@ -131,7 +135,7 @@ export default function PaymentMethodsModal() {
           </View>
 
           {/* Account list from SQLite */}
-          {!accountsLoading && accounts.length === 0 ? (
+          {!accountsLoading && visibleAccounts.length === 0 ? (
             <View style={[styles.infoCard, ui.infoCard]}>
               <View style={styles.infoAvatarFrame}>
                 <Image
@@ -146,7 +150,7 @@ export default function PaymentMethodsModal() {
               </Text>
             </View>
           ) : (
-            accounts.map((acct) => (
+            visibleAccounts.map((acct) => (
               <Pressable
                 key={acct.id}
                 style={[styles.methodCard, ui.methodCard]}

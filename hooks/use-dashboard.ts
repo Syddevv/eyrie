@@ -327,7 +327,7 @@ function mapBudgetProgress(
   };
 }
 
-const useDashboardStore = create<DashboardState>((set, get) => ({
+export const useDashboardStore = create<DashboardState>((set, get) => ({
   activeUserId: null,
   isLoading: false,
   isRefreshing: false,

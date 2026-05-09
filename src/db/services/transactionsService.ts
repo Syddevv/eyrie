@@ -17,8 +17,12 @@ import {
   assertTransactionType,
   assertTransferAccounts,
 } from "../utils/validation";
+import { emitAccountsChanged } from "@/src/lib/dbSync";
 
-export type CreateTransactionInput = Omit<NewTransaction, "id" | "createdAt" | "updatedAt"> & {
+export type CreateTransactionInput = Omit<
+  NewTransaction,
+  "id" | "createdAt" | "updatedAt"
+> & {
   id?: string;
 };
 
@@ -37,7 +41,7 @@ export class TransactionsService {
     const timestamp = nowIso();
     const transactionId = input.id ?? createId("txn");
 
-    return db.transaction(async (tx) => {
+    const created = await db.transaction(async (tx) => {
       const entry = {
         ...input,
         id: transactionId,
@@ -59,10 +63,13 @@ export class TransactionsService {
 
       return created;
     });
+
+    emitAccountsChanged();
+    return created;
   }
 
   async update(id: string, input: Partial<NewTransaction>) {
-    return db.transaction(async (tx) => {
+    const updated = await db.transaction(async (tx) => {
       const existing = await tx.query.transactions.findFirst({
         where: (table, { eq: innerEq }) => innerEq(table.id, id),
       });
@@ -100,6 +107,9 @@ export class TransactionsService {
 
       return updated;
     });
+
+    emitAccountsChanged();
+    return updated;
   }
 
   async delete(id: string) {
@@ -116,6 +126,8 @@ export class TransactionsService {
       await tx.delete(transactions).where(eq(transactions.id, id));
       await refreshBudgetsForTransactionChange(tx, existing, undefined);
     });
+
+    emitAccountsChanged();
   }
 
   async fetch(userId: string) {

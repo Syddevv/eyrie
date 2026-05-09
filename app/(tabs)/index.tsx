@@ -93,17 +93,22 @@ export default function HomeScreen() {
 
   useDashboardBootstrap(currentUser?.id);
 
-  const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
-  const liveTotalBalance = useMemo(
-    () =>
-      visibleAccounts.reduce(
-        (sum, account) => sum + (Number(account.balance) || 0),
-        0,
-      ),
-    [visibleAccounts],
+  const visibleAccounts = allAccounts.filter(
+    (account) => !account.isHidden && account.type !== "cash",
   );
+
+  // Calculate total balance including ALL account types (bank, ewallet, cash, but NOT credit)
+  // This matches the getTotalBalance query which includes bank, ewallet, and cash
+  const totalBalanceIncludingCash = useMemo(
+    () =>
+      allAccounts
+        .filter((account) => account.type !== "credit")
+        .reduce((sum, account) => sum + (Number(account.balance) || 0), 0),
+    [allAccounts],
+  );
+
   const summaryValues = summary ?? {
-    totalBalance: liveTotalBalance,
+    totalBalance: totalBalanceIncludingCash,
     totalIncome: 0,
     totalExpenses: 0,
   };
@@ -302,7 +307,7 @@ export default function HomeScreen() {
               >
                 {isLoading && !summary
                   ? "---"
-                  : formatCurrency(liveTotalBalance).replace("₱", "")}
+                  : formatCurrency(summaryValues.totalBalance).replace("₱", "")}
               </Text>
             </View>
 

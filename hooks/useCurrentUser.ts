@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { usersService } from "@/src/db/services";
+import { accountsService } from "@/src/db/services";
 import { useAuthStore } from "@/store/useAuthStore";
 
 type CurrentUser = {
@@ -49,6 +50,11 @@ export function useCurrentUser() {
         avatar_url: local.avatarUrl ?? null,
         currency_code: (local.currencyCode as string) ?? null,
       };
+
+      await accountsService.ensureDefaultCashAccount(
+        result.id,
+        result.currency_code,
+      );
 
       setUser(result);
       return result;
