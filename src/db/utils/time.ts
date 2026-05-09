@@ -19,3 +19,18 @@ export function addDaysIso(date: string | Date, days: number) {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString();
 }
+
+export function toTransactionIso(
+  date: Date = new Date(),
+  referenceTime: Date = new Date(),
+) {
+  const value = new Date(date);
+  value.setHours(
+    referenceTime.getHours(),
+    referenceTime.getMinutes(),
+    referenceTime.getSeconds(),
+    referenceTime.getMilliseconds(),
+  );
+
+  return value.toISOString();
+}

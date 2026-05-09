@@ -14,6 +14,24 @@ type CurrentUser = {
   currency_code?: string | null;
 };
 
+type CurrentUserSnapshot = {
+  user: CurrentUser | null;
+  isLoading: boolean;
+};
+
+const listeners = new Set<(snapshot: CurrentUserSnapshot) => void>();
+let currentSnapshot: CurrentUserSnapshot = {
+  user: null,
+  isLoading: false,
+};
+
+function publishSnapshot(snapshot: CurrentUserSnapshot) {
+  currentSnapshot = snapshot;
+  for (const listener of Array.from(listeners)) {
+    listener(snapshot);
+  }
+}
+
 function firstName(fullName?: string | null) {
   if (!fullName) return undefined;
   const parts = fullName.trim().split(/\s+/);
@@ -22,23 +40,32 @@ function firstName(fullName?: string | null) {
 
 export function useCurrentUser() {
   const supabaseUser = useAuthStore((s) => s.user) as SupabaseUser | null;
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [snapshot, setSnapshot] = useState<CurrentUserSnapshot>(currentSnapshot);
 
   const refresh = useCallback(async () => {
     if (!supabaseUser) {
-      setUser(null);
+      publishSnapshot({
+        user: null,
+        isLoading: false,
+      });
       return null;
     }
 
-    setIsLoading(true);
+    publishSnapshot({
+      user: currentSnapshot.user,
+      isLoading: true,
+    });
+
     try {
       const local = await usersService.syncFromSupabaseUser(
         supabaseUser as any,
       );
 
       if (!local) {
-        setUser(null);
+        publishSnapshot({
+          user: null,
+          isLoading: false,
+        });
         return null;
       }
 
@@ -56,18 +83,37 @@ export function useCurrentUser() {
         result.currency_code,
       );
 
-      setUser(result);
+      publishSnapshot({
+        user: result,
+        isLoading: false,
+      });
       return result;
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      publishSnapshot({
+        user: currentSnapshot.user,
+        isLoading: false,
+      });
+      throw error;
     }
   }, [supabaseUser]);
 
   useEffect(() => {
+    listeners.add(setSnapshot);
+    setSnapshot(currentSnapshot);
+
+    return () => {
+      listeners.delete(setSnapshot);
+    };
+  }, []);
+
+  useEffect(() => {
     refresh().catch(() => {
-      setIsLoading(false);
+      publishSnapshot({
+        user: currentSnapshot.user,
+        isLoading: false,
+      });
     });
   }, [refresh]);
 
-  return { user, isLoading, refresh } as const;
+  return { user: snapshot.user, isLoading: snapshot.isLoading, refresh } as const;
 }

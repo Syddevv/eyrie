@@ -87,6 +87,10 @@ type DashboardState = {
 const dashboardLoadRequests = new Map<string, Promise<void>>();
 const pendingDashboardRefreshes = new Set<string>();
 
+function describeDashboardError(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
@@ -165,6 +169,63 @@ function formatBudgetLabel(value: number) {
 
 function categoryKey(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
+}
+
+const merchantAcronyms = new Set([
+  "bir",
+  "bpi",
+  "ched",
+  "kfc",
+  "lrt",
+  "mrt",
+  "pldt",
+  "sm",
+  "sr",
+  "sss",
+  "up",
+]);
+
+function formatMerchantToken(token: string) {
+  if (!token) {
+    return "";
+  }
+
+  const normalized = token.trim().toLowerCase();
+
+  if (merchantAcronyms.has(normalized)) {
+    return normalized.toUpperCase();
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function normalizeMerchantName(value?: string | null) {
+  const raw = value?.trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = raw.toLowerCase();
+  const prefix =
+    normalized.startsWith("merchant_default_")
+      ? "merchant_default_"
+      : normalized.startsWith("merchant_")
+        ? "merchant_"
+        : null;
+
+  if (!prefix) {
+    return raw;
+  }
+
+  const cleaned = raw.slice(prefix.length);
+  const formatted = cleaned
+    .split("_")
+    .filter(Boolean)
+    .map(formatMerchantToken)
+    .join(" ");
+
+  return formatted || raw;
 }
 
 function resolveTransactionVisual(
@@ -278,7 +339,7 @@ function mapRecentTransaction(
   source: Awaited<ReturnType<typeof getRecentTransactions>>[number],
 ): DashboardRecentTransaction {
   const merchant =
-    source.merchantName?.trim() ||
+    normalizeMerchantName(source.merchantName) ||
     source.category?.name ||
     source.account?.name ||
     "Transaction";
@@ -322,7 +383,7 @@ function mapBudgetProgress(
     spentLabel: `Spent ${formatBudgetLabel(source.spent)} of ${formatBudgetLabel(source.amount)}`,
     remainingLabel: formatBudgetLabel(source.remaining),
     progress: source.progress / 100,
-    status: source.status,
+    status: source.status as DashboardBudgetProgress["status"],
     ...visual,
   };
 }
@@ -372,6 +433,15 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     if (inFlight) {
       if (force) {
         pendingDashboardRefreshes.add(userId);
+        return inFlight.finally(async () => {
+          const refreshedRequest = dashboardLoadRequests.get(userId);
+
+          // Wait for the queued follow-up refresh so callers do not proceed
+          // with stale summary totals after a transaction write.
+          if (refreshedRequest && refreshedRequest !== inFlight) {
+            await refreshedRequest;
+          }
+        });
       }
 
       return inFlight;
@@ -389,56 +459,112 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
     const request = (async () => {
       const [
-        totalBalance,
-        totalIncome,
-        totalExpenses,
-        recentTransactions,
-        budgetProgress,
-        spendingBreakdown,
-        goalsProgress,
-      ] = await Promise.all([
-        getTotalBalance(userId),
-        getTotalIncome(userId),
-        getTotalExpenses(userId),
+        summaryResult,
+        recentTransactionsResult,
+        budgetProgressResult,
+        spendingBreakdownResult,
+        goalsProgressResult,
+      ] = await Promise.allSettled([
+        Promise.all([
+          getTotalBalance(userId),
+          getTotalIncome(userId),
+          getTotalExpenses(userId),
+        ]),
         getRecentTransactions(userId, 5),
         getBudgetProgress(userId),
         getSpendingBreakdown(userId),
         getGoalsProgress(userId),
       ]);
 
-      const now = new Date().toISOString();
-      const activeBudgets = budgetProgress
-        .filter((budget) => budget.startDate <= now && budget.endDate >= now)
-        .map(mapBudgetProgress);
-
-      set({
+      const nextState: Partial<DashboardState> = {
         activeUserId: userId,
         isLoading: false,
         isRefreshing: false,
-        error: null,
         lastLoadedAt: Date.now(),
-        summary: {
+      };
+      const errors: string[] = [];
+
+      if (summaryResult.status === "fulfilled") {
+        const [totalBalance, totalIncome, totalExpenses] = summaryResult.value;
+        nextState.summary = {
           totalBalance,
           totalIncome,
           totalExpenses,
           netCashFlow: totalIncome - totalExpenses,
-        },
-        recentTransactions: recentTransactions.map(mapRecentTransaction),
-        budgetProgress: activeBudgets,
-        spendingBreakdown: spendingBreakdown.map((item) => ({
-          categoryId: item.categoryId,
-          categoryName: item.categoryName,
-          categoryColor: item.categoryColor,
-          total: item.total,
-        })),
-        goalsProgress,
-      });
+        };
+      } else {
+        errors.push(
+          `summary: ${describeDashboardError(
+            summaryResult.reason,
+            "Unable to load summary totals.",
+          )}`,
+        );
+      }
+
+      if (recentTransactionsResult.status === "fulfilled") {
+        nextState.recentTransactions = recentTransactionsResult.value.map(
+          mapRecentTransaction,
+        );
+      } else {
+        errors.push(
+          `recent transactions: ${describeDashboardError(
+            recentTransactionsResult.reason,
+            "Unable to load recent transactions.",
+          )}`,
+        );
+      }
+
+      if (budgetProgressResult.status === "fulfilled") {
+        const now = new Date().toISOString();
+        nextState.budgetProgress = budgetProgressResult.value
+          .filter((budget) => budget.startDate <= now && budget.endDate >= now)
+          .map(mapBudgetProgress);
+      } else {
+        errors.push(
+          `budgets: ${describeDashboardError(
+            budgetProgressResult.reason,
+            "Unable to load budget progress.",
+          )}`,
+        );
+      }
+
+      if (spendingBreakdownResult.status === "fulfilled") {
+        nextState.spendingBreakdown = spendingBreakdownResult.value.map(
+          (item) => ({
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            categoryColor: item.categoryColor,
+            total: item.total,
+          }),
+        );
+      } else {
+        errors.push(
+          `spending breakdown: ${describeDashboardError(
+            spendingBreakdownResult.reason,
+            "Unable to load spending breakdown.",
+          )}`,
+        );
+      }
+
+      if (goalsProgressResult.status === "fulfilled") {
+        nextState.goalsProgress = goalsProgressResult.value;
+      } else {
+        errors.push(
+          `goals: ${describeDashboardError(
+            goalsProgressResult.reason,
+            "Unable to load goals progress.",
+          )}`,
+        );
+      }
+
+      nextState.error = errors.length ? errors.join(" | ") : null;
+      set(nextState);
     })()
       .catch((error: unknown) => {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to load dashboard data.";
+        const message = describeDashboardError(
+          error,
+          "Unable to load dashboard data.",
+        );
         set({
           isLoading: false,
           isRefreshing: false,
@@ -457,9 +583,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     dashboardLoadRequests.set(userId, request);
     return request;
   },
-  loadDasboard: async (userId, options = {}) => {
-    return useDashboardStore.getState().loadDashboard(userId, options);
-  },
+  loadDasboard: async (userId, options = {}) => get().loadDashboard(userId, options),
   clearDashboard: () =>
     set({
       activeUserId: null,
@@ -488,7 +612,9 @@ export function useDashboardBootstrap(userId?: string | null) {
       void loadDashboard(userId, { force: true });
     });
 
-    return () => off();
+    return () => {
+      off();
+    };
   }, [loadDashboard, userId]);
 
   useFocusEffect(

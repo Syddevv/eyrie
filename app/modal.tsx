@@ -283,9 +283,15 @@ export default function AddTransactionModal() {
   const merchantOptions = useMerchantsByCategory(
     selectedExpenseCategoryLabel ?? activeExpenseCategory?.label,
   );
+  const selectedMerchantOption =
+    merchantOptions.find((merchant) => merchant.id === selectedMerchant) ?? null;
   const isExpenseSaveBlockedByInsufficientBalance = Boolean(
     selectedExpensePaymentMethodIsInsufficient,
   );
+  const insufficientBalanceMessage =
+    selectedExpensePaymentMethodIsInsufficient
+      ? "Selected account does not have enough balance for this expense."
+      : null;
   const isSaveEnabled =
     selectedAmount > 0 &&
     (entryType === "income"
@@ -538,7 +544,7 @@ export default function AddTransactionModal() {
           >
             <View style={styles.amountBlock}>
               <Text style={[styles.amountLabel, ui.amountLabel]}>Amount</Text>
-              <View style={styles.amountRow}>
+              <View style={styles.amountField}>
                 <Text style={[styles.currencyMark, ui.amountText]}>₱</Text>
                 <TextInput
                   value={amount}
@@ -551,7 +557,6 @@ export default function AddTransactionModal() {
                   placeholderTextColor={ui.amountPlaceholder.color}
                   selectionColor={colors.primary}
                   textAlignVertical="center"
-                  includeFontPadding={false}
                 />
               </View>
             </View>
@@ -903,6 +908,17 @@ export default function AddTransactionModal() {
                   })}
                 </View>
               ) : null}
+
+              {insufficientBalanceMessage ? (
+                <Text
+                  style={[
+                    styles.inlineWarningMessage,
+                    { color: colors.destructive ?? "#EF4444" },
+                  ]}
+                >
+                  {insufficientBalanceMessage}
+                </Text>
+              ) : null}
             </View>
 
             <View style={styles.inlineFieldsRow}>
@@ -982,7 +998,7 @@ export default function AddTransactionModal() {
                       amount: Number(amount),
                       categoryId: selectedExpenseCategoryId,
                       accountId: selectedPaymentMethodId,
-                      merchantName: selectedMerchant ?? undefined,
+                      merchantName: selectedMerchantOption?.label ?? undefined,
                       notes: notes || undefined,
                       transactionDate: selectedDate,
                     });
@@ -1260,13 +1276,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.medium,
   },
-  amountRow: {
+  amountField: {
     marginTop: 6,
+    minHeight: 56,
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    minHeight: 48,
+    gap: 8,
   },
   currencyMark: {
     fontFamily: fontFamilies.sans,
@@ -1276,19 +1293,19 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
   },
   amountInput: {
-    minWidth: 156,
-    maxWidth: 220,
+    height: 56,
+    width: 150,
     fontFamily: fontFamilies.sans,
     fontSize: 34,
-    lineHeight: 38,
+    lineHeight: 40,
     fontWeight: fontWeights.semibold,
     letterSpacing: -1,
     textAlign: "center",
+    paddingHorizontal: 0,
     paddingVertical: 0,
     paddingTop: 0,
     paddingBottom: 0,
     textAlignVertical: "center",
-    includeFontPadding: false,
   },
   section: {
     marginTop: 12,
@@ -1588,5 +1605,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: fontWeights.medium,
     textAlign: "center",
+  },
+  inlineWarningMessage: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
 });

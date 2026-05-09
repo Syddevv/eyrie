@@ -107,11 +107,7 @@ export default function HomeScreen() {
     [allAccounts],
   );
 
-  const summaryValues = summary ?? {
-    totalBalance: totalBalanceIncludingCash,
-    totalIncome: 0,
-    totalExpenses: 0,
-  };
+  const totalBalanceValue = summary?.totalBalance ?? totalBalanceIncludingCash;
 
   const pageStyles = useMemo(
     () => ({
@@ -197,7 +193,7 @@ export default function HomeScreen() {
                   Good evening
                 </Text>
                 <Text style={[styles.userName, { color: colors.foreground }]}>
-                  {useCurrentUser().user?.first_name ?? "You"}
+                  {currentUser?.first_name ?? "You"}
                 </Text>
               </View>
             </View>
@@ -307,7 +303,7 @@ export default function HomeScreen() {
               >
                 {isLoading && !summary
                   ? "---"
-                  : formatCurrency(summaryValues.totalBalance).replace("₱", "")}
+                  : formatCurrency(totalBalanceValue).replace("₱", "")}
               </Text>
             </View>
 
@@ -322,9 +318,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.incomeAmount}>
-                  {isLoading && !summary
-                    ? "---"
-                    : formatCurrency(summaryValues.totalIncome)}
+                  {summary
+                    ? formatCurrency(summary.totalIncome)
+                    : "---"}
                 </Text>
               </View>
 
@@ -338,9 +334,9 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.expenseAmount}>
-                  {isLoading && !summary
-                    ? "---"
-                    : formatCurrency(summaryValues.totalExpenses)}
+                  {summary
+                    ? formatCurrency(summary.totalExpenses)
+                    : "---"}
                 </Text>
               </View>
             </View>
@@ -728,8 +724,8 @@ export default function HomeScreen() {
 
           <View style={styles.transactionList}>
             {recentTransactions.length ? (
-              recentTransactions.map((item) => (
-                <View key={item.id} style={styles.transactionRow}>
+                recentTransactions.map((item) => (
+                  <View key={item.id} style={styles.transactionRow}>
                   <View
                     style={[
                       styles.transactionIconWrap,
@@ -742,12 +738,13 @@ export default function HomeScreen() {
                     )}
                   </View>
                   <View style={styles.transactionContent}>
-                    <View>
+                    <View style={styles.transactionDetails}>
                       <Text
                         style={[
                           styles.transactionTitle,
                           { color: colors.foreground },
                         ]}
+                        numberOfLines={1}
                       >
                         {item.merchant}
                       </Text>
@@ -756,6 +753,7 @@ export default function HomeScreen() {
                           styles.transactionCategory,
                           pageStyles.mutedText,
                         ]}
+                        numberOfLines={1}
                       >
                         {item.category} · {item.typeLabel}
                       </Text>
@@ -770,11 +768,15 @@ export default function HomeScreen() {
                               : colors.foreground,
                           },
                         ]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
                       >
                         {item.amountLabel}
                       </Text>
                       <Text
                         style={[styles.transactionDate, pageStyles.mutedText]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
                       >
                         {item.dateLabel}
                       </Text>
@@ -1417,7 +1419,7 @@ const styles = StyleSheet.create({
   },
   transactionRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 14,
     paddingVertical: 6,
   },
@@ -1430,31 +1432,44 @@ const styles = StyleSheet.create({
   },
   transactionContent: {
     flex: 1,
+    minWidth: 0,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 14,
+    gap: 10,
+  },
+  transactionDetails: {
+    flex: 1,
+    minWidth: 0,
   },
   transactionTitle: {
     fontFamily: fontFamilies.sans,
     fontSize: 17,
     lineHeight: 22,
     fontWeight: fontWeights.medium,
+    flexShrink: 1,
   },
   transactionCategory: {
     marginTop: 2,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 20,
+    flexShrink: 1,
   },
   transactionAmountBlock: {
     alignItems: "flex-end",
+    justifyContent: "flex-start",
+    flexShrink: 1,
+    minWidth: 92,
+    maxWidth: "42%",
   },
   transactionAmount: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: fontWeights.bold,
+    textAlign: "right",
+    flexShrink: 1,
   },
   transactionDate: {
     marginTop: 4,
@@ -1462,5 +1477,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     textAlign: "right",
+    flexShrink: 1,
   },
 });
