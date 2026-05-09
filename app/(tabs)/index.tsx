@@ -20,6 +20,7 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   formatCurrency,
   useBudgetProgress,
@@ -182,7 +183,7 @@ export default function HomeScreen() {
                   Good evening
                 </Text>
                 <Text style={[styles.userName, { color: colors.foreground }]}>
-                  Juan
+                  {useCurrentUser().user?.first_name ?? "You"}
                 </Text>
               </View>
             </View>

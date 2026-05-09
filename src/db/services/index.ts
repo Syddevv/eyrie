@@ -4,3 +4,4 @@ export { categoriesService } from "./categoriesService";
 export { goalsService } from "./goalsService";
 export { seedDatabase } from "./seed.service";
 export { transactionsService } from "./transactionsService";
+export { usersService } from "./usersService";
