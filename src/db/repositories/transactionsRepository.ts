@@ -23,12 +23,22 @@ export class TransactionsRepository {
     return db.query.transactions.findMany({
       where: eq(transactions.userId, userId),
       orderBy: [desc(transactions.transactionDate), desc(transactions.createdAt)],
+      with: {
+        category: true,
+        account: true,
+        transferAccount: true,
+      },
     });
   }
 
   async findById(id: string) {
     return db.query.transactions.findFirst({
       where: eq(transactions.id, id),
+      with: {
+        category: true,
+        account: true,
+        transferAccount: true,
+      },
     });
   }
 }

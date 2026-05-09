@@ -451,3 +451,20 @@ export function getMerchantsForCategory(categoryName?: string | null) {
   const key = normalizeExpenseMerchantCategory(categoryName);
   return merchantCatalog[key] ?? defaultMerchants;
 }
+
+export function getMerchantForCategoryByLabel(
+  categoryName?: string | null,
+  merchantLabel?: string | null,
+) {
+  const normalizedLabel = merchantLabel?.trim().toLowerCase();
+
+  if (!normalizedLabel) {
+    return null;
+  }
+
+  return (
+    getMerchantsForCategory(categoryName).find(
+      (merchant) => merchant.label.trim().toLowerCase() === normalizedLabel,
+    ) ?? null
+  );
+}
