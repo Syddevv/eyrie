@@ -87,20 +87,38 @@ export async function getBudgetProgress(userId: string) {
     orderBy: [desc(budgets.startDate)],
   });
 
-  return rows.map((budget) => {
-    const remaining = roundMoney(budget.amount - budget.spent);
-    const progress =
-      budget.amount > 0
-        ? clamp((budget.spent / budget.amount) * 100, 0, 999)
-        : 0;
+  return Promise.all(
+    rows.map(async (budget) => {
+      const [countResult] = await db
+        .select({
+          count: sql<number>`count(*)`,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.userId, budget.userId),
+            eq(transactions.type, "expense"),
+            eq(transactions.categoryId, budget.categoryId),
+            gte(transactions.transactionDate, budget.startDate),
+            lte(transactions.transactionDate, budget.endDate),
+          ),
+        );
 
-    return {
-      ...budget,
-      remaining,
-      progress,
-      status: remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
-    };
-  });
+      const remaining = roundMoney(budget.amount - budget.spent);
+      const progress =
+        budget.amount > 0
+          ? clamp((budget.spent / budget.amount) * 100, 0, 999)
+          : 0;
+
+      return {
+        ...budget,
+        remaining,
+        progress,
+        transactionCount: countResult?.count ?? 0,
+        status: remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
+      };
+    }),
+  );
 }
 
 export async function getSpendingBreakdown(

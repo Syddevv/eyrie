@@ -1,11 +1,13 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,21 +18,11 @@ import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useExpenseCategories } from "@/hooks/useExpenseCategories";
+import { useAvailableBudgetCategories, type BudgetCycle } from "@/hooks/useBudgets";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
-import { DEFAULT_EXPENSE_CATEGORIES } from "@/src/db/utils/constants";
-
-type CategoryOption = {
-  id: string;
-  label: string;
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-};
-
-const categoryOptions: readonly CategoryOption[] =
-  DEFAULT_EXPENSE_CATEGORIES.map((category) => ({
-    id: category.id,
-    label: category.name,
-    icon: category.icon,
-  })) as const;
+import { budgetsService } from "@/src/db/services";
 
 function sanitizeBudgetAmount(value: string) {
   const normalized = value.replace(/[^0-9.]/g, "");
@@ -45,22 +37,44 @@ function sanitizeBudgetAmount(value: string) {
 
 export default function AddCategoryModal() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ cycle?: string }>();
+  const { user } = useCurrentUser();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const selectedCycle = (Array.isArray(params.cycle) ? params.cycle[0] : params.cycle ?? "monthly") as BudgetCycle;
+  const { categories: expenseCategories } = useExpenseCategories();
+  const { categoryIdsWithActiveBudget, cycleRange } = useAvailableBudgetCategories(selectedCycle);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<CategoryOption | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showCategoryList, setShowCategoryList] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const isAddEnabled = Boolean(selectedCategory) && Number(budgetAmount) > 0;
+  const [isSaving, setIsSaving] = useState(false);
+
+  const availableCategories = useMemo(
+    () => expenseCategories.filter((category) => !categoryIdsWithActiveBudget.has(category.id)),
+    [categoryIdsWithActiveBudget, expenseCategories],
+  );
+  const selectedCategory = availableCategories.find((category) => category.id === selectedCategoryId) ?? null;
+  const isAddEnabled = Boolean(selectedCategoryId) && Number(budgetAmount) > 0;
 
   useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    if (!availableCategories.length) {
+      setSelectedCategoryId(null);
+      return;
+    }
+
+    setSelectedCategoryId((current) =>
+      current && availableCategories.some((category) => category.id === current)
+        ? current
+        : null,
+    );
+  }, [availableCategories]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
@@ -79,26 +93,18 @@ export default function AddCategoryModal() {
   const ui = useMemo(
     () => ({
       overlay: {
-        backgroundColor: isDark
-          ? "rgba(2, 6, 23, 0.52)"
-          : "rgba(15, 23, 42, 0.22)",
+        backgroundColor: isDark ? "rgba(2, 6, 23, 0.52)" : "rgba(15, 23, 42, 0.22)",
       },
       sheet: {
         backgroundColor: colors.card,
-        borderColor: isDark
-          ? "rgba(255,255,255,0.06)"
-          : "rgba(15, 23, 42, 0.06)",
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(15, 23, 42, 0.06)",
       },
       handle: { backgroundColor: isDark ? "#64748B" : "#CBD5E1" },
       title: { color: colors.foreground },
       label: { color: colors.foreground },
       fieldSurface: {
-        backgroundColor: isDark
-          ? "rgba(15, 23, 42, 0.26)"
-          : "rgba(241, 245, 249, 0.8)",
-        borderColor: isDark
-          ? "rgba(255,255,255,0.05)"
-          : "rgba(226, 232, 240, 0.92)",
+        backgroundColor: isDark ? "rgba(15, 23, 42, 0.26)" : "rgba(241, 245, 249, 0.8)",
+        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(226, 232, 240, 0.92)",
       },
       placeholder: { color: colors.mutedForeground },
       value: { color: colors.foreground },
@@ -115,25 +121,54 @@ export default function AddCategoryModal() {
       addButtonText: { color: "#FFFFFF" },
       dropdownSurface: {
         backgroundColor: colors.card,
-        borderColor: isDark
-          ? "rgba(255,255,255,0.08)"
-          : "rgba(226, 232, 240, 0.92)",
+        borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(226, 232, 240, 0.92)",
       },
       dropdownItemBorder: {
-        borderBottomColor: isDark
-          ? "rgba(255,255,255,0.05)"
-          : "rgba(226, 232, 240, 0.72)",
+        borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(226, 232, 240, 0.72)",
+      },
+      helperText: {
+        color: isDark ? "#94A3B8" : "#64748B",
       },
     }),
     [colors, isDark],
   );
 
+  const handleSave = async () => {
+    if (!isAddEnabled) {
+      showIncompleteFormAlert();
+      return;
+    }
+
+    if (!user?.id || !selectedCategoryId) {
+      Alert.alert("Missing category", "Choose an expense category to create a budget.");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await budgetsService.create({
+        userId: user.id,
+        categoryId: selectedCategoryId,
+        amount: Number(budgetAmount),
+        period: selectedCycle,
+        startDate: cycleRange.startDate,
+        endDate: cycleRange.endDate,
+      });
+
+      router.back();
+    } catch (error) {
+      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to create budget.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-      style={styles.keyboardWrap}
-    >
+      style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
@@ -145,122 +180,114 @@ export default function AddCategoryModal() {
             keyboardHeight > 0 && {
               marginBottom: Math.max(12, keyboardHeight - 8),
             },
-          ]}
-        >
+          ]}>
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
-            <Text style={[styles.title, ui.title]}>Add New Category</Text>
-            <Pressable
-              style={[styles.closeButton, ui.closeButton]}
-              onPress={() => router.back()}
-            >
+            <Text style={[styles.title, ui.title]}>Create Budget</Text>
+            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Category</Text>
-            <Pressable
-              style={[styles.selectField, ui.fieldSurface]}
-              onPress={() => setShowCategoryList((current) => !current)}
-            >
-              <Text style={[styles.selectText, ui.value]}>
-                {selectedCategory ? selectedCategory.label : "Select category"}
-              </Text>
-              <Feather
-                name={showCategoryList ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={colors.mutedForeground}
-              />
-            </Pressable>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Choose expense category</Text>
+              <Pressable
+                style={[styles.selectField, ui.fieldSurface]}
+                onPress={() => setShowCategoryList((current) => !current)}>
+                <Text style={[styles.selectText, ui.value]}>
+                  {selectedCategory ? selectedCategory.label : "Choose expense category"}
+                </Text>
+                <Feather
+                  name={showCategoryList ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={colors.mutedForeground}
+                />
+              </Pressable>
 
-            {showCategoryList ? (
-              <View
-                style={[styles.dropdownCard, ui.dropdownSurface, shadows.card]}
-              >
-                {categoryOptions.map((option, index) => {
-                  const isSelected = option.id === selectedCategory?.id;
-                  const isLast = index === categoryOptions.length - 1;
+              {showCategoryList ? (
+                <View style={[styles.dropdownCard, ui.dropdownSurface, shadows.card]}>
+                  {availableCategories.length ? (
+                    availableCategories.map((option, index) => {
+                      const isSelected = option.id === selectedCategory?.id;
+                      const isLast = index === availableCategories.length - 1;
 
-                  return (
-                    <Pressable
-                      key={option.id}
-                      style={[
-                        styles.dropdownItem,
-                        !isLast && styles.dropdownItemBorder,
-                        !isLast && ui.dropdownItemBorder,
-                      ]}
-                      onPress={() => {
-                        setSelectedCategory(option);
-                        setShowCategoryList(false);
-                      }}
-                    >
-                      <View style={styles.dropdownItemLeft}>
-                        <MaterialCommunityIcons
-                          name={option.icon}
-                          size={18}
-                          color={
-                            isSelected ? colors.primary : colors.mutedForeground
-                          }
-                        />
-                        <Text
+                      return (
+                        <Pressable
+                          key={option.id}
                           style={[
-                            styles.dropdownItemText,
-                            isSelected ? { color: colors.primary } : ui.value,
+                            styles.dropdownItem,
+                            !isLast && styles.dropdownItemBorder,
+                            !isLast && ui.dropdownItemBorder,
                           ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </View>
-                      {isSelected ? (
-                        <Feather
-                          name="check"
-                          size={16}
-                          color={colors.primary}
-                        />
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Budget Amount</Text>
-            <View style={[styles.amountField, ui.fieldSurface]}>
-              <Text style={[styles.currencyMark, ui.placeholder]}>₱</Text>
-              <TextInput
-                value={budgetAmount}
-                onChangeText={(value) =>
-                  setBudgetAmount(sanitizeBudgetAmount(value))
-                }
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={ui.placeholder.color}
-                selectionColor={colors.primary}
-                style={[styles.amountInput, ui.value]}
-              />
+                          onPress={() => {
+                            setSelectedCategoryId(option.id);
+                            setShowCategoryList(false);
+                          }}>
+                          <View style={styles.dropdownItemLeft}>
+                            <View
+                              style={[
+                                styles.categoryIconWrap,
+                                { backgroundColor: `${option.color}22` },
+                              ]}>
+                              <MaterialCommunityIcons
+                                name={option.icon as ComponentProps<typeof MaterialCommunityIcons>["name"]}
+                                size={18}
+                                color={option.color}
+                              />
+                            </View>
+                            <Text
+                              style={[
+                                styles.dropdownItemText,
+                                isSelected ? { color: colors.primary } : ui.value,
+                              ]}>
+                              {option.label}
+                            </Text>
+                          </View>
+                          {isSelected ? <Feather name="check" size={16} color={colors.primary} /> : null}
+                        </Pressable>
+                      );
+                    })
+                  ) : (
+                    <View style={styles.emptyDropdownState}>
+                      <Text style={[styles.emptyDropdownText, ui.helperText]}>
+                        Budget already exists for every expense category in this cycle.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ) : null}
             </View>
-          </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Budget limit</Text>
+              <View style={[styles.amountField, ui.fieldSurface]}>
+                <Text style={[styles.currencyMark, ui.placeholder]}>₱</Text>
+                <TextInput
+                  value={budgetAmount}
+                  onChangeText={(value) => setBudgetAmount(sanitizeBudgetAmount(value))}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={ui.placeholder.color}
+                  selectionColor={colors.primary}
+                  style={[styles.amountInput, ui.value]}
+                />
+              </View>
+              <Text style={[styles.helperText, ui.helperText]}>
+                This budget will track spending for the selected expense category automatically.
+              </Text>
+            </View>
+          </ScrollView>
 
           <Pressable
             style={[
               styles.addButton,
-              isAddEnabled ? ui.addButton : ui.addButtonDisabled,
+              isAddEnabled && !isSaving ? ui.addButton : ui.addButtonDisabled,
             ]}
-            onPress={() => {
-              if (!isAddEnabled) {
-                showIncompleteFormAlert();
-                return;
-              }
-
-              router.back();
-            }}
-          >
+            onPress={handleSave}>
             <Text style={[styles.addButtonText, ui.addButtonText]}>
-              Add Category
+              {isSaving ? "Creating Budget..." : "Create Budget"}
             </Text>
           </Pressable>
         </View>
@@ -287,6 +314,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 10,
     paddingBottom: 28,
+    maxHeight: "82%",
   },
   handle: {
     alignSelf: "center",
@@ -345,7 +373,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dropdownItem: {
-    minHeight: 48,
+    minHeight: 52,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -364,6 +392,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
     fontWeight: fontWeights.medium,
+  },
+  categoryIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyDropdownState: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyDropdownText: {
+    textAlign: "center",
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
   },
   amountField: {
     minHeight: 50,
@@ -387,6 +434,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: fontWeights.medium,
     paddingVertical: 0,
+  },
+  helperText: {
+    marginTop: 10,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 17,
   },
   addButton: {
     marginTop: 28,

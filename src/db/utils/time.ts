@@ -34,3 +34,33 @@ export function toTransactionIso(
 
   return value.toISOString();
 }
+
+export function getBudgetCycleRange(
+  period: "weekly" | "biweekly" | "monthly",
+  anchorDate: string | Date = new Date(),
+) {
+  const value = typeof anchorDate === "string" ? new Date(anchorDate) : new Date(anchorDate);
+
+  if (period === "monthly") {
+    const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
+  }
+
+  const start = new Date(value);
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+
+  if (period === "biweekly") {
+    const base = new Date(Date.UTC(start.getUTCFullYear(), 0, 7, 0, 0, 0, 0));
+    const diffDays = Math.floor((start.getTime() - base.getTime()) / 86400000);
+    const offset = ((diffDays % 14) + 14) % 14;
+    start.setUTCDate(start.getUTCDate() - offset);
+  }
+
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + (period === "weekly" ? 6 : 13));
+  end.setUTCHours(23, 59, 59, 999);
+
+  return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
