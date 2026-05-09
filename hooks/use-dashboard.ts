@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { create } from "zustand";
 
 import {
@@ -12,6 +12,7 @@ import {
   getTotalIncome,
 } from "@/src/db";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
+import { onAccountsChanged } from "@/src/lib/dbSync";
 
 type IconLibrary = "feather" | "material";
 
@@ -76,10 +77,15 @@ type DashboardState = {
     userId: string,
     options?: { force?: boolean },
   ) => Promise<void>;
+  loadDasboard: (
+    userId: string,
+    options?: { force?: boolean },
+  ) => Promise<void>;
   clearDashboard: () => void;
 };
 
 const dashboardLoadRequests = new Map<string, Promise<void>>();
+const pendingDashboardRefreshes = new Set<string>();
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -364,6 +370,10 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
     }
 
     if (inFlight) {
+      if (force) {
+        pendingDashboardRefreshes.add(userId);
+      }
+
       return inFlight;
     }
 
@@ -437,10 +447,18 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
       })
       .finally(() => {
         dashboardLoadRequests.delete(userId);
+
+        if (pendingDashboardRefreshes.has(userId)) {
+          pendingDashboardRefreshes.delete(userId);
+          void get().loadDashboard(userId, { force: true });
+        }
       });
 
     dashboardLoadRequests.set(userId, request);
     return request;
+  },
+  loadDasboard: async (userId, options = {}) => {
+    return useDashboardStore.getState().loadDashboard(userId, options);
   },
   clearDashboard: () =>
     set({
@@ -460,6 +478,18 @@ const useDashboardStore = create<DashboardState>((set, get) => ({
 export function useDashboardBootstrap(userId?: string | null) {
   const loadDashboard = useDashboardStore((state) => state.loadDashboard);
   const clearDashboard = useDashboardStore((state) => state.clearDashboard);
+
+  useEffect(() => {
+    if (!userId) {
+      return undefined;
+    }
+
+    const off = onAccountsChanged(() => {
+      void loadDashboard(userId, { force: true });
+    });
+
+    return () => off();
+  }, [loadDashboard, userId]);
 
   useFocusEffect(
     useCallback(() => {

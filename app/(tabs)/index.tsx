@@ -15,11 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { themeColors } from "@/constants/colors";
-import { homeCards, homeWallets } from "@/constants/payment-methods";
+import { useAccounts } from "@/hooks/useAccounts";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   formatCurrency,
@@ -80,9 +79,9 @@ function renderDashboardIcon(
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
+  const { user: currentUser } = useCurrentUser();
   const summary = useDashboardSummary();
   const recentTransactions = useRecentTransactions();
   const activeBudgets = useBudgetProgress();
@@ -90,8 +89,24 @@ export default function HomeScreen() {
   const goalsProgress = useGoalsProgress();
   const isLoading = useDashboardLoading();
   const error = useDashboardError();
+  const { accounts: allAccounts, isLoading: accountsLoading } = useAccounts();
 
-  useDashboardBootstrap(user?.id);
+  useDashboardBootstrap(currentUser?.id);
+
+  const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
+  const liveTotalBalance = useMemo(
+    () =>
+      visibleAccounts.reduce(
+        (sum, account) => sum + (Number(account.balance) || 0),
+        0,
+      ),
+    [visibleAccounts],
+  );
+  const summaryValues = summary ?? {
+    totalBalance: liveTotalBalance,
+    totalIncome: 0,
+    totalExpenses: 0,
+  };
 
   const pageStyles = useMemo(
     () => ({
@@ -158,12 +173,6 @@ export default function HomeScreen() {
       pill: topCategory ? "Spending pulse" : "Ready",
     };
   }, [error, goalsProgress, isLoading, spendingBreakdown, summary]);
-
-  const summaryValues = summary ?? {
-    totalBalance: 0,
-    totalIncome: 0,
-    totalExpenses: 0,
-  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -293,7 +302,7 @@ export default function HomeScreen() {
               >
                 {isLoading && !summary
                   ? "---"
-                  : formatCurrency(summaryValues.totalBalance).replace("₱", "")}
+                  : formatCurrency(liveTotalBalance).replace("₱", "")}
               </Text>
             </View>
 
@@ -347,55 +356,110 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsRow}
           >
-            {homeCards.map((card) => (
-              <Pressable
-                key={card.id}
-                style={styles.cardPressable}
-                onPress={() =>
-                  router.push({
-                    pathname: "/payment-method-details-modal",
-                    params: { methodId: card.id },
-                  })
-                }
-              >
-                <LinearGradient
-                  colors={card.colors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.accountCard}
-                >
+            {(() => {
+              const cardAccounts = allAccounts.filter(
+                (a) => a.type === "bank" || a.type === "credit",
+              );
+
+              if (!accountsLoading && cardAccounts.length === 0) {
+                return (
                   <View
                     style={[
-                      styles.cardBubbleLarge,
-                      { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                      styles.emptyCard,
+                      { backgroundColor: pageStyles.whiteCard.backgroundColor },
+                      shadows.soft,
                     ]}
-                  />
-                  <View
-                    style={[
-                      styles.cardBubbleSmall,
-                      { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                    ]}
-                  />
-                  <View style={styles.cardTopRow}>
-                    <View>
-                      <Text style={styles.cardLabel}>{card.label}</Text>
-                      <Text style={styles.cardName}>{card.name}</Text>
+                  >
+                    <View style={styles.emptyCardIconWrap}>
+                      <MaterialCommunityIcons
+                        name="credit-card-outline"
+                        size={28}
+                        color={colors.mutedForeground}
+                      />
                     </View>
+                    <Text
+                      style={[
+                        styles.emptyCardTitle,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      No cards yet
+                    </Text>
+                    <Text style={[styles.emptyCardBody, pageStyles.mutedText]}>
+                      Connect your first bank or credit card to view it here.
+                    </Text>
+                    <Pressable
+                      style={[styles.emptyCardButton, pageStyles.topButton]}
+                      onPress={() => router.push("/add-payment-method-modal")}
+                    >
+                      <Text style={styles.emptyCardButtonText}>Add card</Text>
+                    </Pressable>
+                  </View>
+                );
+              }
+
+              return cardAccounts.map((acct) => (
+                <Pressable
+                  key={acct.id}
+                  style={styles.cardPressable}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/payment-method-details-modal",
+                      params: { methodId: acct.id },
+                    })
+                  }
+                >
+                  <LinearGradient
+                    colors={[
+                      acct.color ?? "#3553D8",
+                      acct.color ?? "#2A49CF",
+                      acct.color ?? "#2445C9",
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.accountCard}
+                  >
                     <View
                       style={[
-                        styles.cardBadge,
-                        { backgroundColor: card.badgeColor },
+                        styles.cardBubbleLarge,
+                        { backgroundColor: withOpacity("#FFFFFF", 0.08) },
                       ]}
                     />
-                  </View>
-                  <Text style={styles.cardAmount}>{card.amount}</Text>
-                  <View style={styles.cardBottomRow}>
-                    <Text style={styles.cardDigits}>•••• {card.digits}</Text>
-                    <Text style={styles.cardType}>{card.cardTypeLabel}</Text>
-                  </View>
-                </LinearGradient>
-              </Pressable>
-            ))}
+                    <View
+                      style={[
+                        styles.cardBubbleSmall,
+                        { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                      ]}
+                    />
+                    <View style={styles.cardTopRow}>
+                      <View>
+                        <Text style={styles.cardLabel}>{acct.name}</Text>
+                        <Text style={styles.cardName}>
+                          {acct.type === "credit" ? "Credit" : "Bank"}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.cardBadge,
+                          { backgroundColor: acct.color ?? "#F7B400" },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.cardAmount}>
+                      {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                    </Text>
+                    <View style={styles.cardBottomRow}>
+                      <Text style={styles.cardDigits}>
+                        •••• {acct.accountNumberLast4 ?? ""}
+                      </Text>
+                      <Text style={styles.cardType}>
+                        {acct.type === "credit" ? "CREDIT" : "DEBIT"}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </Pressable>
+              ));
+            })()}
           </ScrollView>
 
           <View style={[styles.sectionHeader, styles.walletsHeader]}>
@@ -409,56 +473,110 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsRow}
           >
-            {homeWallets.map((wallet) => (
-              <Pressable
-                key={wallet.id}
-                style={styles.cardPressable}
-                onPress={() =>
-                  router.push({
-                    pathname: "/payment-method-details-modal",
-                    params: { methodId: wallet.id },
-                  })
-                }
-              >
-                <LinearGradient
-                  colors={wallet.colors}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.accountCard}
-                >
+            {(() => {
+              const walletAccounts = allAccounts.filter(
+                (a) => a.type === "ewallet" || a.type === "cash",
+              );
+
+              if (!accountsLoading && walletAccounts.length === 0) {
+                return (
                   <View
                     style={[
-                      styles.cardBubbleLarge,
-                      { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                      styles.emptyCard,
+                      { backgroundColor: pageStyles.whiteCard.backgroundColor },
+                      shadows.soft,
                     ]}
-                  />
-                  <View
-                    style={[
-                      styles.cardBubbleSmall,
-                      { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                    ]}
-                  />
-                  <View style={styles.cardTopRow}>
-                    <View>
-                      <Text style={styles.cardLabel}>{wallet.label}</Text>
-                      <Text style={styles.cardName}>{wallet.name}</Text>
+                  >
+                    <View style={styles.emptyCardIconWrap}>
+                      <MaterialCommunityIcons
+                        name="wallet-outline"
+                        size={28}
+                        color={colors.mutedForeground}
+                      />
                     </View>
-                    <View
+                    <Text
                       style={[
-                        styles.walletBadge,
-                        { backgroundColor: wallet.badgeColor },
+                        styles.emptyCardTitle,
+                        { color: colors.foreground },
                       ]}
                     >
-                      <Text style={styles.walletBadgeText}>
-                        {wallet.name.charAt(0)}
-                      </Text>
-                    </View>
+                      No wallets yet
+                    </Text>
+                    <Text style={[styles.emptyCardBody, pageStyles.mutedText]}>
+                      Connect your first e-wallet or cash account to track
+                      balances.
+                    </Text>
+                    <Pressable
+                      style={[styles.emptyCardButton, pageStyles.topButton]}
+                      onPress={() => router.push("/add-payment-method-modal")}
+                    >
+                      <Text style={styles.emptyCardButtonText}>Add wallet</Text>
+                    </Pressable>
                   </View>
-                  <Text style={styles.walletAmount}>{wallet.amount}</Text>
-                  <Text style={styles.walletType}>{wallet.cardTypeLabel}</Text>
-                </LinearGradient>
-              </Pressable>
-            ))}
+                );
+              }
+
+              return walletAccounts.map((acct) => (
+                <Pressable
+                  key={acct.id}
+                  style={styles.cardPressable}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/payment-method-details-modal",
+                      params: { methodId: acct.id },
+                    })
+                  }
+                >
+                  <LinearGradient
+                    colors={[
+                      acct.color ?? "#16B76D",
+                      acct.color ?? "#0FA785",
+                      acct.color ?? "#119E8D",
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.accountCard}
+                  >
+                    <View
+                      style={[
+                        styles.cardBubbleLarge,
+                        { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.cardBubbleSmall,
+                        { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                      ]}
+                    />
+                    <View style={styles.cardTopRow}>
+                      <View>
+                        <Text style={styles.cardLabel}>
+                          {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
+                        </Text>
+                        <Text style={styles.cardName}>{acct.name}</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.walletBadge,
+                          { backgroundColor: acct.color ?? "#D9ECFF" },
+                        ]}
+                      >
+                        <Text style={styles.walletBadgeText}>
+                          {acct.name.charAt(0)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.walletAmount}>
+                      {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                    </Text>
+                    <Text style={styles.walletType}>
+                      {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
+                    </Text>
+                  </LinearGradient>
+                </Pressable>
+              ));
+            })()}
           </ScrollView>
 
           <View style={styles.sectionHeader}>
@@ -1233,6 +1351,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+  },
+  emptyCard: {
+    width: 320,
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+  },
+  emptyCardIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  emptyCardTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    textAlign: "center",
+  },
+  emptyCardBody: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  emptyCardButton: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyCardButtonText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
   },
   emptyStateTitle: {
     fontFamily: fontFamilies.sans,
