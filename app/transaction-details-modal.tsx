@@ -84,7 +84,7 @@ export default function TransactionDetailsModal() {
     try {
       await transactionsService.delete(transaction.id);
       setShowDeleteConfirm(false);
-      router.replace("/transactions");
+      router.back();
     } catch (error) {
       Alert.alert("Delete failed", error instanceof Error ? error.message : "Unable to delete transaction.");
     } finally {
