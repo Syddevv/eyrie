@@ -146,7 +146,11 @@ function getVerifyOtpErrorMessage(error: unknown) {
     return "That verification code has expired. Request a new code and try again.";
   }
 
-  if (lower.includes("token") || lower.includes("otp") || lower.includes("invalid")) {
+  if (
+    lower.includes("token") ||
+    lower.includes("otp") ||
+    lower.includes("invalid")
+  ) {
     return "That verification code is invalid. Check the 6 digits and try again.";
   }
 
@@ -433,7 +437,7 @@ export async function signOut() {
   } catch (error) {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     const message =
-      error instanceof Error ? error.message : "Unable to sign out right now.";
+      error instanceof Error ? error.message : "Unable to sign out right now. ";
     store.showSnackbar(message, "error");
     throw error;
   } finally {

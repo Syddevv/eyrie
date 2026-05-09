@@ -418,7 +418,6 @@ export function OtpVerificationModal() {
                       style={[
                         styles.codeInput,
                         {
-                          color: colors.foreground,
                           backgroundColor:
                             colorScheme === "light"
                               ? "rgba(255, 255, 255, 0.72)"
