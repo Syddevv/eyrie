@@ -13,14 +13,21 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { formatCurrency } from "@/hooks/use-dashboard";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
-import { useAvailableBudgetCategories, type BudgetCycle } from "@/hooks/useBudgets";
+import {
+  calculateBudgetPlanningSnapshot,
+  useAvailableBudgetCategories,
+  type BudgetCycle,
+} from "@/hooks/useBudgets";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { budgetsService } from "@/src/db/services";
 
@@ -43,14 +50,35 @@ export default function AddCategoryModal() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
   const selectedCycle = (Array.isArray(params.cycle) ? params.cycle[0] : params.cycle ?? "monthly") as BudgetCycle;
+  const { accounts } = useAccounts();
   const { categories: expenseCategories } = useExpenseCategories();
-  const { categoryIdsWithActiveBudget, cycleRange } = useAvailableBudgetCategories(selectedCycle);
+  const {
+    categoryIdsWithActiveBudget,
+    cycleRange,
+    currentTotalBudgeted,
+  } = useAvailableBudgetCategories(selectedCycle);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [showCategoryList, setShowCategoryList] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+
+  const proposedBudgetAmount = Number(budgetAmount) || 0;
+  const hasBudgetAmount = budgetAmount.trim().length > 0;
+  const availableFunds = useMemo(
+    () => accounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0),
+    [accounts],
+  );
+  const planningOverview = useMemo(
+    () =>
+      calculateBudgetPlanningSnapshot({
+        availableFunds,
+        currentTotalBudgeted,
+        proposedBudgetAmount,
+      }),
+    [availableFunds, currentTotalBudgeted, proposedBudgetAmount],
+  );
 
   const availableCategories = useMemo(
     () => expenseCategories.filter((category) => !categoryIdsWithActiveBudget.has(category.id)),
@@ -128,6 +156,26 @@ export default function AddCategoryModal() {
       },
       helperText: {
         color: isDark ? "#94A3B8" : "#64748B",
+      },
+      overviewCard: {
+        backgroundColor: isDark ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.92)",
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(226, 232, 240, 0.92)",
+      },
+      overviewHealthyAccent: { color: isDark ? "#6EE7B7" : "#109669" },
+      overviewHealthySurface: {
+        backgroundColor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(220, 252, 231, 0.9)",
+        borderColor: isDark ? "rgba(52, 211, 153, 0.22)" : "rgba(52, 211, 153, 0.22)",
+      },
+      overviewWarningAccent: { color: isDark ? "#FDBA74" : "#EA7A15" },
+      overviewWarningSurface: {
+        backgroundColor: isDark ? "rgba(249, 115, 22, 0.14)" : "rgba(255, 237, 213, 0.94)",
+        borderColor: isDark ? "rgba(251, 146, 60, 0.24)" : "rgba(251, 146, 60, 0.24)",
+      },
+      overviewMutedLabel: { color: isDark ? "#9FB0C4" : "#64748B" },
+      overviewValue: { color: colors.foreground },
+      insightCard: {
+        backgroundColor: isDark ? "rgba(26, 34, 48, 0.88)" : "rgba(255,255,255,0.94)",
+        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(251, 146, 60, 0.18)",
       },
     }),
     [colors, isDark],
@@ -278,6 +326,111 @@ export default function AddCategoryModal() {
                 This budget will track spending for the selected expense category automatically.
               </Text>
             </View>
+
+            {hasBudgetAmount ? (
+              <Animated.View
+                entering={FadeInDown.duration(220)}
+                layout={LinearTransition.springify().damping(18).stiffness(180)}
+                style={styles.section}>
+                <View style={[styles.overviewCard, ui.overviewCard, shadows.card]}>
+                  <View style={styles.overviewHeader}>
+                    <View
+                      style={[
+                        styles.overviewIconWrap,
+                        planningOverview.status === "warning"
+                          ? ui.overviewWarningSurface
+                          : ui.overviewHealthySurface,
+                      ]}>
+                      <Feather
+                        name={planningOverview.status === "warning" ? "alert-triangle" : "check-circle"}
+                        size={16}
+                        color={
+                          planningOverview.status === "warning"
+                            ? ui.overviewWarningAccent.color
+                            : ui.overviewHealthyAccent.color
+                        }
+                      />
+                    </View>
+                    <View style={styles.overviewHeaderText}>
+                      <Text style={[styles.overviewTitle, ui.title]}>Budget Overview</Text>
+                      <Text style={[styles.overviewSubtitle, ui.helperText]}>
+                        Compare available money with planned budgets before saving.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.overviewRows}>
+                    <View style={styles.overviewRow}>
+                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Available Funds</Text>
+                      <Text style={[styles.overviewValue, ui.overviewValue]}>
+                        {formatCurrency(planningOverview.availableFunds)}
+                      </Text>
+                    </View>
+                    <View style={styles.overviewRow}>
+                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Currently Budgeted</Text>
+                      <Text style={[styles.overviewValue, ui.overviewValue]}>
+                        {formatCurrency(currentTotalBudgeted)}
+                      </Text>
+                    </View>
+                    <View style={styles.overviewRow}>
+                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Budgeted After Save</Text>
+                      <Text style={[styles.overviewValue, ui.overviewValue]}>
+                        {formatCurrency(planningOverview.newTotalBudgetedAfterSave)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.overviewStatus,
+                      planningOverview.status === "warning"
+                        ? ui.overviewWarningSurface
+                        : ui.overviewHealthySurface,
+                    ]}>
+                    <Feather
+                      name={planningOverview.status === "warning" ? "info" : "check"}
+                      size={14}
+                      color={
+                        planningOverview.status === "warning"
+                          ? ui.overviewWarningAccent.color
+                          : ui.overviewHealthyAccent.color
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.overviewStatusText,
+                        planningOverview.status === "warning"
+                          ? ui.overviewWarningAccent
+                          : ui.overviewHealthyAccent,
+                      ]}>
+                      {planningOverview.status === "warning"
+                        ? `Budgets will exceed available funds by ${formatCurrency(
+                            Math.abs(planningOverview.difference),
+                          )}.`
+                        : "Your budgets are within available funds."}
+                    </Text>
+                  </View>
+                </View>
+
+                {planningOverview.status === "warning" ? (
+                  <Animated.View
+                    entering={FadeInDown.duration(240)}
+                    layout={LinearTransition.springify().damping(18).stiffness(180)}
+                    style={[styles.insightCard, ui.insightCard]}>
+                    <View style={styles.insightHeader}>
+                      <Feather name="info" size={15} color={ui.overviewWarningAccent.color} />
+                      <Text style={[styles.insightTitle, ui.title]}>Planning Insight</Text>
+                    </View>
+                    <Text style={[styles.insightText, ui.helperText]}>
+                      Budgets are planned spending limits and may include future income.
+                    </Text>
+                    <Text style={[styles.insightText, ui.helperText]}>
+                      Budgets are planning tools, not wallet restrictions.
+                    </Text>
+                  </Animated.View>
+                ) : null}
+              </Animated.View>
+            ) : null}
           </ScrollView>
 
           <Pressable
@@ -437,6 +590,103 @@ const styles = StyleSheet.create({
   },
   helperText: {
     marginTop: 10,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  overviewCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  overviewHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  overviewIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overviewHeaderText: {
+    flex: 1,
+  },
+  overviewTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: fontWeights.bold,
+  },
+  overviewSubtitle: {
+    marginTop: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  overviewRows: {
+    marginTop: 16,
+    gap: 10,
+  },
+  overviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  overviewLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  overviewValue: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    textAlign: "right",
+  },
+  overviewStatus: {
+    marginTop: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  overviewStatusText: {
+    flex: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+  },
+  insightCard: {
+    marginTop: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  insightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  insightTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.bold,
+  },
+  insightText: {
+    marginTop: 8,
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 17,
