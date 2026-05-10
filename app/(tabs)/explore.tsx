@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { CategoryAvatar } from "@/components/category-avatar";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
@@ -51,14 +52,15 @@ function withOpacity(hex: string, opacity: number) {
 
 function renderBudgetIcon(item: BudgetCard) {
   return (
-    <MaterialCommunityIcons
-      name={
-        item.categoryIcon as React.ComponentProps<
-          typeof MaterialCommunityIcons
-        >["name"]
-      }
+    <CategoryAvatar
+      category={{
+        iconType: item.categoryIconType,
+        iconName: item.categoryIcon,
+        iconImageUri: item.categoryIconImageUri,
+        emoji: item.categoryEmoji,
+        color: item.categoryColor,
+      }}
       size={22}
-      color={item.categoryColor}
     />
   );
 }

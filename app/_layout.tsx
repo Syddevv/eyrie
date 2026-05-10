@@ -45,6 +45,7 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
+            <Stack.Screen name="categories-settings" options={{ headerShown: false }} />
             <Stack.Screen
               name="goal-details-modal"
               options={{

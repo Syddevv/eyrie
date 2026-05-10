@@ -332,6 +332,30 @@ export default function SettingsScreen() {
 
             <Pressable
               style={styles.row}
+              onPress={() => router.push("/categories-settings")}
+            >
+              <View style={styles.rowLeft}>
+                <View style={[styles.rowIconWrap, pageStyles.rowIconWrap]}>
+                  <Feather name="grid" size={18} color={colors.foreground} />
+                </View>
+                <Text style={[styles.rowTitle, pageStyles.title]}>
+                  Categories
+                </Text>
+              </View>
+
+              <View style={styles.rowRight}>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={pageStyles.trailingText.color}
+                />
+              </View>
+            </Pressable>
+
+            <View style={[styles.rowDivider, pageStyles.rowDivider]} />
+
+            <Pressable
+              style={styles.row}
               onPress={() => router.push("/currency-modal")}
             >
               <View style={styles.rowLeft}>

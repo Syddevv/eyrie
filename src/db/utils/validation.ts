@@ -1,9 +1,11 @@
 import {
   ACCOUNT_TYPES,
   BUDGET_PERIODS,
+  CATEGORY_ICON_TYPES,
   CATEGORY_TYPES,
   TRANSACTION_TYPES,
   type AccountType,
+  type CategoryIconType,
   type BudgetPeriod,
   type CategoryType,
   type TransactionType,
@@ -25,6 +27,10 @@ export function assertAccountType(value: string): asserts value is AccountType {
 
 export function assertCategoryType(value: string): asserts value is CategoryType {
   assertEnumValue(value, CATEGORY_TYPES, "category type");
+}
+
+export function assertCategoryIconType(value: string): asserts value is CategoryIconType {
+  assertEnumValue(value, CATEGORY_ICON_TYPES, "category icon type");
 }
 
 export function assertTransactionType(value: string): asserts value is TransactionType {

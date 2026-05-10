@@ -1,10 +1,12 @@
 export const ACCOUNT_TYPES = ["bank", "ewallet", "cash", "credit"] as const;
 export const CATEGORY_TYPES = ["expense", "income"] as const;
+export const CATEGORY_ICON_TYPES = ["vector", "emoji", "uploaded_image"] as const;
 export const TRANSACTION_TYPES = ["expense", "income", "transfer"] as const;
 export const BUDGET_PERIODS = ["weekly", "biweekly", "monthly"] as const;
 
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type CategoryType = (typeof CATEGORY_TYPES)[number];
+export type CategoryIconType = (typeof CATEGORY_ICON_TYPES)[number];
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 export type BudgetPeriod = (typeof BUDGET_PERIODS)[number];
 

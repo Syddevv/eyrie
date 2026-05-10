@@ -1,66 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { categoriesService } from "@/src/db/services";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-
-export type IncomeCategoryOption = {
-  id: string;
-  label: string;
-  icon: string;
-  color: string;
-  isDefault: boolean;
-};
+import { useCategories, type CategoryOption } from "@/hooks/useCategories";
 
 export function useIncomeCategories() {
-  const { user } = useCurrentUser();
-  const userId = user?.id ?? "__system__";
-  const [categories, setCategories] = useState<IncomeCategoryOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetchCategories = useCallback(async () => {
-    if (!userId) {
-      setCategories([]);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const rows = await categoriesService.fetch(userId, "income");
-      const next = (rows ?? [])
-        .map((category) => ({
-          id: category.id,
-          label: category.name,
-          icon: category.icon ?? "shape-outline",
-          color: category.color ?? "#64748B",
-          isDefault: Boolean(category.isDefault),
-        }))
-        .sort((left, right) => {
-          if (left.isDefault !== right.isDefault) {
-            return left.isDefault ? -1 : 1;
-          }
-
-          return left.label.localeCompare(right.label);
-        });
-
-      setCategories(next);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    fetchCategories().catch(() => undefined);
-  }, [fetchCategories]);
-
-  const defaultCategoryId = useMemo(
-    () => categories[0]?.id ?? null,
-    [categories],
-  );
-
-  return {
-    categories,
-    defaultCategoryId,
-    isLoading,
-    refresh: fetchCategories,
-  } as const;
+  return useCategories("income");
 }
+
+export type IncomeCategoryOption = CategoryOption;

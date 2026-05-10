@@ -1,6 +1,6 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
+import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -279,11 +280,7 @@ export default function AddCategoryModal() {
                                 styles.categoryIconWrap,
                                 { backgroundColor: `${option.color}22` },
                               ]}>
-                              <MaterialCommunityIcons
-                                name={option.icon as ComponentProps<typeof MaterialCommunityIcons>["name"]}
-                                size={18}
-                                color={option.color}
-                              />
+                              <CategoryAvatar category={option} size={18} />
                             </View>
                             <Text
                               style={[

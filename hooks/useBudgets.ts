@@ -15,7 +15,10 @@ export type BudgetCardItem = {
   id: string;
   categoryId: string;
   categoryName: string;
+  categoryIconType: "vector" | "emoji" | "uploaded_image";
   categoryIcon: string;
+  categoryIconImageUri: string | null;
+  categoryEmoji: string | null;
   categoryColor: string;
   budgetLimit: number;
   amountSpent: number;
@@ -106,7 +109,10 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
           id: budget.id,
           categoryId: budget.categoryId,
           categoryName: budget.category?.name ?? "Expense Category",
-          categoryIcon: budget.category?.icon ?? "shape-outline",
+          categoryIconType: (budget.category?.iconType ?? "vector") as BudgetCardItem["categoryIconType"],
+          categoryIcon: budget.category?.iconName ?? budget.category?.icon ?? "shape-outline",
+          categoryIconImageUri: budget.category?.iconImageUri ?? null,
+          categoryEmoji: budget.category?.emoji ?? null,
           categoryColor: budget.category?.color ?? "#64748B",
           budgetLimit: budget.amount,
           amountSpent: budget.spent,

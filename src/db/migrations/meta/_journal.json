@@ -15,6 +15,13 @@
       "when": 1778293685380,
       "tag": "0001_next_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778390000000,
+      "tag": "0002_fancy_category_control",
+      "breakpoints": true
     }
   ]
 }

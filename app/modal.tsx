@@ -15,9 +15,12 @@ import {
   View,
 } from "react-native";
 
+import { CategoryAvatar } from "@/components/category-avatar";
+import { CategoryEditorSheet, type CategoryDraft } from "@/components/category-editor-sheet";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import type { CategoryOption as ManagedCategoryOption } from "@/hooks/useCategories";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
 import { useIncomeCategories } from "@/hooks/useIncomeCategories";
 import { useMerchantsByCategory } from "@/hooks/useMerchantsByCategory";
@@ -25,7 +28,9 @@ import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCreateExpense } from "@/hooks/useCreateExpense";
 import { useCreateIncome } from "@/hooks/useCreateIncome";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
+import { categoriesService } from "@/src/db/services";
 
 type EntryType = "expense" | "income";
 
@@ -33,6 +38,11 @@ type CategoryOption = {
   id: string;
   label: string;
   icon: string;
+  iconType: ManagedCategoryOption["iconType"];
+  iconName: string | null;
+  iconImageUri: string | null;
+  emoji: string | null;
+  color: string;
 };
 
 const PRIMARY_EXPENSE_CATEGORY_LIMIT = 9;
@@ -135,7 +145,16 @@ function CategoryIcon({
   color: string;
 }) {
   return (
-    <MaterialCommunityIcons name={option.icon as any} size={14} color={color} />
+    <CategoryAvatar
+      category={{
+        iconType: option.iconType,
+        iconName: option.iconName,
+        iconImageUri: option.iconImageUri,
+        emoji: option.emoji,
+        color,
+      }}
+      size={14}
+    />
   );
 }
 
@@ -144,6 +163,7 @@ export default function AddTransactionModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const { user } = useCurrentUser();
 
   // Transaction creation hooks
   const { create: createExpense, isLoading: isCreatingExpense } =
@@ -151,8 +171,8 @@ export default function AddTransactionModal() {
   const { create: createIncome, isLoading: isCreatingIncome } =
     useCreateIncome();
 
-  const { categories: expenseCategories } = useExpenseCategories();
-  const { categories: incomeCategories } = useIncomeCategories();
+  const { categories: expenseCategories, refresh: refreshExpenseCategories } = useExpenseCategories();
+  const { categories: incomeCategories, refresh: refreshIncomeCategories } = useIncomeCategories();
   const { methods: paymentMethods } = usePaymentMethods();
 
   const [entryType, setEntryType] = useState<EntryType>("expense");
@@ -179,6 +199,8 @@ export default function AddTransactionModal() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCategoryEditorVisible, setIsCategoryEditorVisible] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   const merchantFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -254,6 +276,11 @@ export default function AddTransactionModal() {
         id: category.id,
         label: category.label,
         icon: category.icon,
+        iconType: category.iconType,
+        iconName: category.iconName,
+        iconImageUri: category.iconImageUri,
+        emoji: category.emoji,
+        color: category.color,
       })),
     [incomeCategories],
   );
@@ -361,6 +388,49 @@ export default function AddTransactionModal() {
     showMerchantSection,
     merchantOptions.length,
   ]);
+
+  const handleCreateCategory = async (draft: CategoryDraft) => {
+    setIsSavingCategory(true);
+
+    try {
+      const created = await categoriesService.create({
+        userId: user?.id ?? null,
+        name: draft.name,
+        type: draft.type,
+        iconType: draft.iconType,
+        iconName: draft.iconName,
+        iconImageUri: draft.iconImageUri,
+        emoji: draft.emoji,
+        color: draft.color,
+        icon: draft.iconType === "vector" ? draft.iconName : null,
+        isDefault: false,
+        isSystem: false,
+        isArchived: false,
+      });
+
+      if (draft.type === "expense") {
+        await refreshExpenseCategories();
+        setSelectedExpenseCategoryId(created?.id ?? null);
+        setSelectedExpenseCategoryLabel(created?.name ?? draft.name);
+      } else {
+        await refreshIncomeCategories();
+        setSelectedIncomeCategory(created?.id ?? null);
+      }
+
+      setIsCategoryEditorVisible(false);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to create category.",
+      );
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const openQuickCreateCategory = () => {
+    setErrorMessage(null);
+    setIsCategoryEditorVisible(true);
+  };
 
   const ui = useMemo(
     () => ({
@@ -563,11 +633,24 @@ export default function AddTransactionModal() {
 
             <View style={styles.section}>
               <Text style={[styles.fieldLabel, ui.fieldLabel]}>Category</Text>
+              <Text style={[styles.fieldHelper, ui.mutedValue]}>
+                Need another one? Tap Create New to add a category.
+              </Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoryRow}
               >
+                <Pressable
+                  style={[styles.categoryChip, ui.chip]}
+                  onPress={openQuickCreateCategory}
+                >
+                  <Feather name="plus" size={14} color={ui.iconTint} />
+                  <Text style={[styles.categoryChipText, ui.chipText]}>
+                    Create New
+                  </Text>
+                </Pressable>
+
                 {activeCategories.map((option) => {
                   const isActive =
                     entryType === "expense"
@@ -1183,6 +1266,26 @@ export default function AddTransactionModal() {
             </View>
           ) : null}
         </View>
+
+        <CategoryEditorSheet
+          visible={isCategoryEditorVisible}
+          title={`Create ${entryType === "expense" ? "Expense" : "Income"} Category`}
+          saveLabel="Save Category"
+          initialValue={{
+            type: entryType,
+            color:
+              entryType === "expense"
+                ? "#F97316"
+                : "#10B981",
+            iconName:
+              entryType === "expense"
+                ? "shopping-outline"
+                : "wallet-outline",
+          }}
+          isSaving={isSavingCategory}
+          onClose={() => setIsCategoryEditorVisible(false)}
+          onSave={handleCreateCategory}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -1316,6 +1419,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 17,
     fontWeight: fontWeights.medium,
+  },
+  fieldHelper: {
+    marginTop: -2,
+    marginBottom: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.regular,
   },
   categoryRow: {
     gap: 8,
