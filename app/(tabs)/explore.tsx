@@ -36,7 +36,12 @@ function sanitizeBudgetInput(value: string) {
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
-    normalized.length === 3 ? normalized.split("").map((char) => char + char).join("") : normalized;
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const red = Number.parseInt(full.slice(0, 2), 16);
   const green = Number.parseInt(full.slice(2, 4), 16);
   const blue = Number.parseInt(full.slice(4, 6), 16);
@@ -47,7 +52,11 @@ function withOpacity(hex: string, opacity: number) {
 function renderBudgetIcon(item: BudgetCard) {
   return (
     <MaterialCommunityIcons
-      name={item.categoryIcon as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+      name={
+        item.categoryIcon as React.ComponentProps<
+          typeof MaterialCommunityIcons
+        >["name"]
+      }
       size={22}
       color={item.categoryColor}
     />
@@ -74,7 +83,8 @@ export default function BudgetScreen() {
   const { budgets, summary, isLoading, refresh } = useBudgets(selectedCycle);
   const [editingBudget, setEditingBudget] = useState<BudgetCard | null>(null);
   const [draftBudgetValue, setDraftBudgetValue] = useState("");
-  const [budgetPendingDelete, setBudgetPendingDelete] = useState<BudgetCard | null>(null);
+  const [budgetPendingDelete, setBudgetPendingDelete] =
+    useState<BudgetCard | null>(null);
   const [isDeletingBudget, setIsDeletingBudget] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -82,23 +92,35 @@ export default function BudgetScreen() {
     () => ({
       background: { backgroundColor: colors.background },
       title: { color: colors.foreground },
-      mutedText: { color: colorScheme === "light" ? "#5B6980" : colors.mutedForeground },
+      mutedText: {
+        color: colorScheme === "light" ? "#5B6980" : colors.mutedForeground,
+      },
       totalGradient:
         colorScheme === "light"
           ? (["#1F9BFF", "#178BFF", "#117FFF"] as const)
           : (["#127FF0", "#0E71E2", "#0D5CCA"] as const),
       cycleCard: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
-        borderColor: colorScheme === "light" ? withOpacity(colors.border, 0.96) : "rgba(255,255,255,0.05)",
+        borderColor:
+          colorScheme === "light"
+            ? withOpacity(colors.border, 0.96)
+            : "rgba(255,255,255,0.05)",
       },
       segmentInactive: {
-        backgroundColor: colorScheme === "light" ? withOpacity(colors.secondary, 0.92) : "#1A2230",
+        backgroundColor:
+          colorScheme === "light"
+            ? withOpacity(colors.secondary, 0.92)
+            : "#1A2230",
       },
       tipCard: {
         backgroundColor:
-          colorScheme === "light" ? "rgba(226, 251, 240, 0.95)" : "rgba(2, 61, 48, 0.48)",
+          colorScheme === "light"
+            ? "rgba(226, 251, 240, 0.95)"
+            : "rgba(2, 61, 48, 0.48)",
         borderColor:
-          colorScheme === "light" ? "rgba(83, 214, 156, 0.28)" : "rgba(53, 211, 165, 0.24)",
+          colorScheme === "light"
+            ? "rgba(83, 214, 156, 0.28)"
+            : "rgba(53, 211, 165, 0.24)",
       },
       tipAvatarWrap: {
         borderColor: colorScheme === "light" ? "#BCEEDD" : "#CFEFE8",
@@ -106,31 +128,54 @@ export default function BudgetScreen() {
       },
       tipTitle: { color: colorScheme === "light" ? "#13A76B" : "#70F4B4" },
       tipText: { color: colorScheme === "light" ? "#188A61" : "#69EEA9" },
-      addButton: { backgroundColor: colorScheme === "light" ? colors.primary : "#1697FF" },
+      addButton: {
+        backgroundColor: colorScheme === "light" ? colors.primary : "#1697FF",
+      },
       categoryCard: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
-        borderColor: colorScheme === "light" ? withOpacity(colors.border, 0.96) : "rgba(255,255,255,0.04)",
+        borderColor:
+          colorScheme === "light"
+            ? withOpacity(colors.border, 0.96)
+            : "rgba(255,255,255,0.04)",
       },
       actionButton: {
-        backgroundColor: colorScheme === "light" ? withOpacity(colors.secondary, 0.92) : "#1A2230",
+        backgroundColor:
+          colorScheme === "light"
+            ? withOpacity(colors.secondary, 0.92)
+            : "#1A2230",
       },
       categorySpent: { color: colorScheme === "light" ? "#6E7787" : "#9EA6B5" },
-      categoryLeftLabel: { color: colorScheme === "light" ? "#7E8796" : "#8C93A3" },
-      progressTrack: { backgroundColor: colorScheme === "light" ? "#E8EDF4" : "#1B2433" },
+      categoryLeftLabel: {
+        color: colorScheme === "light" ? "#7E8796" : "#8C93A3",
+      },
+      progressTrack: {
+        backgroundColor: colorScheme === "light" ? "#E8EDF4" : "#1B2433",
+      },
       modalOverlay: {
-        backgroundColor: colorScheme === "light" ? "rgba(15, 23, 42, 0.24)" : "rgba(2, 6, 23, 0.58)",
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(15, 23, 42, 0.24)"
+            : "rgba(2, 6, 23, 0.58)",
       },
       modalSheet: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
-        borderColor: colorScheme === "light" ? withOpacity(colors.border, 0.98) : "rgba(255,255,255,0.06)",
+        borderColor:
+          colorScheme === "light"
+            ? withOpacity(colors.border, 0.98)
+            : "rgba(255,255,255,0.06)",
       },
       modalHandle: {
         backgroundColor: colorScheme === "light" ? "#CBD5E1" : "#64748B",
       },
       modalCloseButton: {
-        backgroundColor: colorScheme === "light" ? withOpacity(colors.secondary, 0.96) : "#1A2230",
+        backgroundColor:
+          colorScheme === "light"
+            ? withOpacity(colors.secondary, 0.96)
+            : "#1A2230",
       },
-      modalMutedText: { color: colorScheme === "light" ? "#5B6980" : "#9EA6B5" },
+      modalMutedText: {
+        color: colorScheme === "light" ? "#5B6980" : "#9EA6B5",
+      },
       budgetInput: {
         backgroundColor: colorScheme === "light" ? colors.card : "#172132",
         borderColor: colorScheme === "light" ? "#9FD0FF" : "#2E8FFF",
@@ -138,7 +183,10 @@ export default function BudgetScreen() {
       budgetInputText: { color: colors.foreground },
       emptyCard: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
-        borderColor: colorScheme === "light" ? withOpacity(colors.border, 0.96) : "rgba(255,255,255,0.04)",
+        borderColor:
+          colorScheme === "light"
+            ? withOpacity(colors.border, 0.96)
+            : "rgba(255,255,255,0.04)",
       },
     }),
     [colorScheme, colors],
@@ -147,8 +195,10 @@ export default function BudgetScreen() {
   const styles = useMemo(() => createStyles(), []);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
@@ -187,11 +237,16 @@ export default function BudgetScreen() {
     }
 
     try {
-      await budgetsService.update(editingBudget.id, { amount: nextBudgetAmount });
+      await budgetsService.update(editingBudget.id, {
+        amount: nextBudgetAmount,
+      });
       cancelEditingBudget();
       await refresh();
     } catch (error) {
-      Alert.alert("Update failed", error instanceof Error ? error.message : "Unable to update budget.");
+      Alert.alert(
+        "Update failed",
+        error instanceof Error ? error.message : "Unable to update budget.",
+      );
     }
   };
 
@@ -210,67 +265,103 @@ export default function BudgetScreen() {
       setBudgetPendingDelete(null);
       await refresh();
     } catch (error) {
-      Alert.alert("Delete failed", error instanceof Error ? error.message : "Unable to delete budget.");
+      Alert.alert(
+        "Delete failed",
+        error instanceof Error ? error.message : "Unable to delete budget.",
+      );
     } finally {
       setIsDeletingBudget(false);
     }
   };
 
   const totalRemaining = Math.max(summary.limit - summary.spent, 0);
-  const totalProgress = summary.limit > 0 ? Math.min(summary.spent / summary.limit, 1) : 0;
+  const totalProgress =
+    summary.limit > 0 ? Math.min(summary.spent / summary.limit, 1) : 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
         <View style={styles.headerBlock}>
           <Text style={[styles.title, pageStyles.title]}>Budget</Text>
-          <Text style={[styles.subtitle, pageStyles.mutedText]}>Track your spending limits</Text>
+          <Text style={[styles.subtitle, pageStyles.mutedText]}>
+            Track your spending limits
+          </Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <LinearGradient
             colors={pageStyles.totalGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.totalCard}>
+            style={styles.totalCard}
+          >
             <View style={styles.totalBubble} />
             <View style={styles.totalTopRow}>
               <Text style={styles.totalLabel}>Total Budget</Text>
               <View style={styles.totalPill}>
                 <Feather name="trending-down" size={14} color="#FFFFFF" />
-                <Text style={styles.totalPillText}>{Math.round(totalProgress * 100)}% used</Text>
+                <Text style={styles.totalPillText}>
+                  {Math.round(totalProgress * 100)}% used
+                </Text>
               </View>
             </View>
 
-            <Text style={styles.totalAmount}>{formatCurrency(summary.limit)}</Text>
+            <Text style={styles.totalAmount}>
+              {formatCurrency(summary.limit)}
+            </Text>
 
             <View style={styles.totalProgressTrack}>
-              <View style={[styles.totalProgressFill, { width: `${totalProgress * 100}%` }]} />
+              <View
+                style={[
+                  styles.totalProgressFill,
+                  { width: `${totalProgress * 100}%` },
+                ]}
+              />
             </View>
 
             <View style={styles.totalStatsRow}>
               <View>
                 <Text style={styles.totalStatLabel}>Spent</Text>
-                <Text style={styles.totalSpent}>{formatCurrency(summary.spent)}</Text>
+                <Text style={styles.totalSpent}>
+                  {formatCurrency(summary.spent)}
+                </Text>
               </View>
               <View style={styles.totalStatRight}>
                 <Text style={styles.totalStatLabel}>Remaining</Text>
-                <Text style={styles.totalRemaining}>{formatCurrency(totalRemaining)}</Text>
+                <Text style={styles.totalRemaining}>
+                  {formatCurrency(totalRemaining)}
+                </Text>
               </View>
             </View>
           </LinearGradient>
 
           <View style={[styles.cycleCard, pageStyles.cycleCard, shadows.card]}>
-            <Text style={[styles.cardTitle, pageStyles.title]}>Budget Cycle</Text>
+            <Text style={[styles.cardTitle, pageStyles.title]}>
+              Budget Cycle
+            </Text>
             <View style={styles.segmentedRow}>
               {(["weekly", "biweekly", "monthly"] as const).map((cycle) => {
                 const isActive = selectedCycle === cycle;
                 return (
                   <Pressable
                     key={cycle}
-                    style={isActive ? styles.segmentActive : [styles.segmentInactive, pageStyles.segmentInactive]}
-                    onPress={() => setSelectedCycle(cycle)}>
-                    <Text style={isActive ? styles.segmentActiveText : [styles.segmentInactiveText, pageStyles.title]}>
+                    style={
+                      isActive
+                        ? styles.segmentActive
+                        : [styles.segmentInactive, pageStyles.segmentInactive]
+                    }
+                    onPress={() => setSelectedCycle(cycle)}
+                  >
+                    <Text
+                      style={
+                        isActive
+                          ? styles.segmentActiveText
+                          : [styles.segmentInactiveText, pageStyles.title]
+                      }
+                    >
                       {cycleLabel(cycle)}
                     </Text>
                   </Pressable>
@@ -278,7 +369,11 @@ export default function BudgetScreen() {
               })}
             </View>
             <Text style={[styles.cycleHint, pageStyles.mutedText]}>
-              Budgets reset every {selectedCycle === "biweekly" ? "two weeks" : selectedCycle.slice(0, -2)} while transactions stay in history.
+              Budgets reset every{" "}
+              {selectedCycle === "biweekly"
+                ? "two weeks"
+                : selectedCycle.slice(0, -2)}{" "}
+              while transactions stay in history.
             </Text>
           </View>
 
@@ -291,27 +386,44 @@ export default function BudgetScreen() {
               />
             </View>
             <View style={styles.tipTextBlock}>
-              <Text style={[styles.tipTitle, pageStyles.tipTitle]}>Budget Tip</Text>
+              <Text style={[styles.tipTitle, pageStyles.tipTitle]}>
+                Budget Tip
+              </Text>
               <Text style={[styles.tipText, pageStyles.tipText]}>
-                Budgets are linked directly to your expense categories, so every expense updates the right budget automatically.
+                Budgets are linked directly to your expense categories, so every
+                expense updates the right budget automatically.
               </Text>
             </View>
           </View>
 
           <View style={styles.categoriesHeader}>
-            <Text style={[styles.categoriesTitle, pageStyles.title]}>Category Budgets</Text>
+            <Text style={[styles.categoriesTitle, pageStyles.title]}>
+              Category Budgets
+            </Text>
             <Pressable
               style={[styles.addButton, pageStyles.addButton]}
-              onPress={() => router.push({ pathname: "/add-category-modal", params: { cycle: selectedCycle } })}>
+              onPress={() =>
+                router.push({
+                  pathname: "/add-category-modal",
+                  params: { cycle: selectedCycle },
+                })
+              }
+            >
               <Feather name="plus" size={18} color="#FFFFFF" />
               <Text style={styles.addButtonText}>Create Budget</Text>
             </Pressable>
           </View>
 
           {isLoading ? (
-            <View style={[styles.emptyCard, pageStyles.emptyCard, shadows.soft]}>
-              <Text style={[styles.emptyTitle, pageStyles.title]}>Loading budgets</Text>
-              <Text style={[styles.emptyText, pageStyles.mutedText]}>Fetching your category spending limits.</Text>
+            <View
+              style={[styles.emptyCard, pageStyles.emptyCard, shadows.soft]}
+            >
+              <Text style={[styles.emptyTitle, pageStyles.title]}>
+                Loading budgets
+              </Text>
+              <Text style={[styles.emptyText, pageStyles.mutedText]}>
+                Fetching your category spending limits.
+              </Text>
             </View>
           ) : budgets.length ? (
             <View style={styles.categoryList}>
@@ -319,51 +431,109 @@ export default function BudgetScreen() {
                 const remainingAmount = Math.max(item.remainingAmount, 0);
 
                 return (
-                  <View key={item.id} style={[styles.categoryCard, pageStyles.categoryCard, shadows.soft]}>
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.categoryCard,
+                      pageStyles.categoryCard,
+                      shadows.soft,
+                    ]}
+                  >
                     <View style={styles.categoryTopRow}>
                       <View style={styles.categoryIdentity}>
                         <View
                           style={[
                             styles.categoryIconWrap,
-                            { backgroundColor: withOpacity(item.categoryColor, 0.16) },
-                          ]}>
+                            {
+                              backgroundColor: withOpacity(
+                                item.categoryColor,
+                                0.16,
+                              ),
+                            },
+                          ]}
+                        >
                           {renderBudgetIcon(item)}
                         </View>
                         <View>
-                          <Text style={[styles.categoryTitle, pageStyles.title]}>{item.categoryName}</Text>
-                          <Text style={[styles.categoryTransactions, pageStyles.mutedText]}>
-                            {item.transactionCount} transaction{item.transactionCount === 1 ? "" : "s"}
+                          <Text
+                            style={[styles.categoryTitle, pageStyles.title]}
+                          >
+                            {item.categoryName}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.categoryTransactions,
+                              pageStyles.mutedText,
+                            ]}
+                          >
+                            {item.transactionCount} transaction
+                            {item.transactionCount === 1 ? "" : "s"}
                           </Text>
                         </View>
                       </View>
 
                       <View style={styles.categoryActions}>
-                        <Pressable style={[styles.actionButton, pageStyles.actionButton]} onPress={() => startEditingBudget(item)}>
-                          <Feather name="edit-3" size={16} color={colors.foreground} />
+                        <Pressable
+                          style={[styles.actionButton, pageStyles.actionButton]}
+                          onPress={() => startEditingBudget(item)}
+                        >
+                          <Feather
+                            name="edit-3"
+                            size={16}
+                            color={colors.foreground}
+                          />
                         </Pressable>
                         <Pressable
                           style={[styles.actionButton, pageStyles.actionButton]}
-                          onPress={() => setBudgetPendingDelete(item)}>
-                          <Feather name="trash-2" size={16} color={colors.foreground} />
+                          onPress={() => setBudgetPendingDelete(item)}
+                        >
+                          <Feather
+                            name="trash-2"
+                            size={16}
+                            color={colors.foreground}
+                          />
                         </Pressable>
                       </View>
                     </View>
 
                     <View style={styles.categoryAmountsRow}>
-                      <Text style={[styles.categorySpent, pageStyles.categorySpent]}>
-                        {formatCurrency(item.amountSpent)} / {formatCurrency(item.budgetLimit)}
+                      <Text
+                        style={[styles.categorySpent, pageStyles.categorySpent]}
+                      >
+                        {formatCurrency(item.amountSpent)} /{" "}
+                        {formatCurrency(item.budgetLimit)}
                       </Text>
-                      <Text style={[styles.categoryRemaining, { color: item.categoryColor }]}>
+                      <Text
+                        style={[
+                          styles.categoryRemaining,
+                          { color: item.categoryColor },
+                        ]}
+                      >
                         {formatCurrency(remainingAmount)}{" "}
-                        <Text style={[styles.categoryLeftLabel, pageStyles.categoryLeftLabel]}>left</Text>
+                        <Text
+                          style={[
+                            styles.categoryLeftLabel,
+                            pageStyles.categoryLeftLabel,
+                          ]}
+                        >
+                          left
+                        </Text>
                       </Text>
                     </View>
 
-                    <View style={[styles.categoryProgressTrack, pageStyles.progressTrack]}>
+                    <View
+                      style={[
+                        styles.categoryProgressTrack,
+                        pageStyles.progressTrack,
+                      ]}
+                    >
                       <View
                         style={[
                           styles.categoryProgressFill,
-                          { width: `${Math.min(item.progress, 1) * 100}%`, backgroundColor: item.categoryColor },
+                          {
+                            width: `${Math.min(item.progress, 1) * 100}%`,
+                            backgroundColor: item.categoryColor,
+                          },
                         ]}
                       />
                     </View>
@@ -372,38 +542,58 @@ export default function BudgetScreen() {
               })}
             </View>
           ) : (
-            <View style={[styles.emptyCard, pageStyles.emptyCard, shadows.soft]}>
-              <Text style={[styles.emptyTitle, pageStyles.title]}>No budgets yet</Text>
+            <View
+              style={[styles.emptyCard, pageStyles.emptyCard, shadows.soft]}
+            >
+              <Text style={[styles.emptyTitle, pageStyles.title]}>
+                No budgets yet
+              </Text>
               <Text style={[styles.emptyText, pageStyles.mutedText]}>
                 Create your first budget to start tracking spending limits.
               </Text>
               <Pressable
                 style={[styles.emptyCtaButton, pageStyles.addButton]}
-                onPress={() => router.push({ pathname: "/add-category-modal", params: { cycle: selectedCycle } })}>
+                onPress={() =>
+                  router.push({
+                    pathname: "/add-category-modal",
+                    params: { cycle: selectedCycle },
+                  })
+                }
+              >
                 <Text style={styles.emptyCtaText}>Create Budget</Text>
               </Pressable>
             </View>
           )}
         </ScrollView>
 
-        <AppBottomNav activeTab="budget" variant={colorScheme === "dark" ? "dark" : "light"} />
+        <AppBottomNav
+          activeTab="budget"
+          variant={colorScheme === "dark" ? "dark" : "light"}
+        />
       </View>
 
       {editingBudget ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-          style={styles.modalWrap}>
+          style={styles.modalWrap}
+        >
           <View style={[styles.modalOverlay, pageStyles.modalOverlay]}>
-            <Pressable style={styles.modalBackdrop} onPress={cancelEditingBudget} />
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={cancelEditingBudget}
+            />
 
             <View
               style={[
                 styles.editSheet,
                 pageStyles.modalSheet,
                 shadows.floating,
-                keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) },
-              ]}>
+                keyboardHeight > 0 && {
+                  marginBottom: Math.max(12, keyboardHeight - 8),
+                },
+              ]}
+            >
               <View style={[styles.editSheetHandle, pageStyles.modalHandle]} />
 
               <View style={styles.editSheetHeader}>
@@ -411,53 +601,110 @@ export default function BudgetScreen() {
                   <View
                     style={[
                       styles.editSheetIconWrap,
-                      { backgroundColor: withOpacity(editingBudget.categoryColor, 0.16) },
-                    ]}>
+                      {
+                        backgroundColor: withOpacity(
+                          editingBudget.categoryColor,
+                          0.16,
+                        ),
+                      },
+                    ]}
+                  >
                     {renderBudgetIcon(editingBudget)}
                   </View>
                   <View style={styles.editSheetTextBlock}>
-                    <Text style={[styles.editSheetTitle, pageStyles.title]}>{editingBudget.categoryName}</Text>
-                    <Text style={[styles.editSheetSubtitle, pageStyles.modalMutedText]}>
+                    <Text style={[styles.editSheetTitle, pageStyles.title]}>
+                      {editingBudget.categoryName}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.editSheetSubtitle,
+                        pageStyles.modalMutedText,
+                      ]}
+                    >
                       {cycleLabel(selectedCycle)} budget
                     </Text>
                   </View>
                 </View>
 
-                <Pressable style={[styles.editSheetCloseButton, pageStyles.modalCloseButton]} onPress={cancelEditingBudget}>
+                <Pressable
+                  style={[
+                    styles.editSheetCloseButton,
+                    pageStyles.modalCloseButton,
+                  ]}
+                  onPress={cancelEditingBudget}
+                >
                   <Feather name="x" size={18} color={colors.foreground} />
                 </Pressable>
               </View>
 
               <View style={styles.editSheetSection}>
-                <Text style={[styles.editSheetLabel, pageStyles.title]}>Spent so far</Text>
-                <Text style={[styles.editSheetSpentValue, pageStyles.modalMutedText]}>
-                  {formatCurrency(editingBudget.amountSpent)} across {editingBudget.transactionCount} transaction
+                <Text style={[styles.editSheetLabel, pageStyles.title]}>
+                  Spent so far
+                </Text>
+                <Text
+                  style={[
+                    styles.editSheetSpentValue,
+                    pageStyles.modalMutedText,
+                  ]}
+                >
+                  {formatCurrency(editingBudget.amountSpent)} across{" "}
+                  {editingBudget.transactionCount} transaction
                   {editingBudget.transactionCount === 1 ? "" : "s"}
                 </Text>
               </View>
 
               <View style={styles.editSheetSection}>
-                <Text style={[styles.editSheetLabel, pageStyles.title]}>Budget limit</Text>
-                <View style={[styles.editSheetAmountField, pageStyles.budgetInput]}>
-                  <Text style={[styles.editSheetCurrency, pageStyles.modalMutedText]}>₱</Text>
+                <Text style={[styles.editSheetLabel, pageStyles.title]}>
+                  Budget limit
+                </Text>
+                <View
+                  style={[styles.editSheetAmountField, pageStyles.budgetInput]}
+                >
+                  <Text
+                    style={[
+                      styles.editSheetCurrency,
+                      pageStyles.modalMutedText,
+                    ]}
+                  >
+                    ₱
+                  </Text>
                   <TextInput
                     autoFocus
                     value={draftBudgetValue}
-                    onChangeText={(value) => setDraftBudgetValue(sanitizeBudgetInput(value))}
+                    onChangeText={(value) =>
+                      setDraftBudgetValue(sanitizeBudgetInput(value))
+                    }
                     keyboardType="decimal-pad"
                     selectionColor={colors.primary}
-                    style={[styles.editSheetAmountInput, pageStyles.budgetInputText]}
+                    style={[
+                      styles.editSheetAmountInput,
+                      pageStyles.budgetInputText,
+                    ]}
                   />
                 </View>
               </View>
 
               <View style={styles.editSheetActions}>
-                <Pressable style={[styles.editSheetSecondaryButton, pageStyles.actionButton]} onPress={cancelEditingBudget}>
-                  <Text style={[styles.editSheetSecondaryText, pageStyles.title]}>Cancel</Text>
+                <Pressable
+                  style={[
+                    styles.editSheetSecondaryButton,
+                    pageStyles.actionButton,
+                  ]}
+                  onPress={cancelEditingBudget}
+                >
+                  <Text
+                    style={[styles.editSheetSecondaryText, pageStyles.title]}
+                  >
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.editSheetPrimaryButton, { backgroundColor: colors.primary }]}
-                  onPress={() => void saveEditingBudget()}>
+                  style={[
+                    styles.editSheetPrimaryButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => void saveEditingBudget()}
+                >
                   <Text style={styles.editSheetPrimaryText}>Save Changes</Text>
                 </Pressable>
               </View>
