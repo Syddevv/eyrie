@@ -1,0 +1,46 @@
+export const GOAL_ICON_PRESETS = [
+  "shield-check",
+  "laptop",
+  "airplane",
+  "car",
+  "home",
+  "gift",
+  "school",
+  "heart",
+  "briefcase",
+  "camera",
+  "cellphone",
+  "target",
+  "wallet",
+  "beach",
+  "medical-bag",
+  "sofa",
+] as const;
+
+export const GOAL_EMOJI_PRESETS = [
+  "🎯",
+  "🏖️",
+  "🏠",
+  "🚗",
+  "💻",
+  "🎓",
+  "🎁",
+  "💍",
+  "🛟",
+  "🧳",
+  "📱",
+  "🐾",
+] as const;
+
+export const GOAL_COLOR_PRESETS = [
+  "#1495FF",
+  "#10B981",
+  "#2563EB",
+  "#8B5CF6",
+  "#EC4899",
+  "#F97316",
+  "#EAB308",
+  "#14B8A6",
+  "#64748B",
+  "#EF4444",
+] as const;

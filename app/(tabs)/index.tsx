@@ -163,7 +163,7 @@ export default function HomeScreen() {
 
     const spendingLabel = topCategory?.categoryName ?? "No spending yet";
     const goalLabel = topGoal
-      ? `${Math.round(topGoal.progress)}% to ${topGoal.name}`
+      ? `${Math.round(topGoal.progress)}% to ${topGoal.title}`
       : "No goals yet";
 
     return {

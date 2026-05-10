@@ -1,174 +1,125 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
-} from 'react-native';
+} from "react-native";
 
-import { themeColors } from '@/constants/colors';
-import { radius, shadows } from '@/constants/theme';
-import { fontFamilies, fontWeights } from '@/constants/typography';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
+import { GoalAvatar } from "@/components/goal-avatar";
+import { GOAL_COLOR_PRESETS, GOAL_EMOJI_PRESETS, GOAL_ICON_PRESETS } from "@/constants/goal-presets";
+import { themeColors } from "@/constants/colors";
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { goalsService } from "@/src/db/services";
+import { formatCurrency } from "@/src/lib/goals";
 
-type FeatherName = ComponentProps<typeof Feather>['name'];
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
-type MaterialName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-type GoalIconOption = {
-  id: string;
-  family: 'feather' | 'ionicons' | 'material';
-  name: FeatherName | IoniconName | MaterialName;
-  activeColor: string;
-};
-
-const goalIcons: readonly GoalIconOption[] = [
-  { id: 'shield', family: 'ionicons', name: 'shield-checkmark-outline', activeColor: '#10B981' },
-  { id: 'monitor', family: 'feather', name: 'monitor', activeColor: '#3B82F6' },
-  { id: 'travel', family: 'ionicons', name: 'airplane-outline', activeColor: '#8B5CF6' },
-  { id: 'car', family: 'material', name: 'car-outline', activeColor: '#F97316' },
-  { id: 'home', family: 'feather', name: 'home', activeColor: '#0EA5E9' },
-  { id: 'gift', family: 'feather', name: 'gift', activeColor: '#EF4444' },
-  { id: 'education', family: 'ionicons', name: 'school-outline', activeColor: '#6366F1' },
-  { id: 'heart', family: 'feather', name: 'heart', activeColor: '#EC4899' },
-  { id: 'briefcase', family: 'feather', name: 'briefcase', activeColor: '#14B8A6' },
-  { id: 'camera', family: 'feather', name: 'camera', activeColor: '#F59E0B' },
-  { id: 'phone', family: 'feather', name: 'smartphone', activeColor: '#64748B' },
-  { id: 'target', family: 'feather', name: 'target', activeColor: '#A855F7' },
-] as const;
-
-const monthNames = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const;
-
-const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] as const;
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"] as const;
+const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
 function sanitizeAmountInput(value: string) {
-  const normalized = value.replace(/[^0-9.]/g, '');
-  const parts = normalized.split('.');
-
+  const normalized = value.replace(/[^0-9.]/g, "");
+  const parts = normalized.split(".");
   if (parts.length === 1) {
     return parts[0];
   }
 
-  return `${parts[0]}.${parts.slice(1).join('').slice(0, 2)}`;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`;
 }
 
 function formatDateLabel(date: Date) {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${month}/${day}/${date.getFullYear()}`;
+  return `${monthNames[date.getMonth()].slice(0, 3)} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
 function buildCalendarDays(monthDate: Date) {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
   const leadingDays = firstDay.getDay();
-  const daysInMonth = lastDay.getDate();
   const cells: { key: string; date: Date; inMonth: boolean }[] = [];
 
   for (let index = 0; index < leadingDays; index += 1) {
-    const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), index - leadingDays + 1);
-    cells.push({ key: `prev-${index}`, date, inMonth: false });
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
     cells.push({
-      key: `current-${day}`,
-      date: new Date(monthDate.getFullYear(), monthDate.getMonth(), day),
-      inMonth: true,
+      key: `prev-${index}`,
+      date: new Date(monthDate.getFullYear(), monthDate.getMonth(), index - leadingDays + 1),
+      inMonth: false,
     });
   }
 
-  const remainder = cells.length % 7;
+  for (let day = 1; day <= lastDay.getDate(); day += 1) {
+    cells.push({ key: `current-${day}`, date: new Date(monthDate.getFullYear(), monthDate.getMonth(), day), inMonth: true });
+  }
 
-  if (remainder !== 0) {
-    const trailing = 7 - remainder;
-
-    for (let index = 1; index <= trailing; index += 1) {
-      cells.push({
-        key: `next-${index}`,
-        date: new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, index),
-        inMonth: false,
-      });
-    }
+  while (cells.length % 7 !== 0) {
+    const index = cells.length;
+    cells.push({
+      key: `next-${index}`,
+      date: new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, index - cells.length + 1),
+      inMonth: false,
+    });
   }
 
   return cells;
 }
 
-function GoalIcon({ option, color }: { option: GoalIconOption; color: string }) {
-  if (option.family === 'feather') {
-    return <Feather name={option.name as FeatherName} size={22} color={color} />;
-  }
-
-  if (option.family === 'material') {
-    return <MaterialCommunityIcons name={option.name as MaterialName} size={22} color={color} />;
-  }
-
-  return <Ionicons name={option.name as IoniconName} size={22} color={color} />;
+function isSameDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
 }
 
 export default function NewSavingsGoalModal() {
   const router = useRouter();
-  const { suggestedName, suggestedIconId } = useLocalSearchParams<{
+  const { suggestedName, suggestedIconName, suggestedColor } = useLocalSearchParams<{
     suggestedName?: string;
-    suggestedIconId?: string;
+    suggestedIconName?: string;
+    suggestedColor?: string;
   }>();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+  const { height: windowHeight } = useWindowDimensions();
+  const { user } = useCurrentUser();
+  const { methods } = usePaymentMethods();
 
-  const initialIconId =
-    typeof suggestedIconId === 'string' && goalIcons.some((item) => item.id === suggestedIconId)
-      ? suggestedIconId
-      : goalIcons[0].id;
-  const [goalName, setGoalName] = useState(typeof suggestedName === 'string' ? suggestedName : '');
-  const [targetAmount, setTargetAmount] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 4, 8));
-  const [calendarMonth, setCalendarMonth] = useState(new Date(2026, 4, 1));
-  const [selectedIconId, setSelectedIconId] = useState(initialIconId);
+  const [goalName, setGoalName] = useState(typeof suggestedName === "string" ? suggestedName : "");
+  const [targetAmount, setTargetAmount] = useState("");
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const next = new Date();
+    next.setMonth(next.getMonth() + 6);
+    return next;
+  });
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+  const [iconType, setIconType] = useState<"vector" | "emoji" | "uploaded_image">("vector");
+  const [iconName, setIconName] = useState(typeof suggestedIconName === "string" ? suggestedIconName : GOAL_ICON_PRESETS[0]);
+  const [emoji, setEmoji] = useState<string | null>(GOAL_EMOJI_PRESETS[0]);
+  const [iconImageUri, setIconImageUri] = useState<string | null>(null);
+  const [color, setColor] = useState<string>(typeof suggestedColor === "string" ? suggestedColor : GOAL_COLOR_PRESETS[0]);
+  const [linkedWalletId, setLinkedWalletId] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const isCreateEnabled = goalName.trim().length > 0 && Number(targetAmount) > 0;
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
     });
-
-    const hideSubscription = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
 
     return () => {
       showSubscription.remove();
@@ -176,61 +127,110 @@ export default function NewSavingsGoalModal() {
     };
   }, []);
 
+  useEffect(() => {
+    const defaultWallet = methods.find((method) => !method.isFallback);
+    setLinkedWalletId(defaultWallet?.id ?? null);
+  }, [methods]);
+
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
+  const parsedTargetAmount = Number(targetAmount) || 0;
+  const dayDifference = Math.max(1, Math.ceil((selectedDate.getTime() - Date.now()) / 86400000));
+  const monthsRemaining = Math.max(1, Math.ceil(dayDifference / 30));
+  const monthlyTarget = parsedTargetAmount > 0 ? parsedTargetAmount / monthsRemaining : 0;
+  const weeklyTarget = parsedTargetAmount > 0 ? parsedTargetAmount / Math.max(1, Math.ceil(dayDifference / 7)) : 0;
+  const linkedWallet = methods.find((method) => method.id === linkedWalletId) ?? null;
+  const isCreateEnabled = goalName.trim().length > 0 && parsedTargetAmount > 0 && selectedDate.getTime() > Date.now();
+  const isKeyboardOpen = keyboardHeight > 0;
+  const maxSheetHeight = Math.min(
+    windowHeight * 0.9,
+    Math.max(320, windowHeight - keyboardHeight - 20),
+  );
 
   const ui = useMemo(
     () => ({
-      overlay: { backgroundColor: isDark ? 'rgba(2, 6, 23, 0.64)' : 'rgba(15, 23, 42, 0.34)' },
+      overlay: { backgroundColor: isDark ? "rgba(2, 6, 23, 0.64)" : "rgba(15, 23, 42, 0.34)" },
       sheet: {
         backgroundColor: colors.card,
-        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15, 23, 42, 0.04)',
+        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(15, 23, 42, 0.04)",
       },
-      handle: { backgroundColor: isDark ? '#64748B' : '#CBD5E1' },
+      handle: { backgroundColor: isDark ? "#64748B" : "#CBD5E1" },
       title: { color: colors.foreground },
+      muted: { color: colors.mutedForeground },
       closeButton: { backgroundColor: colors.secondary },
-      closeIcon: { color: colors.mutedForeground },
-      coachCard: {
-        backgroundColor: isDark ? 'rgba(31, 113, 255, 0.12)' : 'rgba(74, 168, 255, 0.12)',
-        borderColor: isDark ? 'rgba(96,165,250,0.18)' : 'rgba(137, 191, 255, 0.34)',
-      },
-      coachText: { color: isDark ? '#B8D6FF' : '#56708E' },
-      fieldLabel: { color: colors.foreground },
-      fieldSurface: {
+      card: {
         backgroundColor: colors.secondary,
-        borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(226,232,240,0.92)',
+        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(226,232,240,0.92)",
       },
-      placeholder: { color: colors.mutedForeground },
-      value: { color: colors.foreground },
-      iconSurface: {
-        backgroundColor: colors.secondary,
-        borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(226,232,240,0.92)',
+      selectedCard: {
+        backgroundColor: isDark ? "rgba(20,149,255,0.16)" : "rgba(20,149,255,0.1)",
+        borderColor: colors.primary,
       },
-      cta: {
-        backgroundColor: colors.secondary,
-      },
-      ctaText: { color: colors.mutedForeground },
-      ctaDisabled: {
-        backgroundColor: isDark ? '#31577D' : '#A9CDED',
-      },
-      ctaActive: {
-        backgroundColor: colors.primary,
-      },
-      ctaActiveText: { color: '#FFFFFF' },
-      calendarCard: {
-        backgroundColor: colors.card,
-        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.08)',
-      },
-      mutedCalendarText: { color: colors.mutedForeground },
-      todayRing: { borderColor: colors.primary },
-      dayOutsideText: { color: isDark ? '#475569' : '#B2BCCB' },
+      primaryButton: { backgroundColor: colors.primary },
+      disabledButton: { backgroundColor: isDark ? "#31577D" : "#A9CDED" },
     }),
-    [colors, isDark]
+    [colors, isDark],
   );
+
+  const handlePickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Photo access needed", "Allow gallery access to use a custom goal icon.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+      selectionLimit: 1,
+    });
+
+    if (result.canceled || !result.assets.length) {
+      return;
+    }
+
+    setIconType("uploaded_image");
+    setIconImageUri(result.assets[0]?.uri ?? null);
+  };
+
+  const handleCreate = async () => {
+    if (!user) {
+      return;
+    }
+
+    if (!isCreateEnabled) {
+      Alert.alert("Complete required fields", "Add a name, valid target amount, and future deadline.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await goalsService.create({
+        userId: user.id,
+        title: goalName.trim(),
+        targetAmount: parsedTargetAmount,
+        targetDate: selectedDate.toISOString(),
+        iconType,
+        iconName: iconType === "vector" ? iconName : null,
+        iconImageUri: iconType === "uploaded_image" ? iconImageUri : null,
+        emoji: iconType === "emoji" ? emoji : null,
+        color,
+        linkedWalletId,
+      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch (error) {
+      Alert.alert("Unable to create goal", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
@@ -240,6 +240,8 @@ export default function NewSavingsGoalModal() {
             styles.sheet,
             ui.sheet,
             shadows.floating,
+            { maxHeight: maxSheetHeight },
+            isKeyboardOpen && styles.sheetCompact,
             keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) },
           ]}>
           <View style={[styles.handle, ui.handle]} />
@@ -247,175 +249,231 @@ export default function NewSavingsGoalModal() {
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>New Savings Goal</Text>
             <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
-              <Feather name="x" size={20} color={ui.closeIcon.color} />
+              <Feather name="x" size={20} color={ui.muted.color} />
             </Pressable>
           </View>
 
-          <View style={[styles.coachCard, ui.coachCard]}>
-            <View style={styles.coachAvatarFrame}>
-              <Image
-                contentFit="cover"
-                source={require('@/assets/images/Eyrie_Mascot_1.png')}
-                style={styles.coachAvatar}
-              />
-            </View>
-            <Text style={[styles.coachText, ui.coachText]}>
-              Setting goals is the first step to achieving them! What would you like to save for?
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.fieldLabel, ui.fieldLabel]}>Goal Name</Text>
-            <TextInput
-              value={goalName}
-              onChangeText={setGoalName}
-              placeholder="e.g., Dream Vacation"
-              placeholderTextColor={ui.placeholder.color}
-              selectionColor={colors.primary}
-              style={[styles.textField, ui.fieldSurface, ui.value]}
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.fieldLabel, ui.fieldLabel]}>Target Amount</Text>
-            <View style={[styles.amountField, ui.fieldSurface]}>
-              <Text style={[styles.currencyMark, ui.placeholder]}>₱</Text>
-              <TextInput
-                value={targetAmount}
-                onChangeText={(value) => setTargetAmount(sanitizeAmountInput(value))}
-                placeholder="0"
-                placeholderTextColor={ui.placeholder.color}
-                keyboardType="decimal-pad"
-                selectionColor={colors.primary}
-                style={[styles.amountInput, ui.value]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.fieldLabel, ui.fieldLabel]}>Target Date</Text>
-            <Pressable style={[styles.dateField, ui.fieldSurface]} onPress={() => setShowCalendar(true)}>
-              <View style={styles.dateFieldLeft}>
-                <Feather name="calendar" size={16} color={colors.mutedForeground} />
-                <Text style={[styles.dateValue, ui.value]}>{formatDateLabel(selectedDate)}</Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={isKeyboardOpen ? styles.scrollContentCompact : styles.scrollContent}>
+            <View style={[styles.previewCard, ui.card, isKeyboardOpen && styles.previewCardCompact]}>
+              <View style={[styles.previewIconWrap, { backgroundColor: `${color}22` }]}>
+                <GoalAvatar goal={{ iconType, iconName, iconImageUri, emoji, color }} size={26} />
               </View>
-              <Ionicons name="calendar-clear-outline" size={18} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.fieldLabel, ui.fieldLabel]}>Choose an Icon</Text>
-            <View style={styles.iconGrid}>
-              {goalIcons.map((iconOption) => {
-                const isActive = iconOption.id === selectedIconId;
-
-                return (
-                  <Pressable
-                    key={iconOption.id}
-                    style={[
-                      styles.iconButton,
-                      ui.iconSurface,
-                      isActive && {
-                        backgroundColor: iconOption.activeColor,
-                        borderColor: iconOption.activeColor,
-                      },
-                    ]}
-                    onPress={() => setSelectedIconId(iconOption.id)}>
-                    <GoalIcon option={iconOption} color={isActive ? '#FFFFFF' : colors.foreground} />
-                  </Pressable>
-                );
-              })}
+              <View style={styles.previewText}>
+                <Text style={[styles.previewTitle, ui.title]}>{goalName.trim() || "New Goal"}</Text>
+                <Text style={[styles.previewSubtitle, ui.muted]}>
+                  {parsedTargetAmount > 0
+                    ? `Save about ${formatCurrency(monthlyTarget)} per month to hit this goal.`
+                    : "Set a target amount and deadline to see your monthly pace."}
+                </Text>
+              </View>
             </View>
-          </View>
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Goal name</Text>
+              <TextInput
+                value={goalName}
+                onChangeText={setGoalName}
+                placeholder="e.g. Emergency Buffer"
+                placeholderTextColor={ui.muted.color}
+                selectionColor={colors.primary}
+                style={[styles.textField, ui.card, ui.title, isKeyboardOpen && styles.textFieldCompact]}
+              />
+            </View>
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Target amount</Text>
+              <View style={[styles.amountField, ui.card, isKeyboardOpen && styles.amountFieldCompact]}>
+                <Text style={[styles.currencyMark, ui.muted]}>₱</Text>
+                <TextInput
+                  value={targetAmount}
+                  onChangeText={(value) => setTargetAmount(sanitizeAmountInput(value))}
+                  placeholder="0.00"
+                  placeholderTextColor={ui.muted.color}
+                  keyboardType="decimal-pad"
+                  selectionColor={colors.primary}
+                  style={[styles.amountInput, ui.title, isKeyboardOpen && styles.amountInputCompact]}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.metricsRow, isKeyboardOpen && styles.metricsRowCompact]}>
+              <View style={[styles.metricCard, ui.card, isKeyboardOpen && styles.metricCardCompact]}>
+                <Text style={[styles.metricLabel, ui.muted]}>Monthly</Text>
+                <Text style={[styles.metricValue, ui.title]}>{formatCurrency(monthlyTarget)}</Text>
+              </View>
+              <View style={[styles.metricCard, ui.card, isKeyboardOpen && styles.metricCardCompact]}>
+                <Text style={[styles.metricLabel, ui.muted]}>Weekly</Text>
+                <Text style={[styles.metricValue, ui.title]}>{formatCurrency(weeklyTarget)}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Target date</Text>
+              <Pressable style={[styles.dateField, ui.card, isKeyboardOpen && styles.dateFieldCompact]} onPress={() => setShowCalendar(true)}>
+                <View style={styles.dateFieldLeft}>
+                  <Feather name="calendar" size={16} color={ui.muted.color} />
+                  <Text style={[styles.dateValue, ui.title]}>{formatDateLabel(selectedDate)}</Text>
+                </View>
+                <Text style={[styles.dateHint, ui.muted]}>{`${monthsRemaining} month${monthsRemaining === 1 ? "" : "s"} away`}</Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Icon style</Text>
+              <View style={styles.segmentedRow}>
+                {(["vector", "emoji", "uploaded_image"] as const).map((value) => {
+                  const isSelected = iconType === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      style={[styles.segment, ui.card, isKeyboardOpen && styles.segmentCompact, isSelected && ui.selectedCard]}
+                      onPress={() => setIconType(value)}>
+                      <Text style={[styles.segmentText, ui.title]}>{value === "vector" ? "Built-in" : value === "emoji" ? "Emoji" : "Image"}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {iconType === "vector" ? (
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+                <Text style={[styles.fieldLabel, ui.title]}>Choose icon</Text>
+                <View style={[styles.iconGrid, isKeyboardOpen && styles.iconGridCompact]}>
+                  {GOAL_ICON_PRESETS.map((item) => (
+                    <Pressable
+                      key={item}
+                      style={[styles.iconCell, ui.card, isKeyboardOpen && styles.iconCellCompact, iconName === item && ui.selectedCard]}
+                      onPress={() => setIconName(item)}>
+                      <MaterialCommunityIcons name={item} size={20} color={color} />
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {iconType === "emoji" ? (
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+                <Text style={[styles.fieldLabel, ui.title]}>Choose emoji</Text>
+                <View style={[styles.iconGrid, isKeyboardOpen && styles.iconGridCompact]}>
+                  {GOAL_EMOJI_PRESETS.map((item) => (
+                    <Pressable
+                      key={item}
+                      style={[styles.iconCell, ui.card, isKeyboardOpen && styles.iconCellCompact, emoji === item && ui.selectedCard]}
+                      onPress={() => setEmoji(item)}>
+                      <Text style={styles.emojiCell}>{item}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {iconType === "uploaded_image" ? (
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+                <Text style={[styles.fieldLabel, ui.title]}>Custom image</Text>
+                <Pressable style={[styles.uploadButton, ui.card, isKeyboardOpen && styles.uploadButtonCompact]} onPress={() => void handlePickImage()}>
+                  {iconImageUri ? (
+                    <Image contentFit="cover" source={{ uri: iconImageUri }} style={styles.uploadPreview} />
+                  ) : (
+                    <View style={styles.uploadPlaceholder}>
+                      <Feather name="image" size={18} color={ui.muted.color} />
+                    </View>
+                  )}
+                  <View style={styles.uploadTextBlock}>
+                    <Text style={[styles.uploadTitle, ui.title]}>Upload goal icon</Text>
+                    <Text style={[styles.uploadCaption, ui.muted]}>Square images work best.</Text>
+                  </View>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Accent color</Text>
+              <View style={[styles.colorGrid, isKeyboardOpen && styles.colorGridCompact]}>
+                {GOAL_COLOR_PRESETS.map((item) => (
+                  <Pressable
+                    key={item}
+                    style={[styles.colorSwatch, isKeyboardOpen && styles.colorSwatchCompact, { backgroundColor: item }, color === item && styles.colorSwatchSelected]}
+                    onPress={() => setColor(item)}
+                  />
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+              <Text style={[styles.fieldLabel, ui.title]}>Linked wallet (optional)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
+                <Pressable
+                  style={[styles.walletChip, ui.card, isKeyboardOpen && styles.walletChipCompact, linkedWalletId === null && ui.selectedCard]}
+                  onPress={() => setLinkedWalletId(null)}>
+                  <Text style={[styles.walletChipText, ui.title]}>None</Text>
+                </Pressable>
+                {methods.filter((method) => !method.isFallback).map((method) => (
+                  <Pressable
+                    key={method.id}
+                    style={[styles.walletChip, ui.card, isKeyboardOpen && styles.walletChipCompact, linkedWalletId === method.id && ui.selectedCard]}
+                    onPress={() => setLinkedWalletId(method.id)}>
+                    <Text style={[styles.walletChipText, ui.title]}>{method.label}</Text>
+                    <Text style={[styles.walletChipSubtext, ui.muted]}>{method.balanceLabel}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Text style={[styles.walletHint, ui.muted]}>
+                {linkedWallet
+                  ? `Contributions can deduct from ${linkedWallet.label} automatically.`
+                  : "You can still add manual contributions later without selecting a wallet."}
+              </Text>
+            </View>
+          </ScrollView>
 
           <Pressable
-            style={[
-              styles.createButton,
-              ui.cta,
-              isCreateEnabled ? ui.ctaActive : ui.ctaDisabled,
-            ]}
-            onPress={() => {
-              if (!isCreateEnabled) {
-                showIncompleteFormAlert();
-                return;
-              }
-
-              router.back();
-            }}>
-            <Text
-              style={[
-                styles.createButtonText,
-                ui.ctaText,
-                isCreateEnabled && ui.ctaActiveText,
-              ]}>
-              Create Goal
-            </Text>
+            style={[styles.createButton, isCreateEnabled ? ui.primaryButton : ui.disabledButton]}
+            onPress={() => void handleCreate()}
+            disabled={isSaving}>
+            <Text style={styles.createButtonText}>{isSaving ? "Creating..." : "Create Goal"}</Text>
           </Pressable>
 
           {showCalendar ? (
             <View style={styles.calendarOverlay}>
               <Pressable style={styles.calendarBackdrop} onPress={() => setShowCalendar(false)} />
-              <View style={[styles.calendarCard, ui.calendarCard, shadows.card]}>
+              <View style={[styles.calendarCard, ui.card, shadows.card]}>
                 <View style={styles.calendarHeader}>
                   <Pressable
-                    style={[styles.calendarArrow, ui.fieldSurface]}
-                    onPress={() =>
-                      setCalendarMonth(
-                        (current) => new Date(current.getFullYear(), current.getMonth() - 1, 1)
-                      )
-                    }>
-                    <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
+                    style={[styles.calendarArrow, ui.card]}
+                    onPress={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
+                    <Feather name="chevron-left" size={16} color={ui.muted.color} />
                   </Pressable>
-
-                  <Text style={[styles.calendarTitle, ui.value]}>
+                  <Text style={[styles.calendarTitle, ui.title]}>
                     {monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
                   </Text>
-
                   <Pressable
-                    style={[styles.calendarArrow, ui.fieldSurface]}
-                    onPress={() =>
-                      setCalendarMonth(
-                        (current) => new Date(current.getFullYear(), current.getMonth() + 1, 1)
-                      )
-                    }>
-                    <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                    style={[styles.calendarArrow, ui.card]}
+                    onPress={() => setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
+                    <Feather name="chevron-right" size={16} color={ui.muted.color} />
                   </Pressable>
                 </View>
-
                 <View style={styles.weekdayRow}>
                   {weekdayLabels.map((label) => (
-                    <Text key={label} style={[styles.weekdayLabel, ui.mutedCalendarText]}>
+                    <Text key={label} style={[styles.weekdayLabel, ui.muted]}>
                       {label}
                     </Text>
                   ))}
                 </View>
-
                 <View style={styles.calendarGrid}>
                   {calendarDays.map((day) => {
                     const isSelected = isSameDay(day.date, selectedDate);
-                    const isToday = isSameDay(day.date, new Date());
-
                     return (
                       <Pressable
                         key={day.key}
-                        style={[
-                          styles.dayCell,
-                          isSelected && { backgroundColor: colors.primary },
-                          !isSelected && isToday && styles.todayCell,
-                          !isSelected && isToday && ui.todayRing,
-                        ]}
+                        style={[styles.dayCell, isSelected && { backgroundColor: colors.primary }]}
                         onPress={() => {
                           setSelectedDate(day.date);
                           setCalendarMonth(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
                           setShowCalendar(false);
                         }}>
-                        <Text
-                          style={[
-                            styles.dayLabel,
-                            ui.value,
-                            !day.inMonth && ui.dayOutsideText,
-                            isSelected && styles.selectedDayText,
-                          ]}>
+                        <Text style={[styles.dayLabel, { color: isSelected ? "#FFFFFF" : day.inMonth ? colors.foreground : colors.mutedForeground }]}>
                           {day.date.getDate()}
                         </Text>
                       </Pressable>
@@ -432,238 +490,92 @@ export default function NewSavingsGoalModal() {
 }
 
 const styles = StyleSheet.create({
-  keyboardWrap: {
-    flex: 1,
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  keyboardWrap: { flex: 1 },
+  overlay: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 22,
-    borderWidth: 1,
-    maxHeight: '78%',
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 50,
-    height: 6,
-    borderRadius: radius.full,
-    marginBottom: 14,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 21,
-    lineHeight: 28,
-    fontWeight: fontWeights.bold,
-  },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coachCard: {
-    marginTop: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  coachAvatarFrame: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.full,
-    backgroundColor: '#D8F7EC',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  coachAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: radius.full,
-  },
-  coachText: {
-    flex: 1,
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 22,
-  },
-  section: {
-    marginTop: 14,
-  },
-  fieldLabel: {
-    marginBottom: 8,
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: fontWeights.medium,
-  },
-  textField: {
-    minHeight: 44,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  amountField: {
-    minHeight: 44,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  currencyMark: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: fontWeights.medium,
-  },
-  amountInput: {
-    flex: 1,
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: fontWeights.medium,
-    paddingVertical: 0,
-  },
-  dateField: {
-    minHeight: 44,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateFieldLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  dateValue: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: fontWeights.medium,
-  },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createButton: {
-    marginTop: 16,
-    height: 44,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createButtonText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 18,
-    fontWeight: fontWeights.bold,
-  },
-  calendarOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  calendarCard: {
-    width: '88%',
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  calendarArrow: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarTitle: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: fontWeights.bold,
-  },
-  weekdayRow: {
-    marginTop: 14,
-    flexDirection: 'row',
-  },
-  weekdayLabel: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: fontFamilies.sans,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: fontWeights.medium,
-  },
-  calendarGrid: {
-    marginTop: 10,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  dayCell: {
-    width: '14.2857%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-  },
-  todayCell: {
+    paddingHorizontal: 22,
+    paddingBottom: 28,
     borderWidth: 1,
   },
-  dayLabel: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: fontWeights.medium,
+  sheetCompact: {
+    paddingHorizontal: 18,
+    paddingBottom: 18,
   },
-  selectedDayText: {
-    color: '#FFFFFF',
-  },
+  handle: { alignSelf: "center", width: 50, height: 6, borderRadius: radius.full, marginBottom: 16 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  title: { fontFamily: fontFamilies.sans, fontSize: 21, lineHeight: 28, fontWeight: fontWeights.bold },
+  closeButton: { width: 34, height: 34, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
+  previewCard: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: "row", gap: 12, alignItems: "center" },
+  previewCardCompact: { padding: 12, gap: 10 },
+  previewIconWrap: { width: 50, height: 50, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
+  previewText: { flex: 1 },
+  previewTitle: { fontFamily: fontFamilies.sans, fontSize: 17, lineHeight: 22, fontWeight: fontWeights.bold },
+  previewSubtitle: { marginTop: 4, fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 18 },
+  section: { marginTop: 18 },
+  sectionCompact: { marginTop: 14 },
+  fieldLabel: { marginBottom: 10, fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.medium },
+  textField: { minHeight: 50, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, fontFamily: fontFamilies.sans, fontSize: 16, lineHeight: 20 },
+  textFieldCompact: { minHeight: 46, borderRadius: 18 },
+  amountField: { minHeight: 52, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8 },
+  amountFieldCompact: { minHeight: 46, borderRadius: 18 },
+  currencyMark: { fontFamily: fontFamilies.sans, fontSize: 22, lineHeight: 26, fontWeight: fontWeights.medium },
+  amountInput: { flex: 1, fontFamily: fontFamilies.sans, fontSize: 20, lineHeight: 24, fontWeight: fontWeights.bold, paddingVertical: 0 },
+  amountInputCompact: { fontSize: 18, lineHeight: 22 },
+  metricsRow: { marginTop: 14, flexDirection: "row", gap: 12 },
+  metricsRowCompact: { marginTop: 10, gap: 10 },
+  metricCard: { flex: 1, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 14 },
+  metricCardCompact: { paddingHorizontal: 12, paddingVertical: 10 },
+  metricLabel: { fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
+  metricValue: { marginTop: 4, fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.bold },
+  dateField: { minHeight: 50, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  dateFieldCompact: { minHeight: 46, borderRadius: 18 },
+  dateFieldLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  dateValue: { fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.medium },
+  dateHint: { fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
+  segmentedRow: { flexDirection: "row", gap: 10 },
+  segment: { flex: 1, minHeight: 40, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  segmentCompact: { minHeight: 36, borderRadius: 16 },
+  segmentText: { fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 17, fontWeight: fontWeights.bold },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  iconGridCompact: { gap: 8 },
+  iconCell: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconCellCompact: { width: 46, height: 46, borderRadius: 16 },
+  emojiCell: { fontSize: 24, lineHeight: 28 },
+  uploadButton: { minHeight: 68, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  uploadButtonCompact: { minHeight: 60, borderRadius: 18 },
+  uploadPlaceholder: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(148,163,184,0.12)" },
+  uploadPreview: { width: 44, height: 44, borderRadius: 14 },
+  uploadTextBlock: { flex: 1 },
+  uploadTitle: { fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.bold },
+  uploadCaption: { marginTop: 2, fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
+  colorGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  colorGridCompact: { gap: 10 },
+  colorSwatch: { width: 34, height: 34, borderRadius: radius.full },
+  colorSwatchCompact: { width: 30, height: 30 },
+  colorSwatchSelected: { borderWidth: 2, borderColor: "#FFFFFF" },
+  walletRow: { gap: 10, paddingRight: 12 },
+  walletChip: { minWidth: 132, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  walletChipCompact: { minWidth: 118, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10 },
+  walletChipText: { fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.bold },
+  walletChipSubtext: { marginTop: 4, fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
+  walletHint: { marginTop: 8, fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 17 },
+  createButton: { marginTop: 18, minHeight: 50, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  createButtonText: { color: "#FFFFFF", fontFamily: fontFamilies.sans, fontSize: 16, lineHeight: 20, fontWeight: fontWeights.bold },
+  scrollContent: { paddingBottom: 4 },
+  scrollContentCompact: { paddingBottom: 4 },
+  calendarOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "center", paddingHorizontal: 18 },
+  calendarBackdrop: { ...StyleSheet.absoluteFillObject },
+  calendarCard: { borderRadius: 24, padding: 16, borderWidth: 1 },
+  calendarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  calendarArrow: { width: 34, height: 34, borderRadius: radius.full, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  calendarTitle: { fontFamily: fontFamilies.sans, fontSize: 16, lineHeight: 20, fontWeight: fontWeights.bold },
+  weekdayRow: { marginTop: 16, flexDirection: "row" },
+  weekdayLabel: { flex: 1, textAlign: "center", fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
+  calendarGrid: { marginTop: 12, flexDirection: "row", flexWrap: "wrap" },
+  dayCell: { width: "14.2857%", aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 16 },
+  dayLabel: { fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.medium },
 });

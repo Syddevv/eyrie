@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
@@ -212,8 +212,8 @@ export async function getMonthlyAnalytics(
 
 export async function getGoalsProgress(userId: string) {
   const rows = await db.query.goals.findMany({
-    where: eq(goals.userId, userId),
-    orderBy: [desc(goals.createdAt)],
+    where: and(eq(goals.userId, userId), eq(goals.isArchived, false)),
+    orderBy: [asc(goals.isCompleted), asc(goals.targetDate), desc(goals.createdAt)],
   });
 
   return rows.map((goal) => ({

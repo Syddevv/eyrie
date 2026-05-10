@@ -12,7 +12,7 @@ import {
   getTotalIncome,
 } from "@/src/db";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
-import { onAccountsChanged } from "@/src/lib/dbSync";
+import { onAccountsChanged, onGoalsChanged } from "@/src/lib/dbSync";
 
 type IconLibrary = "feather" | "material";
 
@@ -611,9 +611,13 @@ export function useDashboardBootstrap(userId?: string | null) {
     const off = onAccountsChanged(() => {
       void loadDashboard(userId, { force: true });
     });
+    const offGoals = onGoalsChanged(() => {
+      void loadDashboard(userId, { force: true });
+    });
 
     return () => {
       off();
+      offGoals();
     };
   }, [loadDashboard, userId]);
 

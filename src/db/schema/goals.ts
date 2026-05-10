@@ -1,31 +1,35 @@
-import { index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 import { accounts } from "./accounts";
-import { currencies } from "./currencies";
 import { users } from "./users";
+import { CATEGORY_ICON_TYPES } from "../utils/constants";
 
 export const goals = sqliteTable(
-  "goals",
+  "saving_goals",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
+    title: text("title").notNull(),
     targetAmount: real("target_amount").notNull(),
     currentAmount: real("current_amount").notNull().default(0),
-    currencyCode: text("currency_code")
-      .notNull()
-      .references(() => currencies.code),
-    icon: text("icon"),
+    targetDate: text("target_date").notNull(),
+    iconType: text("icon_type", { enum: CATEGORY_ICON_TYPES }).notNull().default("vector"),
+    iconName: text("icon_name"),
+    iconImageUri: text("icon_image_uri"),
+    emoji: text("emoji"),
     color: text("color"),
-    targetDate: text("target_date"),
+    linkedWalletId: text("linked_wallet_id").references(() => accounts.id, { onDelete: "set null" }),
+    isCompleted: integer("is_completed", { mode: "boolean" }).notNull().default(false),
+    isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => ({
     userIdx: index("goals_user_idx").on(table.userId),
     targetDateIdx: index("goals_target_date_idx").on(table.targetDate),
+    linkedWalletIdx: index("goals_linked_wallet_idx").on(table.linkedWalletId),
   })
 );
 
@@ -36,20 +40,14 @@ export const goalContributions = sqliteTable(
     goalId: text("goal_id")
       .notNull()
       .references(() => goals.id, { onDelete: "cascade" }),
-    accountId: text("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
+    walletId: text("wallet_id").references(() => accounts.id, { onDelete: "set null" }),
     amount: real("amount").notNull(),
-    currencyCode: text("currency_code")
-      .notNull()
-      .references(() => currencies.code),
-    contributionDate: text("contribution_date").notNull(),
     note: text("note"),
     createdAt: text("created_at").notNull(),
   },
   (table) => ({
     goalIdx: index("goal_contributions_goal_idx").on(table.goalId),
-    accountIdx: index("goal_contributions_account_idx").on(table.accountId),
-    dateIdx: index("goal_contributions_date_idx").on(table.contributionDate),
+    walletIdx: index("goal_contributions_wallet_idx").on(table.walletId),
+    dateIdx: index("goal_contributions_date_idx").on(table.createdAt),
   })
 );

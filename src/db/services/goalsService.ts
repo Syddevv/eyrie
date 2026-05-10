@@ -10,7 +10,13 @@ import {
 import type { NewGoal, NewGoalContribution } from "../types";
 import { createId } from "../utils/ids";
 import { nowIso } from "../utils/time";
-import { assertNonNegativeAmount, assertPositiveAmount, assertRequiredText } from "../utils/validation";
+import {
+  assertCategoryIconType,
+  assertNonNegativeAmount,
+  assertPositiveAmount,
+  assertRequiredText,
+} from "../utils/validation";
+import { emitAccountsChanged, emitGoalsChanged } from "@/src/lib/dbSync";
 
 export type CreateGoalInput = Omit<NewGoal, "id" | "createdAt" | "updatedAt" | "currentAmount"> & {
   id?: string;
@@ -19,29 +25,37 @@ export type CreateGoalInput = Omit<NewGoal, "id" | "createdAt" | "updatedAt" | "
 
 export type CreateGoalContributionInput = Omit<NewGoalContribution, "id" | "createdAt"> & {
   id?: string;
+  allowOverdraft?: boolean;
 };
 
 export class GoalsService {
   async create(input: CreateGoalInput) {
     assertRequiredText(input.userId, "userId");
-    assertRequiredText(input.name, "goal name");
+    assertRequiredText(input.title ?? "", "goal name");
     assertPositiveAmount(input.targetAmount, "target amount");
     assertNonNegativeAmount(input.currentAmount ?? 0, "current amount");
+    assertRequiredText(input.targetDate ?? "", "target date");
+    assertCategoryIconType(input.iconType);
 
     const timestamp = nowIso();
 
-    return goalsRepository.create({
+    const created = await goalsRepository.create({
       ...input,
       id: input.id ?? createId("goal"),
       currentAmount: input.currentAmount ?? 0,
+      isCompleted: (input.currentAmount ?? 0) >= input.targetAmount,
+      isArchived: false,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
+
+    emitGoalsChanged();
+    return created;
   }
 
   async update(id: string, input: Partial<NewGoal>) {
-    if (input.name) {
-      assertRequiredText(input.name, "goal name");
+    if (input.title) {
+      assertRequiredText(input.title, "goal name");
     }
 
     if (typeof input.targetAmount === "number") {
@@ -52,11 +66,51 @@ export class GoalsService {
       assertNonNegativeAmount(input.currentAmount, "current amount");
     }
 
-    return goalsRepository.update(id, input);
+    if (input.targetDate) {
+      assertRequiredText(input.targetDate, "target date");
+    }
+
+    if (input.iconType) {
+      assertCategoryIconType(input.iconType);
+    }
+
+    const existing = await goalsRepository.findById(id);
+    if (!existing) {
+      throw new Error("Goal not found.");
+    }
+
+    const nextTarget = typeof input.targetAmount === "number" ? input.targetAmount : existing.targetAmount;
+    const nextCurrent = typeof input.currentAmount === "number" ? input.currentAmount : existing.currentAmount;
+
+    const updated = await goalsRepository.update(id, {
+      ...input,
+      isCompleted: nextTarget > 0 ? nextCurrent >= nextTarget : false,
+    });
+    emitGoalsChanged();
+    return updated;
   }
 
   async delete(id: string) {
     await goalsRepository.delete(id);
+    emitGoalsChanged();
+  }
+
+  async archive(id: string) {
+    const archived = await goalsRepository.update(id, {
+      isArchived: true,
+      updatedAt: nowIso(),
+    });
+    emitGoalsChanged();
+    return archived;
+  }
+
+  async restore(id: string) {
+    const restored = await goalsRepository.update(id, {
+      isArchived: false,
+      updatedAt: nowIso(),
+    });
+    emitGoalsChanged();
+    return restored;
   }
 
   async fetch(userId: string) {
@@ -69,31 +123,66 @@ export class GoalsService {
 
   async createContribution(input: CreateGoalContributionInput) {
     assertRequiredText(input.goalId, "goalId");
-    assertRequiredText(input.accountId, "accountId");
     assertPositiveAmount(input.amount, "contribution amount");
+    const { allowOverdraft = false, ...payload } = input;
 
     const timestamp = nowIso();
 
-    return db.transaction(async (tx) => {
+    const created = await db.transaction(async (tx) => {
+      const goal = await tx.query.goals.findFirst({
+        where: (table, { eq: innerEq }) => innerEq(table.id, payload.goalId),
+      });
+
+      if (!goal) {
+        throw new Error("Goal not found.");
+      }
+
+      if (payload.walletId) {
+        const wallet = await tx.query.accounts.findFirst({
+          where: (table, { eq: innerEq }) => innerEq(table.id, payload.walletId ?? ""),
+        });
+
+        if (!wallet) {
+          throw new Error("Wallet not found.");
+        }
+
+        if (!allowOverdraft && wallet.type !== "credit" && wallet.balance < payload.amount) {
+          throw new Error("Contribution is greater than the selected wallet balance.");
+        }
+      }
+
       const contributionId = input.id ?? createId("gcon");
 
       await tx.insert(goalContributions).values({
-        ...input,
+        ...payload,
         id: contributionId,
         createdAt: timestamp,
       });
 
-      await adjustGoalContributionAccountBalance(tx, input.accountId, -input.amount);
-      await refreshGoalCurrentAmount(tx, input.goalId);
+      if (payload.walletId) {
+        await adjustGoalContributionAccountBalance(tx, payload.walletId, -payload.amount);
+      }
+      await refreshGoalCurrentAmount(tx, payload.goalId);
 
-      return tx.query.goalContributions.findFirst({
+      const created = await tx.query.goalContributions.findFirst({
         where: (table, { eq }) => eq(table.id, contributionId),
+        with: {
+          wallet: true,
+        },
       });
+
+      return created;
     });
+
+    emitGoalsChanged();
+    if (payload.walletId) {
+      emitAccountsChanged();
+    }
+    return created;
   }
 
   async updateContribution(id: string, input: Partial<NewGoalContribution>) {
-    return db.transaction(async (tx) => {
+    const updated = await db.transaction(async (tx) => {
       const existing = await tx.query.goalContributions.findFirst({
         where: (table, { eq }) => eq(table.id, id),
       });
@@ -105,9 +194,13 @@ export class GoalsService {
       const next = { ...existing, ...input };
       assertPositiveAmount(next.amount, "contribution amount");
 
-      await adjustGoalContributionAccountBalance(tx, existing.accountId, existing.amount);
+      if (existing.walletId) {
+        await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
+      }
       await tx.update(goalContributions).set(input).where(eq(goalContributions.id, id));
-      await adjustGoalContributionAccountBalance(tx, next.accountId, -next.amount);
+      if (next.walletId) {
+        await adjustGoalContributionAccountBalance(tx, next.walletId, -next.amount);
+      }
       await refreshGoalCurrentAmount(tx, existing.goalId);
 
       if (existing.goalId !== next.goalId) {
@@ -116,8 +209,15 @@ export class GoalsService {
 
       return tx.query.goalContributions.findFirst({
         where: (table, { eq: innerEq }) => innerEq(table.id, id),
+        with: {
+          wallet: true,
+        },
       });
     });
+
+    emitGoalsChanged();
+    emitAccountsChanged();
+    return updated;
   }
 
   async deleteContribution(id: string) {
@@ -131,9 +231,14 @@ export class GoalsService {
       }
 
       await tx.delete(goalContributions).where(eq(goalContributions.id, id));
-      await adjustGoalContributionAccountBalance(tx, existing.accountId, existing.amount);
+      if (existing.walletId) {
+        await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
+      }
       await refreshGoalCurrentAmount(tx, existing.goalId);
     });
+
+    emitGoalsChanged();
+    emitAccountsChanged();
   }
 
   async fetchContributionById(id: string) {

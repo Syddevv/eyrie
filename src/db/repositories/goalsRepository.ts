@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 
 import { db } from "../client";
 import { goalContributions, goals } from "../schema";
@@ -30,13 +30,31 @@ export class GoalsRepository {
   async findAllByUser(userId: string) {
     return db.query.goals.findMany({
       where: eq(goals.userId, userId),
-      orderBy: [desc(goals.createdAt)],
+      orderBy: [asc(goals.isArchived), asc(goals.isCompleted), asc(goals.targetDate), desc(goals.createdAt)],
+      with: {
+        linkedWallet: true,
+        contributions: {
+          orderBy: [desc(goalContributions.createdAt)],
+          with: {
+            wallet: true,
+          },
+        },
+      },
     });
   }
 
   async findById(id: string) {
     return db.query.goals.findFirst({
       where: eq(goals.id, id),
+      with: {
+        linkedWallet: true,
+        contributions: {
+          orderBy: [desc(goalContributions.createdAt)],
+          with: {
+            wallet: true,
+          },
+        },
+      },
     });
   }
 
@@ -63,7 +81,10 @@ export class GoalsRepository {
   async findContributionsByGoal(goalId: string) {
     return db.query.goalContributions.findMany({
       where: eq(goalContributions.goalId, goalId),
-      orderBy: [desc(goalContributions.contributionDate), desc(goalContributions.createdAt)],
+      orderBy: [desc(goalContributions.createdAt)],
+      with: {
+        wallet: true,
+      },
     });
   }
 }

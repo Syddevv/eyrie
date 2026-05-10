@@ -127,6 +127,7 @@ export async function refreshGoalCurrentAmount(tx: Executor, goalId: string) {
     .update(goals)
     .set({
       currentAmount: roundMoney(result?.total ?? 0),
+      isCompleted: sql`case when ${roundMoney(result?.total ?? 0)} >= ${goals.targetAmount} then 1 else 0 end`,
       updatedAt: nowIso(),
     })
     .where(eq(goals.id, goalId));

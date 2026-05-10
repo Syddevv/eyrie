@@ -28,6 +28,7 @@ export const accountsRelations = relations(accounts, ({ one, many }) => ({
   transactions: many(transactions, { relationName: "sourceAccountTransactions" }),
   inboundTransfers: many(transactions, { relationName: "transferAccountTransactions" }),
   contributions: many(goalContributions),
+  linkedGoals: many(goals),
 }));
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({
@@ -76,6 +77,10 @@ export const goalsRelations = relations(goals, ({ one, many }) => ({
     fields: [goals.userId],
     references: [users.id],
   }),
+  linkedWallet: one(accounts, {
+    fields: [goals.linkedWalletId],
+    references: [accounts.id],
+  }),
   contributions: many(goalContributions),
 }));
 
@@ -84,8 +89,8 @@ export const goalContributionsRelations = relations(goalContributions, ({ one })
     fields: [goalContributions.goalId],
     references: [goals.id],
   }),
-  account: one(accounts, {
-    fields: [goalContributions.accountId],
+  wallet: one(accounts, {
+    fields: [goalContributions.walletId],
     references: [accounts.id],
   }),
 }));
