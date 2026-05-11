@@ -13,6 +13,8 @@ import {
 } from "react-native";
 
 import { radius, shadows } from "@/constants/theme";
+import { BANKS } from "@/constants/banks";
+import { CARD_NETWORKS } from "@/constants/cardNetworks";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
@@ -44,6 +46,8 @@ export default function AddBankAccountModal() {
   const params = useLocalSearchParams<{
     returnTo?: string | string[];
     parentTo?: string | string[];
+    selectedBank?: string | string[];
+    selectedCardType?: string | string[];
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
@@ -53,6 +57,17 @@ export default function AddBankAccountModal() {
   const parentTo = Array.isArray(params.parentTo)
     ? params.parentTo[0]
     : params.parentTo || "/payment-methods-modal";
+  const selectedBankId = Array.isArray(params.selectedBank)
+    ? params.selectedBank[0]
+    : params.selectedBank;
+  const selectedCardTypeId = Array.isArray(params.selectedCardType)
+    ? params.selectedCardType[0]
+    : params.selectedCardType;
+
+  const selectedBank = BANKS.find((bank) => bank.id === selectedBankId);
+  const selectedCardType = CARD_NETWORKS.find(
+    (cardType) => cardType.id === selectedCardTypeId,
+  );
 
   const [cardNumber, setCardNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -170,6 +185,28 @@ export default function AddBankAccountModal() {
             For security purposes, card details are optional because your bank
             account will not be directly connected to the app.
           </Text>
+
+          <View style={styles.selectionSummary}>
+            <View style={[styles.summaryPill, ui.fieldSurface]}>
+              <Text style={[styles.summaryLabel, ui.label]}>Bank</Text>
+              <Text
+                style={[styles.summaryValue, ui.fieldText]}
+                numberOfLines={1}
+              >
+                {selectedBank?.name || "Not selected"}
+              </Text>
+            </View>
+
+            <View style={[styles.summaryPill, ui.fieldSurface]}>
+              <Text style={[styles.summaryLabel, ui.label]}>Card Type</Text>
+              <Text
+                style={[styles.summaryValue, ui.fieldText]}
+                numberOfLines={1}
+              >
+                {selectedCardType?.name || "Not selected"}
+              </Text>
+            </View>
+          </View>
 
           <View style={styles.section}>
             <Text style={[styles.label, ui.label]}>Card Number (Optional)</Text>
@@ -341,6 +378,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: fontWeights.regular,
+  },
+  selectionSummary: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 10,
+  },
+  summaryPill: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: "center",
+  },
+  summaryLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
   },
   label: {
     marginBottom: 10,

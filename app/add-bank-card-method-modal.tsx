@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { radius, shadows } from "@/constants/theme";
@@ -8,33 +8,11 @@ import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 
-type BankOption = {
-  id: string;
-  code: string;
-  name: string;
-  color: string;
-};
+import { BANKS } from "@/constants/banks";
+import { CARD_NETWORKS } from "@/constants/cardNetworks";
+import Logo from "../components/logo";
 
-type CardTypeOption = {
-  id: string;
-  label: string;
-  code: string;
-  color: string;
-};
-
-const bankOptions: readonly BankOption[] = [
-  { id: "bpi", code: "BPI", name: "BPI", color: "#E50914" },
-  { id: "bdo", code: "BDO", name: "BDO", color: "#1D4ED8" },
-  { id: "metrobank", code: "MET", name: "Metrobank", color: "#1E3A8A" },
-  { id: "unionbank", code: "UNI", name: "UnionBank", color: "#F97316" },
-  { id: "landbank", code: "LAN", name: "Landbank", color: "#0F8A46" },
-  { id: "pnb", code: "PNB", name: "PNB", color: "#1E40AF" },
-] as const;
-
-const cardTypeOptions: readonly CardTypeOption[] = [
-  { id: "visa", code: "VISA", label: "Visa", color: "#2563EB" },
-  { id: "mastercard", code: "MC", label: "Mastercard", color: "#F97316" },
-] as const;
+// local filtered lists and simple search
 
 export default function AddBankCardMethodModal() {
   const router = useRouter();
@@ -54,6 +32,27 @@ export default function AddBankCardMethodModal() {
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<string | null>(null);
   const isContinueEnabled = Boolean(selectedBank && selectedCardType);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [visibleBanks, setVisibleBanks] = useState(BANKS);
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => setDebouncedQuery(query.trim().toLowerCase()),
+      250,
+    );
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    if (!debouncedQuery) return setVisibleBanks(BANKS);
+    const filtered = BANKS.filter(
+      (b) =>
+        b.name.toLowerCase().includes(debouncedQuery) ||
+        (b.shortName || "").toLowerCase().includes(debouncedQuery),
+    );
+    setVisibleBanks(filtered);
+  }, [debouncedQuery]);
 
   const ui = useMemo(
     () => ({
@@ -88,7 +87,9 @@ export default function AddBankCardMethodModal() {
       },
       optionCardSelected: {
         borderColor: "#60A5FA",
-        backgroundColor: isDark ? "rgba(96, 165, 250, 0.12)" : "#E8F3FF",
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.04)"
+          : "rgba(255,255,255,0.5)",
       },
       optionText: { color: isDark ? "#F8FAFC" : "#202733" },
       button: { backgroundColor: "#6DB2EE" },
@@ -136,13 +137,15 @@ export default function AddBankCardMethodModal() {
           Select your bank
         </Text>
 
+        {/* Search removed per UX: show curated banks list */}
+
         <View style={styles.bankGridWrap}>
           <ScrollView
             bounces={false}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.bankGrid}
           >
-            {bankOptions.map((bank) => {
+            {visibleBanks.map((bank) => {
               const isSelected = bank.id === selectedBank;
 
               return (
@@ -152,14 +155,18 @@ export default function AddBankCardMethodModal() {
                     styles.bankCard,
                     ui.optionCard,
                     isSelected && ui.optionCardSelected,
+                    isSelected && styles.bankCardActive,
                   ]}
                   onPress={() => setSelectedBank(bank.id)}
                 >
-                  <View
-                    style={[styles.logoBubble, { backgroundColor: bank.color }]}
-                  >
-                    <Text style={styles.logoText}>{bank.code}</Text>
-                  </View>
+                  <Logo
+                    id={bank.id}
+                    name={bank.name}
+                    shortName={bank.shortName}
+                    size={44}
+                    backgroundColor={bank.primaryColor}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text style={[styles.bankName, ui.optionText]}>
                     {bank.name}
                   </Text>
@@ -167,10 +174,6 @@ export default function AddBankCardMethodModal() {
               );
             })}
           </ScrollView>
-          <View style={styles.scrollIndicator}>
-            <View style={[styles.scrollIndicatorTrack, ui.indicatorTrack]} />
-            <View style={[styles.scrollIndicatorThumb, ui.indicatorThumb]} />
-          </View>
         </View>
 
         <Text
@@ -180,7 +183,7 @@ export default function AddBankCardMethodModal() {
         </Text>
 
         <View style={styles.cardTypeRow}>
-          {cardTypeOptions.map((cardType) => {
+          {CARD_NETWORKS.map((cardType) => {
             const isSelected = cardType.id === selectedCardType;
 
             return (
@@ -190,19 +193,27 @@ export default function AddBankCardMethodModal() {
                   styles.cardTypeCard,
                   ui.optionCard,
                   isSelected && ui.optionCardSelected,
+                  isSelected && styles.bankCardActive,
                 ]}
                 onPress={() => setSelectedCardType(cardType.id)}
               >
                 <View
                   style={[
                     styles.logoBubble,
-                    { backgroundColor: cardType.color },
+                    { backgroundColor: cardType.primaryColor || "#6DB2EE" },
                   ]}
                 >
-                  <Text style={styles.logoText}>{cardType.code}</Text>
+                  <Text style={styles.logoText}>
+                    {(cardType.shortName || cardType.name)
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </Text>
                 </View>
-                <Text style={[styles.cardTypeLabel, ui.optionText]}>
-                  {cardType.label}
+                <Text
+                  style={[styles.cardTypeLabel, ui.optionText]}
+                  numberOfLines={1}
+                >
+                  {cardType.name}
                 </Text>
               </Pressable>
             );
@@ -232,6 +243,8 @@ export default function AddBankCardMethodModal() {
               params: {
                 returnTo: "/add-bank-card-method-modal",
                 parentTo: parentTo || "/payment-methods-modal",
+                selectedBank,
+                selectedCardType,
               },
             });
           }}
@@ -312,6 +325,17 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingRight: 10,
   },
+  searchInput: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: "transparent",
+  },
+  bankCardActive: {
+    borderColor: "#60A5FA",
+  },
   bankCard: {
     width: "48%",
     minHeight: 56,
@@ -371,19 +395,23 @@ const styles = StyleSheet.create({
   },
   cardTypeCard: {
     flex: 1,
-    minHeight: 60,
-    borderRadius: 20,
+    minHeight: 52,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    gap: 10,
+    justifyContent: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
   },
   cardTypeLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 16,
     fontWeight: fontWeights.medium,
+    textAlign: "left",
+    flexShrink: 1,
   },
   continueButton: {
     marginTop: 18,

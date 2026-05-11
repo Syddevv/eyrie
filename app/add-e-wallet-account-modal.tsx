@@ -17,6 +17,7 @@ import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
+import { WALLETS } from "@/constants/wallets";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { emitAccountsChanged } from "@/src/lib/dbSync";
 
@@ -113,7 +114,21 @@ export default function AddEWalletAccountModal() {
   const selectedWalletId = Array.isArray(params.selectedWallet)
     ? params.selectedWallet[0]
     : params.selectedWallet || "gcash";
-  const selectedWallet = walletMap[selectedWalletId] ?? walletMap.gcash;
+
+  const walletFromConstants = WALLETS.find((w) => w.id === selectedWalletId);
+
+  const selectedWallet = walletFromConstants
+    ? {
+        code: (walletFromConstants.shortName || walletFromConstants.name)
+          .slice(0, 2)
+          .toUpperCase(),
+        name: walletFromConstants.name,
+        label:
+          walletFromConstants.type === "digital" ? "Digital Bank" : "E-Wallet",
+        color: walletFromConstants.primaryColor || "#2563EB",
+        buttonLabel: `Connect ${walletFromConstants.name}`,
+      }
+    : (walletMap[selectedWalletId] ?? walletMap.gcash);
 
   const [accountName, setAccountName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");

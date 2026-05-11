@@ -1,27 +1,21 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
+import Logo from "../components/logo";
+import { WALLETS } from "@/constants/wallets";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
-
-type WalletOption = {
-  id: string;
-  label: string;
-  code: string;
-  color: string;
-};
-
-const walletOptions: readonly WalletOption[] = [
-  { id: "gcash", label: "GCash", code: "G", color: "#3B82F6" },
-  { id: "maya", label: "Maya", code: "M", color: "#16C347" },
-  { id: "grabpay", label: "GrabPay", code: "G", color: "#16A34A" },
-  { id: "shopeepay", label: "ShopeePay", code: "S", color: "#F97316" },
-  { id: "coinsph", label: "Coins.ph", code: "C", color: "#2563EB" },
-] as const;
 
 export default function AddEWalletMethodModal() {
   const router = useRouter();
@@ -32,6 +26,7 @@ export default function AddEWalletMethodModal() {
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
+
   const returnTo =
     (Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo) ||
     "/payment-methods-modal";
@@ -45,6 +40,9 @@ export default function AddEWalletMethodModal() {
   const [selectedWallet, setSelectedWallet] = useState<string | null>(
     selectedWalletParam || null,
   );
+  // No search field: show curated wallets list
+  const visibleWallets = WALLETS;
+
   const isContinueEnabled = Boolean(selectedWallet);
 
   const ui = useMemo(
@@ -80,7 +78,9 @@ export default function AddEWalletMethodModal() {
       },
       walletCardSelected: {
         borderColor: "#60A5FA",
-        backgroundColor: isDark ? "rgba(96, 165, 250, 0.12)" : "#E8F3FF",
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.04)"
+          : "rgba(255,255,255,0.5)",
       },
       walletText: { color: isDark ? "#F8FAFC" : "#202733" },
       button: { backgroundColor: "#6DB2EE" },
@@ -111,7 +111,7 @@ export default function AddEWalletMethodModal() {
           style={styles.backRow}
           onPress={() =>
             router.replace({
-              pathname: returnTo,
+              pathname: returnTo as any,
               params: { returnTo: parentTo },
             })
           }
@@ -124,8 +124,14 @@ export default function AddEWalletMethodModal() {
           Select your e-wallet
         </Text>
 
-        <View style={styles.walletList}>
-          {walletOptions.map((wallet) => {
+        {/* Search removed: curated wallet list below */}
+
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.walletGridWrap}
+        >
+          {visibleWallets.map((wallet) => {
             const isSelected = wallet.id === selectedWallet;
 
             return (
@@ -135,21 +141,28 @@ export default function AddEWalletMethodModal() {
                   styles.walletCard,
                   ui.walletCard,
                   isSelected && ui.walletCardSelected,
+                  isSelected && styles.walletCardActive,
                 ]}
                 onPress={() => setSelectedWallet(wallet.id)}
               >
-                <View
-                  style={[styles.logoBubble, { backgroundColor: wallet.color }]}
+                <Logo
+                  id={wallet.id}
+                  name={wallet.name}
+                  shortName={wallet.shortName}
+                  size={36}
+                  backgroundColor={wallet.primaryColor}
+                />
+
+                <Text
+                  style={[styles.walletText, ui.walletText]}
+                  numberOfLines={2}
                 >
-                  <Text style={styles.logoText}>{wallet.code}</Text>
-                </View>
-                <Text style={[styles.walletText, ui.walletText]}>
-                  {wallet.label}
+                  {wallet.name}
                 </Text>
               </Pressable>
             );
           })}
-        </View>
+        </ScrollView>
 
         <Pressable
           style={[
@@ -188,9 +201,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     borderWidth: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 30,
+    paddingBottom: 18,
+    maxHeight: "82%",
   },
   handle: {
     alignSelf: "center",
@@ -237,41 +251,46 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.medium,
   },
-  walletList: {
-    marginTop: 14,
+  searchInput: {
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    backgroundColor: "transparent",
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+  },
+  walletGridWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
   walletCard: {
-    minHeight: 74,
-    borderRadius: 22,
+    width: "48%",
+    minHeight: 58,
+    borderRadius: 16,
     borderWidth: 1,
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 10,
   },
-  logoBubble: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 20,
-    fontWeight: fontWeights.bold,
-    color: "#FFFFFF",
+  walletCardActive: {
+    borderColor: "#60A5FA",
   },
   walletText: {
+    flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 18,
     fontWeight: fontWeights.medium,
   },
   continueButton: {
-    marginTop: 16,
+    marginTop: 8,
     height: 44,
     borderRadius: 22,
     alignItems: "center",

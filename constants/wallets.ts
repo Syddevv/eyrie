@@ -1,0 +1,178 @@
+export type WalletItem = {
+  id: string;
+  name: string;
+  shortName?: string;
+  type?: "ewallet" | "digital" | "crypto" | "cash";
+  logo?: string;
+  primaryColor?: string;
+  gradient?: string[];
+};
+
+export const WALLETS: WalletItem[] = [
+  {
+    id: "gcash",
+    name: "GCash",
+    shortName: "GCash",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/gcash.svg",
+    primaryColor: "#2563EB",
+    gradient: ["#2563EB", "#1E4ED8"],
+  },
+  {
+    id: "maya",
+    name: "Maya",
+    shortName: "Maya",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/maya.svg",
+    primaryColor: "#16C347",
+    gradient: ["#16C347", "#0FA236"],
+  },
+  {
+    id: "grabpay",
+    name: "GrabPay",
+    shortName: "Grab",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/grab.svg",
+    primaryColor: "#00A859",
+    gradient: ["#00A859", "#008746"],
+  },
+  {
+    id: "shopeepay",
+    name: "ShopeePay",
+    shortName: "Shopee",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/shopee.svg",
+    primaryColor: "#F97316",
+    gradient: ["#F97316", "#D35F13"],
+  },
+  {
+    id: "coinsph",
+    name: "Coins.ph",
+    shortName: "Coins",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/coinsph.svg",
+    primaryColor: "#2563EB",
+    gradient: ["#2563EB", "#1E4ED8"],
+  },
+  {
+    id: "lazada",
+    name: "Lazada Wallet",
+    shortName: "Lazada",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/lazada.svg",
+    primaryColor: "#FF6A00",
+    gradient: ["#FF6A00", "#E66000"],
+  },
+  {
+    id: "paypal",
+    name: "PayPal",
+    shortName: "PayPal",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/paypal.svg",
+    primaryColor: "#003087",
+    gradient: ["#003087", "#002268"],
+  },
+  {
+    id: "dragonpay",
+    name: "DragonPay",
+    shortName: "DragonPay",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/dragonpay.svg",
+    primaryColor: "#FF6A00",
+    gradient: ["#FF6A00", "#E66000"],
+  },
+  {
+    id: "cliiq",
+    name: "CliQQ Wallet",
+    shortName: "CliQQ",
+    type: "ewallet",
+    logo: "@/assets/logos/ewallets/cliqq.svg",
+    primaryColor: "#00A3FF",
+    gradient: ["#00A3FF", "#0086D6"],
+  },
+  // Digital banks grouped under wallets
+  {
+    id: "gotyme",
+    name: "GoTyme",
+    shortName: "GoTyme",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/gotyme.svg",
+    primaryColor: "#6B7280",
+    gradient: ["#6B7280", "#4B5563"],
+  },
+  {
+    id: "maribank",
+    name: "MariBank",
+    shortName: "Mari",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/maribank.svg",
+    primaryColor: "#7C3AED",
+    gradient: ["#7C3AED", "#6826D6"],
+  },
+  {
+    id: "cimb",
+    name: "CIMB",
+    shortName: "CIMB",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/cimb.svg",
+    primaryColor: "#FF3B3B",
+    gradient: ["#FF3B3B", "#E63333"],
+  },
+  {
+    id: "tonik",
+    name: "Tonik",
+    shortName: "Tonik",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/tonik.svg",
+    primaryColor: "#00B4A2",
+    gradient: ["#00B4A2", "#009284"],
+  },
+  {
+    id: "unobank",
+    name: "UNO Bank",
+    shortName: "UNO",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/unobank.svg",
+    primaryColor: "#0F172A",
+    gradient: ["#0F172A", "#0B1220"],
+  },
+  {
+    id: "komo",
+    name: "Komo",
+    shortName: "Komo",
+    type: "digital",
+    logo: "@/assets/logos/ewallets/komo.svg",
+    primaryColor: "#00C2FF",
+    gradient: ["#00C2FF", "#00A4E0"],
+  },
+  // Crypto / hybrid wallets
+  {
+    id: "binance",
+    name: "Binance Pay",
+    shortName: "Binance",
+    type: "crypto",
+    logo: "@/assets/logos/ewallets/binance.svg",
+    primaryColor: "#F59E0B",
+    gradient: ["#F59E0B", "#D68107"],
+  },
+  {
+    id: "pdax",
+    name: "PDAX",
+    shortName: "PDAX",
+    type: "crypto",
+    logo: "@/assets/logos/ewallets/pdax.svg",
+    primaryColor: "#10B981",
+    gradient: ["#10B981", "#0D9C6F"],
+  },
+  {
+    id: "cryptocom",
+    name: "Crypto.com",
+    shortName: "Crypto.com",
+    type: "crypto",
+    logo: "@/assets/logos/ewallets/cryptocom.svg",
+    primaryColor: "#0033FF",
+    gradient: ["#0033FF", "#0026CC"],
+  },
+];
+
+export default WALLETS;
