@@ -127,8 +127,8 @@ export default function AddContributionModal() {
   const isAddEnabled = parsedAmount > 0;
   const isKeyboardOpen = keyboardHeight > 0;
   const maxSheetHeight = Math.min(
-    windowHeight * 0.84,
-    Math.max(300, windowHeight - keyboardHeight - 20),
+    windowHeight * 0.82,
+    Math.max(280, windowHeight - keyboardHeight - 18),
   );
 
   const closeContributionFlow = () => {
@@ -258,7 +258,7 @@ export default function AddContributionModal() {
               <Text style={[styles.fieldLabel, ui.title]}>Source wallet</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
                 <Pressable
-                  style={[styles.walletChip, ui.card, isKeyboardOpen && styles.walletChipCompact, walletId === null && ui.selectedCard]}
+                  style={[styles.walletChip, styles.walletChipManual, ui.card, isKeyboardOpen && styles.walletChipCompact, isKeyboardOpen && styles.walletChipManualCompact, walletId === null && ui.selectedCard]}
                   onPress={() => setWalletId(null)}>
                   <Text style={[styles.walletChipText, ui.title]}>Manual only</Text>
                   <Text style={[styles.walletChipSubtext, ui.muted]}>Does not deduct from a wallet</Text>
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 22, paddingBottom: 24, borderWidth: 1 },
-  sheetCompact: { paddingHorizontal: 18, paddingBottom: 18 },
+  sheetCompact: { paddingHorizontal: 18, paddingBottom: 16 },
   handle: { alignSelf: "center", width: 50, height: 6, borderRadius: radius.full, marginBottom: 16 },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   headerIdentity: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
@@ -330,10 +330,10 @@ const styles = StyleSheet.create({
   targetText: { fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18 },
   closeButton: { width: 34, height: 34, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
   section: { marginTop: 18 },
-  sectionCompact: { marginTop: 14 },
+  sectionCompact: { marginTop: 12 },
   fieldLabel: { marginBottom: 10, fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.medium },
   amountField: { minHeight: 58, borderRadius: 20, borderWidth: 2, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8 },
-  amountFieldCompact: { minHeight: 48, borderRadius: 18, paddingHorizontal: 14 },
+  amountFieldCompact: { minHeight: 46, borderRadius: 16, paddingHorizontal: 14 },
   currencyMark: { fontFamily: fontFamilies.sans, fontSize: 22, lineHeight: 26, fontWeight: fontWeights.medium },
   amountInput: { flex: 1, fontFamily: fontFamilies.sans, fontSize: 20, lineHeight: 24, fontWeight: fontWeights.bold, paddingVertical: 0 },
   amountInputCompact: { fontSize: 18, lineHeight: 22 },
@@ -345,15 +345,17 @@ const styles = StyleSheet.create({
   quickChipText: { fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.medium },
   walletRow: { gap: 10, paddingRight: 12 },
   walletChip: { minWidth: 150, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  walletChipManual: { minWidth: 122, maxWidth: 168 },
   walletChipCompact: { minWidth: 130, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10 },
+  walletChipManualCompact: { minWidth: 112, maxWidth: 148 },
   walletChipText: { fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.bold },
   walletChipSubtext: { marginTop: 4, fontFamily: fontFamilies.sans, fontSize: 12, lineHeight: 16 },
   noteField: { minHeight: 48, borderRadius: 18, borderWidth: 1, paddingHorizontal: 16, fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20 },
   noteFieldCompact: { minHeight: 42, borderRadius: 16, fontSize: 14, lineHeight: 18, paddingHorizontal: 14 },
   coachCard: { marginTop: 18, borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 12 },
-  coachCardCompact: { marginTop: 14, borderRadius: 18, paddingVertical: 10 },
+  coachCardCompact: { marginTop: 12, borderRadius: 18, paddingVertical: 10 },
   coachText: { fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 18, fontWeight: fontWeights.medium },
-  footerActions: { marginTop: 18, flexDirection: "row", gap: 12 },
+  footerActions: { marginTop: 16, flexDirection: "row", gap: 12 },
   footerButton: { flex: 1, minHeight: 48, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   footerButtonText: { fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.bold },
   scrollContent: { paddingBottom: 4 },

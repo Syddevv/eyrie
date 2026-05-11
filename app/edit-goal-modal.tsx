@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -72,6 +73,7 @@ export default function EditGoalModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const { height: windowHeight } = useWindowDimensions();
   const { goal } = useSavingsGoal(goalId);
   const { methods } = usePaymentMethods();
 
@@ -170,14 +172,7 @@ export default function EditGoalModal() {
     }
   };
 
-  const returnToGoal = () => {
-    if (!goal) {
-      router.back();
-      return;
-    }
-
-    router.replace({ pathname: "/goal-details-modal", params: { goalId: goal.id } });
-  };
+  const closeEditFlow = () => router.replace("/(tabs)/goals");
 
   const handleSave = async () => {
     if (!goal) {
@@ -203,7 +198,7 @@ export default function EditGoalModal() {
         linkedWalletId,
       });
       await Haptics.selectionAsync();
-      returnToGoal();
+      closeEditFlow();
     } catch (error) {
       Alert.alert("Unable to update goal", error instanceof Error ? error.message : "Please try again.");
     } finally {
@@ -215,24 +210,41 @@ export default function EditGoalModal() {
     return null;
   }
 
+  const isKeyboardOpen = keyboardHeight > 0;
+  const maxSheetHeight = Math.min(
+    windowHeight * 0.88,
+    Math.max(320, windowHeight - keyboardHeight - 18),
+  );
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={returnToGoal} />
-        <View style={[styles.sheet, ui.sheet, shadows.floating, keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) }]}>
+        <Pressable style={styles.backdrop} onPress={closeEditFlow} />
+        <View
+          style={[
+            styles.sheet,
+            ui.sheet,
+            shadows.floating,
+            { maxHeight: maxSheetHeight },
+            isKeyboardOpen && styles.sheetCompact,
+            keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) },
+          ]}>
           <View style={[styles.handle, ui.handle]} />
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>Edit Goal</Text>
-            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={returnToGoal}>
+            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={closeEditFlow}>
               <Feather name="x" size={20} color={ui.muted.color} />
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={[styles.previewCard, ui.card]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={isKeyboardOpen ? styles.scrollContentCompact : styles.scrollContent}>
+            <View style={[styles.previewCard, ui.card, isKeyboardOpen && styles.previewCardCompact]}>
               <View style={[styles.previewIconWrap, { backgroundColor: `${color}22` }]}>
                 <GoalAvatar goal={{ iconType, iconName, iconImageUri, emoji, color }} size={26} />
               </View>
@@ -244,37 +256,37 @@ export default function EditGoalModal() {
               </View>
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Goal name</Text>
-              <TextInput value={goalName} onChangeText={setGoalName} selectionColor={colors.primary} style={[styles.textField, ui.card, ui.title]} />
+              <TextInput value={goalName} onChangeText={setGoalName} selectionColor={colors.primary} style={[styles.textField, ui.card, ui.title, isKeyboardOpen && styles.textFieldCompact]} />
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Target amount</Text>
-              <View style={[styles.amountField, ui.card]}>
+              <View style={[styles.amountField, ui.card, isKeyboardOpen && styles.amountFieldCompact]}>
                 <Text style={[styles.currencyMark, ui.muted]}>₱</Text>
                 <TextInput
                   value={targetAmount}
                   onChangeText={(value) => setTargetAmount(sanitizeAmountInput(value))}
                   keyboardType="decimal-pad"
                   selectionColor={colors.primary}
-                  style={[styles.amountInput, ui.title]}
+                  style={[styles.amountInput, ui.title, isKeyboardOpen && styles.amountInputCompact]}
                 />
               </View>
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Target date</Text>
-              <Pressable style={[styles.dateField, ui.card]} onPress={() => setShowCalendar(true)}>
-                <Text style={[styles.dateValue, ui.title]}>{formatDateLabel(selectedDate)}</Text>
+              <Pressable style={[styles.dateField, ui.card, isKeyboardOpen && styles.dateFieldCompact]} onPress={() => setShowCalendar(true)}>
+                <Text style={[styles.dateValue, ui.title, isKeyboardOpen && styles.dateValueCompact]}>{formatDateLabel(selectedDate)}</Text>
               </Pressable>
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Icon style</Text>
               <View style={styles.segmentedRow}>
                 {(["vector", "emoji", "uploaded_image"] as const).map((value) => (
-                  <Pressable key={value} style={[styles.segment, ui.card, iconType === value && ui.selectedCard]} onPress={() => setIconType(value)}>
+                  <Pressable key={value} style={[styles.segment, ui.card, isKeyboardOpen && styles.segmentCompact, iconType === value && ui.selectedCard]} onPress={() => setIconType(value)}>
                     <Text style={[styles.segmentText, ui.title]}>{value === "vector" ? "Built-in" : value === "emoji" ? "Emoji" : "Image"}</Text>
                   </Pressable>
                 ))}
@@ -282,10 +294,10 @@ export default function EditGoalModal() {
             </View>
 
             {iconType === "vector" ? (
-              <View style={styles.section}>
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
                 <View style={styles.iconGrid}>
                   {GOAL_ICON_PRESETS.map((item) => (
-                    <Pressable key={item} style={[styles.iconCell, ui.card, iconName === item && ui.selectedCard]} onPress={() => setIconName(item)}>
+                    <Pressable key={item} style={[styles.iconCell, ui.card, isKeyboardOpen && styles.iconCellCompact, iconName === item && ui.selectedCard]} onPress={() => setIconName(item)}>
                       <MaterialCommunityIcons name={item} size={20} color={color} />
                     </Pressable>
                   ))}
@@ -294,10 +306,10 @@ export default function EditGoalModal() {
             ) : null}
 
             {iconType === "emoji" ? (
-              <View style={styles.section}>
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
                 <View style={styles.iconGrid}>
                   {GOAL_EMOJI_PRESETS.map((item) => (
-                    <Pressable key={item} style={[styles.iconCell, ui.card, emoji === item && ui.selectedCard]} onPress={() => setEmoji(item)}>
+                    <Pressable key={item} style={[styles.iconCell, ui.card, isKeyboardOpen && styles.iconCellCompact, emoji === item && ui.selectedCard]} onPress={() => setEmoji(item)}>
                       <Text style={styles.emojiCell}>{item}</Text>
                     </Pressable>
                   ))}
@@ -306,8 +318,8 @@ export default function EditGoalModal() {
             ) : null}
 
             {iconType === "uploaded_image" ? (
-              <View style={styles.section}>
-                <Pressable style={[styles.uploadButton, ui.card]} onPress={() => void handlePickImage()}>
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+                <Pressable style={[styles.uploadButton, ui.card, isKeyboardOpen && styles.uploadButtonCompact]} onPress={() => void handlePickImage()}>
                   {iconImageUri ? <Image contentFit="cover" source={{ uri: iconImageUri }} style={styles.uploadPreview} /> : <View style={styles.uploadPlaceholder}><Feather name="image" size={18} color={ui.muted.color} /></View>}
                   <View style={styles.uploadTextBlock}>
                     <Text style={[styles.uploadTitle, ui.title]}>Update goal icon</Text>
@@ -316,7 +328,7 @@ export default function EditGoalModal() {
               </View>
             ) : null}
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Accent color</Text>
               <View style={styles.colorGrid}>
                 {GOAL_COLOR_PRESETS.map((item) => (
@@ -325,7 +337,7 @@ export default function EditGoalModal() {
               </View>
             </View>
 
-            <View style={styles.section}>
+            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.fieldLabel, ui.title]}>Linked wallet</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
                 <Pressable style={[styles.walletChip, ui.card, linkedWalletId === null && ui.selectedCard]} onPress={() => setLinkedWalletId(null)}>
@@ -341,7 +353,7 @@ export default function EditGoalModal() {
           </ScrollView>
 
           <View style={styles.footerActions}>
-            <Pressable style={[styles.footerButton, ui.card]} onPress={returnToGoal}>
+            <Pressable style={[styles.footerButton, ui.card]} onPress={closeEditFlow}>
               <Text style={[styles.footerButtonText, ui.title]}>Cancel</Text>
             </Pressable>
             <Pressable style={[styles.footerButton, isSaveEnabled ? ui.primaryButton : ui.disabledButton]} onPress={() => void handleSave()}>
@@ -398,30 +410,41 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 10, paddingHorizontal: 22, paddingBottom: 28, borderWidth: 1, maxHeight: "90%" },
+  sheetCompact: { paddingHorizontal: 18, paddingBottom: 18 },
   handle: { alignSelf: "center", width: 50, height: 6, borderRadius: radius.full, marginBottom: 16 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   title: { fontFamily: fontFamilies.sans, fontSize: 21, lineHeight: 28, fontWeight: fontWeights.bold },
   closeButton: { width: 34, height: 34, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
   previewCard: { borderRadius: 22, borderWidth: 1, padding: 16, flexDirection: "row", gap: 12, alignItems: "center" },
+  previewCardCompact: { borderRadius: 18, padding: 12 },
   previewIconWrap: { width: 50, height: 50, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
   previewText: { flex: 1 },
   previewTitle: { fontFamily: fontFamilies.sans, fontSize: 17, lineHeight: 22, fontWeight: fontWeights.bold },
   previewSubtitle: { marginTop: 4, fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 18 },
   section: { marginTop: 18 },
+  sectionCompact: { marginTop: 14 },
   fieldLabel: { marginBottom: 10, fontFamily: fontFamilies.sans, fontSize: 14, lineHeight: 18, fontWeight: fontWeights.medium },
   textField: { minHeight: 50, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, fontFamily: fontFamilies.sans, fontSize: 16, lineHeight: 20 },
+  textFieldCompact: { minHeight: 44, borderRadius: 16, paddingHorizontal: 14, fontSize: 15, lineHeight: 18 },
   amountField: { minHeight: 52, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 8 },
+  amountFieldCompact: { minHeight: 46, borderRadius: 16, paddingHorizontal: 14 },
   currencyMark: { fontFamily: fontFamilies.sans, fontSize: 22, lineHeight: 26, fontWeight: fontWeights.medium },
   amountInput: { flex: 1, fontFamily: fontFamilies.sans, fontSize: 20, lineHeight: 24, fontWeight: fontWeights.bold, paddingVertical: 0 },
+  amountInputCompact: { fontSize: 18, lineHeight: 22 },
   dateField: { minHeight: 50, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, justifyContent: "center" },
+  dateFieldCompact: { minHeight: 44, borderRadius: 16, paddingHorizontal: 14 },
   dateValue: { fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.medium },
+  dateValueCompact: { fontSize: 14, lineHeight: 18 },
   segmentedRow: { flexDirection: "row", gap: 10 },
   segment: { flex: 1, minHeight: 40, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  segmentCompact: { minHeight: 36, borderRadius: 14, paddingHorizontal: 10 },
   segmentText: { fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 17, fontWeight: fontWeights.bold },
   iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   iconCell: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconCellCompact: { width: 46, height: 46, borderRadius: 14 },
   emojiCell: { fontSize: 24, lineHeight: 28 },
   uploadButton: { minHeight: 68, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  uploadButtonCompact: { minHeight: 58, borderRadius: 16, paddingHorizontal: 14 },
   uploadPlaceholder: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(148,163,184,0.12)" },
   uploadPreview: { width: 44, height: 44, borderRadius: 14 },
   uploadTextBlock: { flex: 1 },
@@ -436,6 +459,8 @@ const styles = StyleSheet.create({
   footerButton: { flex: 1, minHeight: 48, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   footerButtonText: { fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.bold },
   primaryButtonText: { color: "#FFFFFF", fontFamily: fontFamilies.sans, fontSize: 15, lineHeight: 20, fontWeight: fontWeights.bold },
+  scrollContent: { paddingBottom: 4 },
+  scrollContentCompact: { paddingBottom: 4 },
   calendarOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "center", paddingHorizontal: 18 },
   calendarBackdrop: { ...StyleSheet.absoluteFillObject },
   calendarCard: { borderRadius: 24, padding: 16, borderWidth: 1 },
