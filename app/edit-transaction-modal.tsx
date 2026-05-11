@@ -273,6 +273,18 @@ export default function EditTransactionModal() {
       />
     );
 
+  const previewMerchantLabel =
+    selectedMerchantOption?.label ?? (merchantQuery.trim() || null);
+  const previewTitle = isIncomeTransaction
+    ? (selectedCategory?.label ?? transaction?.category ?? transaction?.title)
+    : (previewMerchantLabel ?? transaction?.title);
+  const previewSubtitle = [
+    selectedCategory?.label ?? transaction?.category,
+    transaction?.dateLabel,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const returnToDetails = () =>
     transaction
       ? router.replace({
@@ -379,10 +391,10 @@ export default function EditTransactionModal() {
             </View>
             <View style={styles.headerText}>
               <Text style={[styles.title, ui.title]}>
-                {transaction?.title ?? "Transaction"}
+                {previewTitle ?? "Transaction"}
               </Text>
               <Text style={[styles.subtitle, ui.subtitle]}>
-                {transaction?.dateLabel ??
+                {previewSubtitle ||
                   (isLoading
                     ? "Loading transaction..."
                     : "Transaction not found")}

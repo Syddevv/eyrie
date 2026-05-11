@@ -18,6 +18,7 @@ export type TransactionListItem = {
   id: string;
   title: string;
   merchant: string;
+  merchantId: string | null;
   category: string;
   categoryId: string | null;
   accountId: string;
@@ -332,6 +333,7 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
     id: source.id,
     title: merchant,
     merchant,
+    merchantId: source.merchantId ?? null,
     category: categoryName,
     categoryId: source.categoryId ?? null,
     accountId: source.accountId,
