@@ -129,10 +129,7 @@ export default function AddBankAccountModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => router.replace(parentTo)}
-        />
+        <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
         <View
           style={[
@@ -150,7 +147,7 @@ export default function AddBankAccountModal() {
             <Text style={[styles.title, ui.title]}>Add Card</Text>
             <Pressable
               style={[styles.closeButton, ui.closeButton]}
-              onPress={() => router.replace(parentTo)}
+              onPress={() => router.back()}
             >
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
@@ -274,7 +271,7 @@ export default function AddBankAccountModal() {
                 // ignore - global feedback handled elsewhere
               }
 
-              router.replace(parentTo);
+              router.back();
             }}
           >
             <Text style={[styles.addButtonText, ui.buttonText]}>Add Card</Text>

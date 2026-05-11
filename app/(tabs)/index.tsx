@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useMemo, type ComponentProps } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -77,6 +78,8 @@ function renderDashboardIcon(
   );
 }
 
+const HOME_CONTENT_WIDTH = Dimensions.get("window").width - 32;
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
@@ -93,9 +96,7 @@ export default function HomeScreen() {
 
   useDashboardBootstrap(currentUser?.id);
 
-  const visibleAccounts = allAccounts.filter(
-    (account) => !account.isHidden && account.type !== "cash",
-  );
+  const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
 
   // Calculate total balance including ALL account types (bank, ewallet, cash, but NOT credit)
   // This matches the getTotalBalance query which includes bank, ewallet, and cash
@@ -318,9 +319,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.incomeAmount}>
-                  {summary
-                    ? formatCurrency(summary.totalIncome)
-                    : "---"}
+                  {summary ? formatCurrency(summary.totalIncome) : "---"}
                 </Text>
               </View>
 
@@ -334,9 +333,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.expenseAmount}>
-                  {summary
-                    ? formatCurrency(summary.totalExpenses)
-                    : "---"}
+                  {summary ? formatCurrency(summary.totalExpenses) : "---"}
                 </Text>
               </View>
             </View>
@@ -344,7 +341,7 @@ export default function HomeScreen() {
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              My Cards
+              Cards
             </Text>
             <View style={styles.hideRow}>
               <Feather name="eye" size={16} color={colors.mutedForeground} />
@@ -358,7 +355,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.cardsRow}
           >
             {(() => {
-              const cardAccounts = allAccounts.filter(
+              const cardAccounts = visibleAccounts.filter(
                 (a) => a.type === "bank" || a.type === "credit",
               );
 
@@ -367,16 +364,36 @@ export default function HomeScreen() {
                   <View
                     style={[
                       styles.emptyCard,
-                      { backgroundColor: pageStyles.whiteCard.backgroundColor },
+                      {
+                        backgroundColor: pageStyles.whiteCard.backgroundColor,
+                        borderColor: withOpacity(colors.border, 0.9),
+                      },
                       shadows.soft,
                     ]}
                   >
-                    <View style={styles.emptyCardIconWrap}>
-                      <MaterialCommunityIcons
-                        name="credit-card-outline"
-                        size={28}
-                        color={colors.mutedForeground}
-                      />
+                    <View style={styles.emptyCardHero}>
+                      <View
+                        style={[
+                          styles.emptyCardIconWrap,
+                          {
+                            backgroundColor:
+                              colorScheme === "light"
+                                ? "#E8F3FF"
+                                : withOpacity(colors.primary, 0.18),
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="credit-card-outline"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      </View>
+                      <Text
+                        style={[styles.emptyCardEyebrow, pageStyles.mutedText]}
+                      >
+                        Card Setup
+                      </Text>
                     </View>
                     <Text
                       style={[
@@ -390,82 +407,125 @@ export default function HomeScreen() {
                       Connect your first bank or credit card to view it here.
                     </Text>
                     <Pressable
-                      style={[styles.emptyCardButton, pageStyles.topButton]}
-                      onPress={() => router.push("/add-payment-method-modal")}
+                      style={[
+                        styles.emptyCardButton,
+                        { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() =>
+                        router.push("/add-bank-card-method-modal", {
+                          returnTo: "/(tabs)",
+                          parentTo: "/(tabs)",
+                        })
+                      }
                     >
-                      <Text style={styles.emptyCardButtonText}>Add card</Text>
+                      <View style={styles.emptyCardButtonContent}>
+                        <Feather name="plus" size={15} color="#FFFFFF" />
+                        <Text style={styles.emptyCardButtonText}>Add card</Text>
+                      </View>
                     </Pressable>
                   </View>
                 );
               }
 
-              return cardAccounts.map((acct) => (
+              return [
+                ...cardAccounts.map((acct) => (
+                  <Pressable
+                    key={acct.id}
+                    style={styles.cardPressable}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/payment-method-details-modal",
+                        params: { methodId: acct.id },
+                      })
+                    }
+                  >
+                    <LinearGradient
+                      colors={[
+                        acct.color ?? "#3553D8",
+                        acct.color ?? "#2A49CF",
+                        acct.color ?? "#2445C9",
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.accountCard}
+                    >
+                      <View
+                        style={[
+                          styles.cardBubbleLarge,
+                          { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.cardBubbleSmall,
+                          { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                        ]}
+                      />
+                      <View style={styles.cardTopRow}>
+                        <View>
+                          <Text style={styles.cardLabel}>{acct.name}</Text>
+                          <Text style={styles.cardName}>
+                            {acct.type === "credit" ? "Credit" : "Bank"}
+                          </Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.cardBadge,
+                            { backgroundColor: acct.color ?? "#F7B400" },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.cardAmount}>
+                        {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                      </Text>
+                      <View style={styles.cardBottomRow}>
+                        <Text style={styles.cardDigits}>
+                          •••• {acct.accountNumberLast4 ?? ""}
+                        </Text>
+                        <Text style={styles.cardType}>
+                          {acct.type === "credit" ? "CREDIT" : "DEBIT"}
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </Pressable>
+                )),
                 <Pressable
-                  key={acct.id}
-                  style={styles.cardPressable}
+                  key="add-account-card"
+                  style={[styles.cardPressable, styles.addAccountCardPressable]}
                   onPress={() =>
-                    router.push({
-                      pathname: "/payment-method-details-modal",
-                      params: { methodId: acct.id },
+                    router.push("/add-bank-card-method-modal", {
+                      returnTo: "/(tabs)",
+                      parentTo: "/(tabs)",
                     })
                   }
                 >
-                  <LinearGradient
-                    colors={[
-                      acct.color ?? "#3553D8",
-                      acct.color ?? "#2A49CF",
-                      acct.color ?? "#2445C9",
+                  <View
+                    style={[
+                      styles.addAccountCard,
+                      pageStyles.whiteCard,
+                      { borderColor: withOpacity(colors.border, 0.95) },
                     ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.accountCard}
                   >
-                    <View
-                      style={[
-                        styles.cardBubbleLarge,
-                        { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.cardBubbleSmall,
-                        { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                      ]}
-                    />
-                    <View style={styles.cardTopRow}>
-                      <View>
-                        <Text style={styles.cardLabel}>{acct.name}</Text>
-                        <Text style={styles.cardName}>
-                          {acct.type === "credit" ? "Credit" : "Bank"}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.cardBadge,
-                          { backgroundColor: acct.color ?? "#F7B400" },
-                        ]}
-                      />
+                    <View style={styles.addAccountIconWrap}>
+                      <Feather name="plus" size={16} color="#2FAF66" />
                     </View>
-                    <Text style={styles.cardAmount}>
-                      {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                    <Text
+                      style={[
+                        styles.addAccountLabel,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Add Card
                     </Text>
-                    <View style={styles.cardBottomRow}>
-                      <Text style={styles.cardDigits}>
-                        •••• {acct.accountNumberLast4 ?? ""}
-                      </Text>
-                      <Text style={styles.cardType}>
-                        {acct.type === "credit" ? "CREDIT" : "DEBIT"}
-                      </Text>
-                    </View>
-                  </LinearGradient>
-                </Pressable>
-              ));
+                  </View>
+                </Pressable>,
+              ];
             })()}
           </ScrollView>
 
           <View style={[styles.sectionHeader, styles.walletsHeader]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              My Wallets
+              Wallets
             </Text>
           </View>
 
@@ -475,7 +535,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.cardsRow}
           >
             {(() => {
-              const walletAccounts = allAccounts.filter(
+              const walletAccounts = visibleAccounts.filter(
                 (a) => a.type === "ewallet" || a.type === "cash",
               );
 
@@ -484,16 +544,36 @@ export default function HomeScreen() {
                   <View
                     style={[
                       styles.emptyCard,
-                      { backgroundColor: pageStyles.whiteCard.backgroundColor },
+                      {
+                        backgroundColor: pageStyles.whiteCard.backgroundColor,
+                        borderColor: withOpacity(colors.border, 0.9),
+                      },
                       shadows.soft,
                     ]}
                   >
-                    <View style={styles.emptyCardIconWrap}>
-                      <MaterialCommunityIcons
-                        name="wallet-outline"
-                        size={28}
-                        color={colors.mutedForeground}
-                      />
+                    <View style={styles.emptyCardHero}>
+                      <View
+                        style={[
+                          styles.emptyCardIconWrap,
+                          {
+                            backgroundColor:
+                              colorScheme === "light"
+                                ? "#E7FAEF"
+                                : withOpacity("#16B76D", 0.22),
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="wallet-outline"
+                          size={24}
+                          color="#16B76D"
+                        />
+                      </View>
+                      <Text
+                        style={[styles.emptyCardEyebrow, pageStyles.mutedText]}
+                      >
+                        Wallet Setup
+                      </Text>
                     </View>
                     <Text
                       style={[
@@ -508,75 +588,120 @@ export default function HomeScreen() {
                       balances.
                     </Text>
                     <Pressable
-                      style={[styles.emptyCardButton, pageStyles.topButton]}
-                      onPress={() => router.push("/add-payment-method-modal")}
+                      style={[
+                        styles.emptyCardButton,
+                        { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() =>
+                        router.push("/add-e-wallet-method-modal", {
+                          returnTo: "/(tabs)",
+                          parentTo: "/(tabs)",
+                        })
+                      }
                     >
-                      <Text style={styles.emptyCardButtonText}>Add wallet</Text>
+                      <View style={styles.emptyCardButtonContent}>
+                        <Feather name="plus" size={15} color="#FFFFFF" />
+                        <Text style={styles.emptyCardButtonText}>
+                          Add wallet
+                        </Text>
+                      </View>
                     </Pressable>
                   </View>
                 );
               }
 
-              return walletAccounts.map((acct) => (
+              return [
+                ...walletAccounts.map((acct) => (
+                  <Pressable
+                    key={acct.id}
+                    style={styles.cardPressable}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/payment-method-details-modal",
+                        params: { methodId: acct.id },
+                      })
+                    }
+                  >
+                    <LinearGradient
+                      colors={[
+                        acct.color ?? "#16B76D",
+                        acct.color ?? "#0FA785",
+                        acct.color ?? "#119E8D",
+                      ]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.accountCard}
+                    >
+                      <View
+                        style={[
+                          styles.cardBubbleLarge,
+                          { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.cardBubbleSmall,
+                          { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                        ]}
+                      />
+                      <View style={styles.cardTopRow}>
+                        <View>
+                          <Text style={styles.cardLabel}>
+                            {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
+                          </Text>
+                          <Text style={styles.cardName}>{acct.name}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.walletBadge,
+                            { backgroundColor: acct.color ?? "#D9ECFF" },
+                          ]}
+                        >
+                          <Text style={styles.walletBadgeText}>
+                            {acct.name.charAt(0)}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.walletAmount}>
+                        {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                      </Text>
+                      <Text style={styles.walletType}>
+                        {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                )),
                 <Pressable
-                  key={acct.id}
-                  style={styles.cardPressable}
+                  key="add-account-wallet"
+                  style={[styles.cardPressable, styles.addAccountCardPressable]}
                   onPress={() =>
-                    router.push({
-                      pathname: "/payment-method-details-modal",
-                      params: { methodId: acct.id },
+                    router.push("/add-e-wallet-method-modal", {
+                      returnTo: "/(tabs)",
+                      parentTo: "/(tabs)",
                     })
                   }
                 >
-                  <LinearGradient
-                    colors={[
-                      acct.color ?? "#16B76D",
-                      acct.color ?? "#0FA785",
-                      acct.color ?? "#119E8D",
+                  <View
+                    style={[
+                      styles.addAccountCard,
+                      pageStyles.whiteCard,
+                      { borderColor: withOpacity(colors.border, 0.95) },
                     ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.accountCard}
                   >
-                    <View
-                      style={[
-                        styles.cardBubbleLarge,
-                        { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.cardBubbleSmall,
-                        { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                      ]}
-                    />
-                    <View style={styles.cardTopRow}>
-                      <View>
-                        <Text style={styles.cardLabel}>
-                          {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
-                        </Text>
-                        <Text style={styles.cardName}>{acct.name}</Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.walletBadge,
-                          { backgroundColor: acct.color ?? "#D9ECFF" },
-                        ]}
-                      >
-                        <Text style={styles.walletBadgeText}>
-                          {acct.name.charAt(0)}
-                        </Text>
-                      </View>
+                    <View style={styles.addAccountIconWrap}>
+                      <Feather name="plus" size={16} color="#2FAF66" />
                     </View>
-                    <Text style={styles.walletAmount}>
-                      {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                    <Text
+                      style={[
+                        styles.addAccountLabel,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Add Wallet
                     </Text>
-                    <Text style={styles.walletType}>
-                      {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
-                    </Text>
-                  </LinearGradient>
-                </Pressable>
-              ));
+                  </View>
+                </Pressable>,
+              ];
             })()}
           </ScrollView>
 
@@ -724,8 +849,8 @@ export default function HomeScreen() {
 
           <View style={styles.transactionList}>
             {recentTransactions.length ? (
-                recentTransactions.map((item) => (
-                  <View key={item.id} style={styles.transactionRow}>
+              recentTransactions.map((item) => (
+                <View key={item.id} style={styles.transactionRow}>
                   <View
                     style={[
                       styles.transactionIconWrap,
@@ -1156,6 +1281,34 @@ const styles = StyleSheet.create({
   cardPressable: {
     width: 164,
   },
+  addAccountCardPressable: {
+    minHeight: 120,
+  },
+  addAccountCard: {
+    minHeight: 120,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    backgroundColor: "#F9F1ED",
+  },
+  addAccountIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#DDF3D8",
+  },
+  addAccountLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+    textAlign: "center",
+  },
   accountCard: {
     minHeight: 120,
     borderRadius: 24,
@@ -1360,26 +1513,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyCard: {
-    width: 320,
-    borderRadius: 18,
-    paddingVertical: 18,
+    width: HOME_CONTENT_WIDTH,
+    minHeight: 172,
+    borderRadius: 22,
+    paddingVertical: 14,
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
   },
+  emptyCardHero: {
+    alignItems: "center",
+    gap: 6,
+  },
   emptyCardIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
+  },
+  emptyCardEyebrow: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+    letterSpacing: 0.2,
   },
   emptyCardTitle: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 20,
     fontWeight: fontWeights.bold,
     textAlign: "center",
@@ -1391,18 +1555,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   emptyCardButton: {
-    marginTop: 10,
+    marginTop: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
+  },
+  emptyCardButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   emptyCardButtonText: {
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.medium,
+    color: "#FFFFFF",
   },
   emptyStateTitle: {
     fontFamily: fontFamilies.sans,

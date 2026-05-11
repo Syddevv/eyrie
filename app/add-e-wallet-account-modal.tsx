@@ -196,10 +196,7 @@ export default function AddEWalletAccountModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => router.replace(parentTo)}
-        />
+        <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
         <View
           style={[
@@ -217,7 +214,7 @@ export default function AddEWalletAccountModal() {
             <Text style={[styles.title, ui.title]}>Add Wallet</Text>
             <Pressable
               style={[styles.closeButton, ui.closeButton]}
-              onPress={() => router.replace(parentTo)}
+              onPress={() => router.back()}
             >
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
@@ -349,7 +346,7 @@ export default function AddEWalletAccountModal() {
                 // ignore
               }
 
-              router.replace(parentTo);
+              router.back();
             }}
           >
             <Text style={[styles.connectButtonText, ui.buttonText]}>

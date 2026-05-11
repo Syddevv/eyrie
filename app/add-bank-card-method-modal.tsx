@@ -1,12 +1,12 @@
-import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { radius, shadows } from '@/constants/theme';
-import { fontFamilies, fontWeights } from '@/constants/typography';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { showIncompleteFormAlert } from '@/lib/utils/form-feedback';
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 
 type BankOption = {
   id: string;
@@ -23,26 +23,33 @@ type CardTypeOption = {
 };
 
 const bankOptions: readonly BankOption[] = [
-  { id: 'bpi', code: 'BPI', name: 'BPI', color: '#E50914' },
-  { id: 'bdo', code: 'BDO', name: 'BDO', color: '#1D4ED8' },
-  { id: 'metrobank', code: 'MET', name: 'Metrobank', color: '#1E3A8A' },
-  { id: 'unionbank', code: 'UNI', name: 'UnionBank', color: '#F97316' },
-  { id: 'landbank', code: 'LAN', name: 'Landbank', color: '#0F8A46' },
-  { id: 'pnb', code: 'PNB', name: 'PNB', color: '#1E40AF' },
+  { id: "bpi", code: "BPI", name: "BPI", color: "#E50914" },
+  { id: "bdo", code: "BDO", name: "BDO", color: "#1D4ED8" },
+  { id: "metrobank", code: "MET", name: "Metrobank", color: "#1E3A8A" },
+  { id: "unionbank", code: "UNI", name: "UnionBank", color: "#F97316" },
+  { id: "landbank", code: "LAN", name: "Landbank", color: "#0F8A46" },
+  { id: "pnb", code: "PNB", name: "PNB", color: "#1E40AF" },
 ] as const;
 
 const cardTypeOptions: readonly CardTypeOption[] = [
-  { id: 'visa', code: 'VISA', label: 'Visa', color: '#2563EB' },
-  { id: 'mastercard', code: 'MC', label: 'Mastercard', color: '#F97316' },
+  { id: "visa", code: "VISA", label: "Visa", color: "#2563EB" },
+  { id: "mastercard", code: "MC", label: "Mastercard", color: "#F97316" },
 ] as const;
 
 export default function AddBankCardMethodModal() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ returnTo?: string | string[]; parentTo?: string | string[] }>();
-  const colorScheme = useColorScheme() ?? 'light';
-  const isDark = colorScheme === 'dark';
-  const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo || '/add-payment-method-modal';
-  const parentTo = Array.isArray(params.parentTo) ? params.parentTo[0] : params.parentTo || '/payment-methods-modal';
+  const params = useLocalSearchParams<{
+    returnTo?: string | string[];
+    parentTo?: string | string[];
+  }>();
+  const colorScheme = useColorScheme() ?? "light";
+  const isDark = colorScheme === "dark";
+  const returnTo =
+    (Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo) ||
+    "/payment-methods-modal";
+  const parentTo =
+    (Array.isArray(params.parentTo) ? params.parentTo[0] : params.parentTo) ||
+    "/payment-methods-modal";
 
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [selectedCardType, setSelectedCardType] = useState<string | null>(null);
@@ -51,77 +58,111 @@ export default function AddBankCardMethodModal() {
   const ui = useMemo(
     () => ({
       overlay: {
-        backgroundColor: isDark ? 'rgba(2, 6, 23, 0.56)' : 'rgba(15, 23, 42, 0.32)',
+        backgroundColor: isDark
+          ? "rgba(2, 6, 23, 0.56)"
+          : "rgba(15, 23, 42, 0.32)",
       },
       sheet: {
-        backgroundColor: isDark ? '#111A27' : '#F4F8FC',
-        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.05)',
+        backgroundColor: isDark ? "#111A27" : "#F4F8FC",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(15, 23, 42, 0.05)",
       },
       handle: {
-        backgroundColor: isDark ? '#526173' : '#C9D3DF',
+        backgroundColor: isDark ? "#526173" : "#C9D3DF",
       },
-      title: { color: isDark ? '#F8FAFC' : '#1A202C' },
+      title: { color: isDark ? "#F8FAFC" : "#1A202C" },
       closeButton: {
-        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.72)',
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(255,255,255,0.72)",
       },
-      closeIcon: { color: isDark ? '#D4DCE6' : '#202733' },
-      backText: { color: isDark ? '#A9B6C8' : '#6B7280' },
-      sectionTitle: { color: isDark ? '#F8FAFC' : '#1F2937' },
+      closeIcon: { color: isDark ? "#D4DCE6" : "#202733" },
+      backText: { color: isDark ? "#A9B6C8" : "#6B7280" },
+      sectionTitle: { color: isDark ? "#F8FAFC" : "#1F2937" },
       optionCard: {
-        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.5)',
-        borderColor: isDark ? 'rgba(255,255,255,0.06)' : '#DCE4EE',
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.04)"
+          : "rgba(255,255,255,0.5)",
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "#DCE4EE",
       },
       optionCardSelected: {
-        borderColor: '#60A5FA',
-        backgroundColor: isDark ? 'rgba(96, 165, 250, 0.12)' : '#E8F3FF',
+        borderColor: "#60A5FA",
+        backgroundColor: isDark ? "rgba(96, 165, 250, 0.12)" : "#E8F3FF",
       },
-      optionText: { color: isDark ? '#F8FAFC' : '#202733' },
-      button: { backgroundColor: '#6DB2EE' },
-      buttonDisabled: { backgroundColor: isDark ? '#31577D' : '#A9CDED' },
-      buttonText: { color: '#FFFFFF' },
-      indicatorTrack: { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : '#D1D5DB' },
-      indicatorThumb: { backgroundColor: isDark ? '#9CA3AF' : '#9CA3AF' },
+      optionText: { color: isDark ? "#F8FAFC" : "#202733" },
+      button: { backgroundColor: "#6DB2EE" },
+      buttonDisabled: { backgroundColor: isDark ? "#31577D" : "#A9CDED" },
+      buttonText: { color: "#FFFFFF" },
+      indicatorTrack: {
+        backgroundColor: isDark ? "rgba(255,255,255,0.12)" : "#D1D5DB",
+      },
+      indicatorThumb: { backgroundColor: isDark ? "#9CA3AF" : "#9CA3AF" },
     }),
-    [isDark]
+    [isDark],
   );
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
-      <Pressable style={styles.backdrop} onPress={() => router.replace(parentTo)} />
+      <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
       <View style={[styles.sheet, ui.sheet, shadows.floating]}>
         <View style={[styles.handle, ui.handle]} />
 
         <View style={styles.headerRow}>
           <Text style={[styles.title, ui.title]}>Add Card</Text>
-          <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.replace(parentTo)}>
+          <Pressable
+            style={[styles.closeButton, ui.closeButton]}
+            onPress={() => router.back()}
+          >
             <Feather name="x" size={20} color={ui.closeIcon.color} />
           </Pressable>
         </View>
 
         <Pressable
           style={styles.backRow}
-          onPress={() => router.replace({ pathname: returnTo, params: { returnTo: parentTo } })}>
+          onPress={() => {
+            router.replace({
+              pathname: returnTo as any,
+              params: { returnTo: parentTo },
+            });
+          }}
+        >
           <Feather name="chevron-left" size={18} color={ui.backText.color} />
           <Text style={[styles.backText, ui.backText]}>Back</Text>
         </Pressable>
 
-        <Text style={[styles.sectionTitle, ui.sectionTitle]}>Select your bank</Text>
+        <Text style={[styles.sectionTitle, ui.sectionTitle]}>
+          Select your bank
+        </Text>
 
         <View style={styles.bankGridWrap}>
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} contentContainerStyle={styles.bankGrid}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.bankGrid}
+          >
             {bankOptions.map((bank) => {
               const isSelected = bank.id === selectedBank;
 
               return (
                 <Pressable
                   key={bank.id}
-                  style={[styles.bankCard, ui.optionCard, isSelected && ui.optionCardSelected]}
-                  onPress={() => setSelectedBank(bank.id)}>
-                  <View style={[styles.logoBubble, { backgroundColor: bank.color }]}>
+                  style={[
+                    styles.bankCard,
+                    ui.optionCard,
+                    isSelected && ui.optionCardSelected,
+                  ]}
+                  onPress={() => setSelectedBank(bank.id)}
+                >
+                  <View
+                    style={[styles.logoBubble, { backgroundColor: bank.color }]}
+                  >
                     <Text style={styles.logoText}>{bank.code}</Text>
                   </View>
-                  <Text style={[styles.bankName, ui.optionText]}>{bank.name}</Text>
+                  <Text style={[styles.bankName, ui.optionText]}>
+                    {bank.name}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -132,7 +173,11 @@ export default function AddBankCardMethodModal() {
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, styles.cardTypeTitle, ui.sectionTitle]}>Card Type</Text>
+        <Text
+          style={[styles.sectionTitle, styles.cardTypeTitle, ui.sectionTitle]}
+        >
+          Card Type
+        </Text>
 
         <View style={styles.cardTypeRow}>
           {cardTypeOptions.map((cardType) => {
@@ -141,41 +186,59 @@ export default function AddBankCardMethodModal() {
             return (
               <Pressable
                 key={cardType.id}
-                style={[styles.cardTypeCard, ui.optionCard, isSelected && ui.optionCardSelected]}
-                onPress={() => setSelectedCardType(cardType.id)}>
-                <View style={[styles.logoBubble, { backgroundColor: cardType.color }]}>
+                style={[
+                  styles.cardTypeCard,
+                  ui.optionCard,
+                  isSelected && ui.optionCardSelected,
+                ]}
+                onPress={() => setSelectedCardType(cardType.id)}
+              >
+                <View
+                  style={[
+                    styles.logoBubble,
+                    { backgroundColor: cardType.color },
+                  ]}
+                >
                   <Text style={styles.logoText}>{cardType.code}</Text>
                 </View>
-                <Text style={[styles.cardTypeLabel, ui.optionText]}>{cardType.label}</Text>
+                <Text style={[styles.cardTypeLabel, ui.optionText]}>
+                  {cardType.label}
+                </Text>
               </Pressable>
             );
           })}
         </View>
 
         <Pressable
-          style={[styles.continueButton, isContinueEnabled ? ui.button : ui.buttonDisabled]}
+          style={[
+            styles.continueButton,
+            isContinueEnabled ? ui.button : ui.buttonDisabled,
+          ]}
           onPress={() => {
             if (!isContinueEnabled) {
               const message =
                 !selectedBank && !selectedCardType
-                  ? 'Please select a bank and card type before continuing.'
+                  ? "Please select a bank and card type before continuing."
                   : !selectedBank
-                    ? 'Please select a bank before continuing.'
-                    : 'Please select a card type before continuing.';
+                    ? "Please select a bank before continuing."
+                    : "Please select a card type before continuing.";
 
-              showIncompleteFormAlert('Selection required', message);
+              showIncompleteFormAlert("Selection required", message);
               return;
             }
 
             router.replace({
-              pathname: '/add-bank-account-modal',
+              pathname: "/add-bank-account-modal",
               params: {
-                returnTo: '/add-bank-card-method-modal',
-                parentTo,
+                returnTo: "/add-bank-card-method-modal",
+                parentTo: parentTo || "/payment-methods-modal",
               },
             });
-          }}>
-          <Text style={[styles.continueButtonText, ui.buttonText]}>Continue</Text>
+          }}
+        >
+          <Text style={[styles.continueButtonText, ui.buttonText]}>
+            Continue
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -183,7 +246,7 @@ export default function AddBankCardMethodModal() {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     borderTopLeftRadius: 30,
@@ -194,16 +257,16 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   handle: {
-    alignSelf: 'center',
+    alignSelf: "center",
     width: 49,
     height: 6,
     borderRadius: radius.full,
     marginBottom: 18,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   title: {
     fontFamily: fontFamilies.sans,
@@ -215,14 +278,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   backRow: {
     marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: 2,
   },
   backText: {
@@ -240,22 +303,22 @@ const styles = StyleSheet.create({
   },
   bankGridWrap: {
     marginTop: 12,
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    flexDirection: "row",
+    alignItems: "stretch",
   },
   bankGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     paddingRight: 10,
   },
   bankCard: {
-    width: '48%',
+    width: "48%",
     minHeight: 56,
     borderRadius: 20,
     borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     gap: 10,
   },
@@ -263,15 +326,15 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoText: {
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 14,
     fontWeight: fontWeights.bold,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   bankName: {
     fontFamily: fontFamilies.sans,
@@ -282,8 +345,8 @@ const styles = StyleSheet.create({
   },
   scrollIndicator: {
     width: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 4,
   },
   scrollIndicatorTrack: {
@@ -292,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   scrollIndicatorThumb: {
-    position: 'absolute',
+    position: "absolute",
     top: 20,
     width: 6,
     height: 64,
@@ -303,7 +366,7 @@ const styles = StyleSheet.create({
   },
   cardTypeRow: {
     marginTop: 12,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   cardTypeCard: {
@@ -311,8 +374,8 @@ const styles = StyleSheet.create({
     minHeight: 60,
     borderRadius: 20,
     borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     gap: 10,
   },
@@ -326,8 +389,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
     height: 44,
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   continueButtonText: {
     fontFamily: fontFamilies.sans,

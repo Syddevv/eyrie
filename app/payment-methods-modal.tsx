@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { settingsPaymentMethods } from "@/constants/settings-payment-methods";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useTotalAssets } from "@/hooks/useTotalAssets";
@@ -11,17 +12,47 @@ import { formatCurrency } from "@/hooks/use-dashboard";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { accountsService } from "@/src/db/services";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function PaymentMethodsModal() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
-  const { accounts, isLoading: accountsLoading } = useAccounts();
+  const { accounts, isLoading: accountsLoading, refresh } = useAccounts();
   const { total, isLoading: totalLoading } = useTotalAssets();
+  const { showSnackbar } = useAuthStore();
+
+  const [deletingAccountId, setDeletingAccountId] = useState<string | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const visibleAccounts = useMemo(
     () => accounts.filter((account) => !account.isHidden),
     [accounts],
   );
+
+  const accountToDelete = useMemo(
+    () => visibleAccounts.find((a) => a.id === deletingAccountId),
+    [visibleAccounts, deletingAccountId],
+  );
+
+  const handleDeleteAccount = async () => {
+    if (!deletingAccountId) return;
+
+    setIsDeleting(true);
+    try {
+      await accountsService.delete(deletingAccountId);
+      await refresh();
+      setDeletingAccountId(null);
+      showSnackbar("Account deleted successfully");
+    } catch (error) {
+      showSnackbar("Failed to delete account. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const ui = useMemo(
     () => ({
@@ -151,47 +182,66 @@ export default function PaymentMethodsModal() {
             </View>
           ) : (
             visibleAccounts.map((acct) => (
-              <Pressable
-                key={acct.id}
-                style={[styles.methodCard, ui.methodCard]}
-                onPress={() =>
-                  router.replace({
-                    pathname: "/payment-wallet-details-modal",
-                    params: { methodId: acct.id },
-                  })
-                }
-              >
-                <View
-                  style={[
-                    styles.brandBubble,
-                    { backgroundColor: acct.color ?? "#6DB2EE" },
-                  ]}
+              <View key={acct.id}>
+                <Pressable
+                  style={[styles.methodCard, ui.methodCard]}
+                  onPress={() =>
+                    router.replace({
+                      pathname: "/payment-wallet-details-modal",
+                      params: { methodId: acct.id },
+                    })
+                  }
                 >
-                  <Text style={styles.brandText}>
-                    {(acct.name || "").slice(0, 2).toUpperCase()}
-                  </Text>
-                </View>
+                  <View
+                    style={[
+                      styles.brandBubble,
+                      { backgroundColor: acct.color ?? "#6DB2EE" },
+                    ]}
+                  >
+                    <Text style={styles.brandText}>
+                      {(acct.name || "").slice(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
 
-                <View style={styles.methodInfo}>
-                  <Text style={[styles.methodTitle, ui.methodTitle]}>
-                    {acct.name}
-                  </Text>
-                  <Text style={[styles.methodDetails, ui.methodDetails]}>
-                    {acct.type}
-                  </Text>
-                  <Text style={[styles.methodBalance, ui.methodBalance]}>
-                    {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
-                  </Text>
-                </View>
+                  <View style={styles.methodInfo}>
+                    <Text style={[styles.methodTitle, ui.methodTitle]}>
+                      {acct.name}
+                    </Text>
+                    <Text style={[styles.methodDetails, ui.methodDetails]}>
+                      {acct.type}
+                    </Text>
+                    <Text style={[styles.methodBalance, ui.methodBalance]}>
+                      {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
+                    </Text>
+                  </View>
 
-                <View style={styles.methodRight}>
-                  <Feather
-                    name="chevron-right"
-                    size={18}
-                    color={ui.chevron.color}
-                  />
-                </View>
-              </Pressable>
+                  <View style={styles.methodRight}>
+                    {acct.type !== "cash" && (
+                      <Pressable
+                        style={[
+                          styles.deleteButton,
+                          {
+                            backgroundColor: isDark
+                              ? "rgba(255, 34, 63, 0.12)"
+                              : "rgba(235, 58, 87, 0.08)",
+                          },
+                        ]}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setDeletingAccountId(acct.id);
+                        }}
+                      >
+                        <Feather name="trash-2" size={16} color="#FF5C73" />
+                      </Pressable>
+                    )}
+                    <Feather
+                      name="chevron-right"
+                      size={18}
+                      color={ui.chevron.color}
+                    />
+                  </View>
+                </Pressable>
+              </View>
             ))
           )}
 
@@ -211,6 +261,15 @@ export default function PaymentMethodsModal() {
           </Pressable>
         </ScrollView>
       </View>
+
+      <DeleteConfirmationModal
+        visible={deletingAccountId !== null}
+        title={`Delete ${accountToDelete?.name}?`}
+        message={`This ${accountToDelete?.type} account will be removed permanently. This action cannot be undone.`}
+        isDeleting={isDeleting}
+        onCancel={() => setDeletingAccountId(null)}
+        onConfirm={handleDeleteAccount}
+      />
     </View>
   );
 }
@@ -343,6 +402,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  deleteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
   },
   defaultPill: {
     minWidth: 58,
