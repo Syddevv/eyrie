@@ -172,7 +172,7 @@ export default function EditGoalModal() {
     }
   };
 
-  const closeEditFlow = () => router.replace("/(tabs)/goals");
+  const closeEditFlow = () => router.dismissTo("/(tabs)/goals");
 
   const handleSave = async () => {
     if (!goal) {
