@@ -1,4 +1,4 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -16,9 +16,11 @@ import { AppBottomNav } from "@/components/app-bottom-nav";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { setThemePreference } from "@/hooks/theme-preference";
 import { signOut } from "@/services/auth";
 
 type AccountItem = {
@@ -88,9 +90,42 @@ export default function SettingsScreen() {
   const colors = themeColors[colorScheme];
   const { isSigningOut } = useAuth();
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
+  const { accounts } = useAccounts();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isThemeSaving, setIsThemeSaving] = useState(false);
 
   const isDark = colorScheme === "dark";
+  const dynamicAccountItems = useMemo(
+    () =>
+      accountItems.map((item) => {
+        if (item.title === "Personal Details") {
+          return {
+            ...item,
+            value: currentUser?.full_name ?? "Not set",
+          };
+        }
+
+        if (item.title === "Cards & Wallets") {
+          const visibleMethodCount = accounts.filter(
+            (account) =>
+              !account.isHidden &&
+              (account.type === "bank" ||
+                account.type === "credit" ||
+                account.type === "ewallet"),
+          ).length;
+
+          return {
+            ...item,
+            value: `${visibleMethodCount} ${
+              visibleMethodCount === 1 ? "method" : "methods"
+            }`,
+          };
+        }
+
+        return item;
+      }),
+    [accounts, currentUser?.full_name],
+  );
 
   const pageStyles = useMemo(
     () => ({
@@ -231,7 +266,7 @@ export default function SettingsScreen() {
           <View
             style={[styles.sectionCard, pageStyles.sectionCard, shadows.soft]}
           >
-            {accountItems.map((item, index) => (
+            {dynamicAccountItems.map((item, index) => (
               <View key={item.title}>
                 <Pressable
                   style={styles.row}
@@ -295,7 +330,13 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={isDark}
-                disabled
+                disabled={isThemeSaving}
+                onValueChange={(enabled) => {
+                  setIsThemeSaving(true);
+                  setThemePreference(enabled ? "dark" : "light")
+                    .catch(() => undefined)
+                    .finally(() => setIsThemeSaving(false));
+                }}
                 trackColor={{
                   false: pageStyles.switchTrackOff,
                   true: pageStyles.switchTrackOn,
@@ -352,36 +393,6 @@ export default function SettingsScreen() {
               </View>
             </Pressable>
 
-            <View style={[styles.rowDivider, pageStyles.rowDivider]} />
-
-            <Pressable
-              style={styles.row}
-              onPress={() => router.push("/currency-modal")}
-            >
-              <View style={styles.rowLeft}>
-                <View style={[styles.rowIconWrap, pageStyles.rowIconWrap]}>
-                  <MaterialCommunityIcons
-                    name="earth"
-                    size={18}
-                    color={colors.foreground}
-                  />
-                </View>
-                <Text style={[styles.rowTitle, pageStyles.title]}>
-                  Currency
-                </Text>
-              </View>
-
-              <View style={styles.rowRight}>
-                <Text style={[styles.rowValue, pageStyles.trailingText]}>
-                  PHP (₱)
-                </Text>
-                <Feather
-                  name="chevron-right"
-                  size={18}
-                  color={pageStyles.trailingText.color}
-                />
-              </View>
-            </Pressable>
           </View>
 
           <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>

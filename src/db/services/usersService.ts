@@ -2,6 +2,7 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { usersRepository } from "../repositories/usersRepository";
 import { nowIso } from "../utils/time";
+import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
 
 type LocalUser = {
   id: string;
@@ -64,6 +65,43 @@ export class UsersService {
 
   async fetchLocalUser(id: string) {
     return usersRepository.findById(id);
+  }
+
+  async updateProfile(
+    id: string,
+    input: {
+      fullName?: string | null;
+      email?: string | null;
+      avatarUrl?: string | null;
+    },
+  ) {
+    const updates: Partial<LocalUser> = {
+      updatedAt: nowIso(),
+    };
+
+    if ("fullName" in input) {
+      updates.fullName = input.fullName?.trim() || null;
+    }
+
+    if ("email" in input) {
+      updates.email = input.email?.trim().toLowerCase() || null;
+    }
+
+    if ("avatarUrl" in input) {
+      updates.avatarUrl = input.avatarUrl || null;
+    }
+
+    return usersRepository.update(id, updates) as Promise<LocalUser>;
+  }
+
+  async updateCurrency(id: string, currencyCode: string) {
+    const normalizedCurrencyCode =
+      currencyCode.trim().toUpperCase() || DEFAULT_CURRENCY_CODE;
+
+    return usersRepository.update(id, {
+      currencyCode: normalizedCurrencyCode,
+      updatedAt: nowIso(),
+    }) as Promise<LocalUser>;
   }
 }
 

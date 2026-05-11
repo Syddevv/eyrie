@@ -19,19 +19,48 @@ import {
 import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
+import { publishCurrentUserUpdate, useCurrentUser } from '@/hooks/useCurrentUser';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
+import { usersService } from '@/src/db/services';
+import { useAuthStore } from '@/store/useAuthStore';
+
+function splitFullName(fullName?: string | null) {
+  const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
+
+  if (!parts.length) {
+    return { firstName: '', lastName: '' };
+  }
+
+  return {
+    firstName: parts[0] ?? '',
+    lastName: parts.slice(1).join(' '),
+  };
+}
 
 export default function PersonalDetailsModal() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === 'dark';
+  const { user } = useCurrentUser();
+  const showSnackbar = useAuthStore((state) => state.showSnackbar);
 
-  const [firstName, setFirstName] = useState('Juan');
-  const [lastName, setLastName] = useState('dela Cruz');
-  const [email, setEmail] = useState('juan.delacruz@email.com');
+  const initialName = splitFullName(user?.full_name);
+  const [firstName, setFirstName] = useState(initialName.firstName);
+  const [lastName, setLastName] = useState(initialName.lastName);
+  const [email, setEmail] = useState(user?.email ?? '');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const nextName = splitFullName(user?.full_name);
+    setFirstName(nextName.firstName);
+    setLastName(nextName.lastName);
+    setEmail(user?.email ?? '');
+    setAvatarUri(user?.avatar_url ?? null);
+  }, [user?.avatar_url, user?.email, user?.full_name]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -201,8 +230,70 @@ export default function PersonalDetailsModal() {
               </View>
             </View>
 
-            <Pressable style={[styles.saveButton, ui.primaryButton]} onPress={() => router.back()}>
-              <Text style={[styles.saveButtonText, ui.primaryButtonText]}>Save Changes</Text>
+            <Pressable
+              style={[styles.saveButton, ui.primaryButton, isSaving && styles.saveButtonDisabled]}
+              disabled={isSaving}
+              onPress={async () => {
+                if (!user) {
+                  showSnackbar('User profile is still loading.', 'info');
+                  return;
+                }
+
+                const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+                const normalizedEmail = email.trim().toLowerCase();
+
+                if (!fullName) {
+                  showSnackbar('Enter your name before saving.', 'error');
+                  return;
+                }
+
+                if (!normalizedEmail) {
+                  showSnackbar('Enter your email before saving.', 'error');
+                  return;
+                }
+
+                setIsSaving(true);
+
+                try {
+                  const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
+
+                  const { error } = await supabase.auth.updateUser({
+                    ...(emailChanged ? { email: normalizedEmail } : {}),
+                    data: {
+                      full_name: fullName,
+                      avatar_url: avatarUri,
+                    },
+                  });
+
+                  if (error) {
+                    throw error;
+                  }
+
+                  const updated = await usersService.updateProfile(user.id, {
+                    fullName,
+                    email: normalizedEmail,
+                    avatarUrl: avatarUri,
+                  });
+
+                  publishCurrentUserUpdate(updated);
+
+                  showSnackbar(
+                    emailChanged
+                      ? 'Profile saved. Check your email to confirm the new address if required.'
+                      : 'Profile updated.',
+                    'success',
+                  );
+                  router.back();
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : 'Unable to update profile.';
+                  showSnackbar(message, 'error');
+                } finally {
+                  setIsSaving(false);
+                }
+              }}>
+              <Text style={[styles.saveButtonText, ui.primaryButtonText]}>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -334,6 +425,9 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.72,
   },
   saveButtonText: {
     fontFamily: fontFamilies.sans,

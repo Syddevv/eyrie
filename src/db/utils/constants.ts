@@ -174,5 +174,9 @@ export const DEFAULT_CURRENCIES = [
   { code: "PHP", symbol: "₱", name: "Philippine Peso", decimalPlaces: 2 },
   { code: "USD", symbol: "$", name: "US Dollar", decimalPlaces: 2 },
   { code: "EUR", symbol: "€", name: "Euro", decimalPlaces: 2 },
+  { code: "GBP", symbol: "£", name: "British Pound", decimalPlaces: 2 },
   { code: "JPY", symbol: "¥", name: "Japanese Yen", decimalPlaces: 0 },
+  { code: "SGD", symbol: "S$", name: "Singapore Dollar", decimalPlaces: 2 },
+  { code: "AUD", symbol: "A$", name: "Australian Dollar", decimalPlaces: 2 },
+  { code: "KRW", symbol: "₩", name: "Korean Won", decimalPlaces: 0 },
 ] as const;

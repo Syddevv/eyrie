@@ -38,6 +38,38 @@ function firstName(fullName?: string | null) {
   return parts[0] ?? undefined;
 }
 
+function toCurrentUser(local: {
+  id: string;
+  fullName?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  currencyCode?: string | null;
+}): CurrentUser {
+  return {
+    id: local.id,
+    full_name: local.fullName ?? null,
+    first_name: firstName(local.fullName ?? undefined),
+    email: local.email ?? null,
+    avatar_url: local.avatarUrl ?? null,
+    currency_code: local.currencyCode ?? null,
+  };
+}
+
+export function publishCurrentUserUpdate(
+  local: {
+    id: string;
+    fullName?: string | null;
+    email?: string | null;
+    avatarUrl?: string | null;
+    currencyCode?: string | null;
+  } | null,
+) {
+  publishSnapshot({
+    user: local ? toCurrentUser(local) : null,
+    isLoading: false,
+  });
+}
+
 export function useCurrentUser() {
   const supabaseUser = useAuthStore((s) => s.user) as SupabaseUser | null;
   const [snapshot, setSnapshot] = useState<CurrentUserSnapshot>(currentSnapshot);
@@ -69,14 +101,7 @@ export function useCurrentUser() {
         return null;
       }
 
-      const result: CurrentUser = {
-        id: local.id,
-        full_name: local.fullName ?? null,
-        first_name: firstName(local.fullName ?? undefined),
-        email: local.email ?? null,
-        avatar_url: local.avatarUrl ?? null,
-        currency_code: (local.currencyCode as string) ?? null,
-      };
+      const result = toCurrentUser(local);
 
       await accountsService.ensureDefaultCashAccount(
         result.id,
