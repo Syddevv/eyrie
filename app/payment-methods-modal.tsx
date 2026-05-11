@@ -184,11 +184,19 @@ export default function PaymentMethodsModal() {
             visibleAccounts.map((acct) => (
               <View key={acct.id}>
                 <Pressable
-                  style={[styles.methodCard, ui.methodCard]}
+                  style={[
+                    styles.methodCard,
+                    ui.methodCard,
+                    acct.type === "cash" && { opacity: 0.6 },
+                  ]}
+                  disabled={acct.type === "cash"}
                   onPress={() =>
                     router.replace({
-                      pathname: "/payment-wallet-details-modal",
-                      params: { methodId: acct.id },
+                      pathname:
+                        acct.type === "bank" || acct.type === "credit"
+                          ? "/payment-card-details-modal"
+                          : "/payment-wallet-details-modal",
+                      params: { accountId: acct.id },
                     })
                   }
                 >
@@ -237,7 +245,9 @@ export default function PaymentMethodsModal() {
                     <Feather
                       name="chevron-right"
                       size={18}
-                      color={ui.chevron.color}
+                      color={
+                        acct.type === "cash" ? "transparent" : ui.chevron.color
+                      }
                     />
                   </View>
                 </Pressable>
