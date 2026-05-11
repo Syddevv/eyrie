@@ -6,6 +6,7 @@ import { categories } from "./categories";
 import { currencies, exchangeRates } from "./currencies";
 import { goalContributions, goals } from "./goals";
 import { insights } from "./insights";
+import { merchantCategoryHistory, merchants } from "./merchants";
 import { notifications } from "./notifications";
 import { transactions } from "./transactions";
 import { users } from "./users";
@@ -18,6 +19,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   goals: many(goals),
   insights: many(insights),
   notifications: many(notifications),
+  merchants: many(merchants),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -38,6 +40,32 @@ export const categoriesRelations = relations(categories, ({ one, many }) => ({
   }),
   transactions: many(transactions),
   budgets: many(budgets),
+  defaultMerchants: many(merchants),
+  merchantHistory: many(merchantCategoryHistory),
+}));
+
+export const merchantsRelations = relations(merchants, ({ one, many }) => ({
+  user: one(users, {
+    fields: [merchants.userId],
+    references: [users.id],
+  }),
+  defaultCategory: one(categories, {
+    fields: [merchants.defaultCategoryId],
+    references: [categories.id],
+  }),
+  transactions: many(transactions),
+  categoryHistory: many(merchantCategoryHistory),
+}));
+
+export const merchantCategoryHistoryRelations = relations(merchantCategoryHistory, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [merchantCategoryHistory.merchantId],
+    references: [merchants.id],
+  }),
+  category: one(categories, {
+    fields: [merchantCategoryHistory.categoryId],
+    references: [categories.id],
+  }),
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -58,6 +86,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   category: one(categories, {
     fields: [transactions.categoryId],
     references: [categories.id],
+  }),
+  merchant: one(merchants, {
+    fields: [transactions.merchantId],
+    references: [merchants.id],
   }),
 }));
 

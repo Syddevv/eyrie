@@ -13,7 +13,9 @@ export type CreateExpenseInput = {
   amount: number;
   categoryId: string;
   accountId: string;
+  merchantId?: string | null;
   merchantName?: string;
+  merchantDefaultCategoryId?: string | null;
   notes?: string;
   transactionDate?: Date;
 };
@@ -59,6 +61,10 @@ export function useCreateExpense() {
             user.currency_code,
           );
 
+          if (!cashAccount) {
+            return { success: false, error: "Unable to create the default cash account." };
+          }
+
           accountId = cashAccount.id;
         }
 
@@ -71,8 +77,11 @@ export function useCreateExpense() {
           type: "expense",
           amount: input.amount,
           categoryId: input.categoryId,
+          merchantId: input.merchantId ?? null,
           accountId,
           merchantName: input.merchantName,
+          merchantDefaultCategoryId:
+            input.merchantDefaultCategoryId ?? input.categoryId,
           notes: input.notes,
           transactionDate: isoDate,
           currencyCode: user.currency_code ?? DEFAULT_CURRENCY_CODE,

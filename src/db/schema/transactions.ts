@@ -3,6 +3,7 @@ import { index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { accounts } from "./accounts";
 import { categories } from "./categories";
 import { currencies } from "./currencies";
+import { merchants } from "./merchants";
 import { users } from "./users";
 import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
 
@@ -20,6 +21,7 @@ export const transactions = sqliteTable(
       .default(DEFAULT_CURRENCY_CODE)
       .references(() => currencies.code),
     categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    merchantId: text("merchant_id").references(() => merchants.id, { onDelete: "set null" }),
     accountId: text("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
@@ -37,6 +39,7 @@ export const transactions = sqliteTable(
     accountIdx: index("transactions_account_idx").on(table.accountId),
     transferAccountIdx: index("transactions_transfer_account_idx").on(table.transferAccountId),
     categoryIdx: index("transactions_category_idx").on(table.categoryId),
+    merchantIdx: index("transactions_merchant_idx").on(table.merchantId),
     dateIdx: index("transactions_date_idx").on(table.transactionDate),
     typeIdx: index("transactions_type_idx").on(table.type),
   })

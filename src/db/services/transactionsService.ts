@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../client";
 import { transactions } from "../schema";
 import { transactionsRepository } from "../repositories/transactionsRepository";
+import { merchantsService } from "./merchantsService";
 import {
   applyTransactionEffects,
   refreshBudgetsForTransactionChange,
@@ -17,13 +18,14 @@ import {
   assertTransactionType,
   assertTransferAccounts,
 } from "../utils/validation";
-import { emitAccountsChanged } from "@/src/lib/dbSync";
+import { emitAccountsChanged, emitMerchantsChanged } from "@/src/lib/dbSync";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
   "id" | "createdAt" | "updatedAt"
 > & {
   id?: string;
+  merchantDefaultCategoryId?: string | null;
 };
 
 export class TransactionsService {
@@ -40,10 +42,25 @@ export class TransactionsService {
 
     const timestamp = nowIso();
     const transactionId = input.id ?? createId("txn");
+    const merchantPayload =
+      input.type === "expense"
+        ? await this.resolveExpenseMerchant({
+            userId: input.userId,
+            merchantId: input.merchantId ?? null,
+            merchantName: input.merchantName ?? null,
+            categoryId: input.categoryId ?? null,
+            merchantDefaultCategoryId: input.merchantDefaultCategoryId ?? input.categoryId ?? null,
+          })
+        : null;
 
     const created = await db.transaction(async (tx) => {
       const entry = {
         ...input,
+        merchantId: merchantPayload?.merchantId ?? input.merchantId ?? null,
+        merchantName:
+          input.type === "expense"
+            ? merchantPayload?.merchantName ?? null
+            : input.merchantName ?? null,
         id: transactionId,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -64,25 +81,58 @@ export class TransactionsService {
       return created;
     });
 
+    if (created.type === "expense" && created.merchantId && created.categoryId) {
+      await merchantsService.learnMerchantCategory(created.merchantId, created.categoryId);
+    }
+
     emitAccountsChanged();
+    emitMerchantsChanged();
     return created;
   }
 
   async update(id: string, input: Partial<NewTransaction>) {
+    const existing = await db.query.transactions.findFirst({
+      where: (table, { eq: innerEq }) => innerEq(table.id, id),
+    });
+
+    if (!existing) {
+      throw new Error(`Transaction ${id} not found.`);
+    }
+
+    const previewNext = {
+      ...existing,
+      ...input,
+    };
+    const merchantPayload =
+      previewNext.type === "expense"
+        ? await this.resolveExpenseMerchant({
+            userId: previewNext.userId,
+            merchantId: previewNext.merchantId ?? null,
+            merchantName: previewNext.merchantName ?? null,
+            categoryId: previewNext.categoryId ?? null,
+            merchantDefaultCategoryId: previewNext.categoryId ?? null,
+          })
+        : null;
+
     const updated = await db.transaction(async (tx) => {
-      const existing = await tx.query.transactions.findFirst({
+      const current = await tx.query.transactions.findFirst({
         where: (table, { eq: innerEq }) => innerEq(table.id, id),
       });
 
-      if (!existing) {
+      if (!current) {
         throw new Error(`Transaction ${id} not found.`);
       }
 
       const next = {
-        ...existing,
+        ...current,
         ...input,
         updatedAt: nowIso(),
       };
+
+      if (next.type === "expense") {
+        next.merchantId = merchantPayload?.merchantId ?? null;
+        next.merchantName = merchantPayload?.merchantName ?? null;
+      }
 
       assertTransactionType(next.type);
       assertPositiveAmount(next.amount, "transaction amount");
@@ -91,7 +141,7 @@ export class TransactionsService {
         assertTransferAccounts(next.accountId, next.transferAccountId);
       }
 
-      await reverseTransactionEffects(tx, existing);
+      await reverseTransactionEffects(tx, current);
       await tx.update(transactions).set(next).where(eq(transactions.id, id));
 
       const updated = await tx.query.transactions.findFirst({
@@ -103,12 +153,22 @@ export class TransactionsService {
       }
 
       await applyTransactionEffects(tx, updated);
-      await refreshBudgetsForTransactionChange(tx, existing, updated);
+      await refreshBudgetsForTransactionChange(tx, current, updated);
 
       return updated;
     });
 
+    if (
+      updated.type === "expense" &&
+      updated.merchantId &&
+      updated.categoryId &&
+      (existing.merchantId !== updated.merchantId || existing.categoryId !== updated.categoryId)
+    ) {
+      await merchantsService.learnMerchantCategory(updated.merchantId, updated.categoryId);
+    }
+
     emitAccountsChanged();
+    emitMerchantsChanged();
     return updated;
   }
 
@@ -136,6 +196,33 @@ export class TransactionsService {
 
   async fetchById(id: string) {
     return transactionsRepository.findById(id);
+  }
+
+  private async resolveExpenseMerchant(input: {
+    userId: string;
+    merchantId: string | null;
+    merchantName: string | null;
+    categoryId: string | null;
+    merchantDefaultCategoryId: string | null;
+  }) {
+    const name = input.merchantName?.trim() ?? "";
+
+    if (!input.merchantId && !name) {
+      return null;
+    }
+
+    const merchant = await merchantsService.ensureMerchant({
+      userId: input.userId,
+      name,
+      defaultCategoryId: input.merchantDefaultCategoryId ?? input.categoryId ?? null,
+    });
+
+    return merchant
+      ? {
+          merchantId: merchant.id,
+          merchantName: merchant.name,
+        }
+      : null;
   }
 }
 

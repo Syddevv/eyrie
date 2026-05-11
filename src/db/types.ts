@@ -9,6 +9,8 @@ import {
   goalContributions,
   goals,
   insights,
+  merchantCategoryHistory,
+  merchants,
   notifications,
   transactions,
   users,
@@ -30,6 +32,10 @@ export type GoalContribution = InferSelectModel<typeof goalContributions>;
 export type NewGoalContribution = InferInsertModel<typeof goalContributions>;
 export type Insight = InferSelectModel<typeof insights>;
 export type NewInsight = InferInsertModel<typeof insights>;
+export type Merchant = InferSelectModel<typeof merchants>;
+export type NewMerchant = InferInsertModel<typeof merchants>;
+export type MerchantCategoryHistory = InferSelectModel<typeof merchantCategoryHistory>;
+export type NewMerchantCategoryHistory = InferInsertModel<typeof merchantCategoryHistory>;
 export type Notification = InferSelectModel<typeof notifications>;
 export type NewNotification = InferInsertModel<typeof notifications>;
 export type Currency = InferSelectModel<typeof currencies>;

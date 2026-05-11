@@ -17,8 +17,9 @@ import {
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useExpenseCategories } from "@/hooks/useExpenseCategories";
+import { useExpenseMerchants } from "@/hooks/useExpenseMerchants";
 import { useIncomeCategories } from "@/hooks/useIncomeCategories";
-import { useMerchantsByCategory } from "@/hooks/useMerchantsByCategory";
 import {
   getBackdropButtonColor,
   getFieldBorder,
@@ -56,24 +57,26 @@ export default function EditTransactionModal() {
   const isDark = colorScheme === "dark";
   const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
   const { transaction, isLoading } = useTransaction(transactionId);
+  const { categories: expenseCategories } = useExpenseCategories();
   const { categories: incomeCategories, defaultCategoryId: defaultIncomeCategoryId } = useIncomeCategories();
 
-  const [merchant, setMerchant] = useState("");
+  const [merchantQuery, setMerchantQuery] = useState("");
+  const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [showCategoryOptions, setShowCategoryOptions] = useState(false);
-  const [showMerchantOptions, setShowMerchantOptions] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const isIncomeTransaction = transaction?.typeValue === "income";
-  const expenseMerchantOptions = useMerchantsByCategory(transaction?.category);
+  const { merchants: expenseMerchantOptions } = useExpenseMerchants(merchantQuery);
 
   useEffect(() => {
     if (!transaction) {
       return;
     }
 
-    setMerchant(transaction.title);
+    setMerchantQuery(transaction.merchant || transaction.title);
+    setSelectedMerchantId(null);
     setAmount(String(transaction.amount));
     setCategoryId(transaction.categoryId);
   }, [transaction]);
@@ -96,10 +99,12 @@ export default function EditTransactionModal() {
     };
   }, []);
 
-  const categoryOptions = incomeCategories;
+  const categoryOptions = isIncomeTransaction ? incomeCategories : expenseCategories;
   const selectedCategory = categoryOptions.find((option) => option.id === categoryId) ?? null;
   const selectedMerchantOption =
-    expenseMerchantOptions.find((option) => option.label.toLowerCase() === merchant.trim().toLowerCase()) ?? null;
+    expenseMerchantOptions.find((option) => option.merchantId === selectedMerchantId) ??
+    expenseMerchantOptions.find((option) => option.label.toLowerCase() === merchantQuery.trim().toLowerCase()) ??
+    null;
 
   useEffect(() => {
     if (!transaction || !isIncomeTransaction) {
@@ -114,13 +119,7 @@ export default function EditTransactionModal() {
     if (defaultIncomeCategoryId) {
       setCategoryId(defaultIncomeCategoryId);
     }
-  }, [defaultIncomeCategoryId, isIncomeTransaction, transaction?.categoryId, transaction?.id]);
-
-  useEffect(() => {
-    if (isIncomeTransaction) {
-      setShowMerchantOptions(false);
-    }
-  }, [isIncomeTransaction]);
+  }, [defaultIncomeCategoryId, isIncomeTransaction, transaction]);
 
   const ui = useMemo(
     () => ({
@@ -170,17 +169,21 @@ export default function EditTransactionModal() {
       if (isIncomeTransaction) {
         const previewColor = selectedCategory?.color ?? transaction.iconColor;
         return {
-          ...resolveTransactionVisual(selectedCategory?.label ?? transaction.category, "income", {
-            categoryIcon: selectedCategory?.icon ?? null,
-            categoryColor: selectedCategory?.color ?? null,
-          }),
+          ...resolveTransactionVisual(
+            selectedCategory?.label ?? transaction.category,
+            "income",
+            {
+              categoryIcon: selectedCategory?.icon ?? null,
+              categoryColor: selectedCategory?.color ?? null,
+            },
+          ),
           iconBackgroundLight: withOpacity(previewColor, 0.16),
           iconBackgroundDark: withOpacity(previewColor, 0.2),
         };
       }
 
-      return resolveTransactionVisual(transaction.category, "expense", {
-        merchantName: selectedMerchantOption?.label ?? merchant,
+      return resolveTransactionVisual(selectedCategory?.label ?? transaction.category, "expense", {
+        merchantName: selectedMerchantOption?.label ?? merchantQuery,
       });
     })();
 
@@ -216,7 +219,7 @@ export default function EditTransactionModal() {
     const normalizedType = transaction.typeValue;
     const normalizedMerchant = isIncomeTransaction
       ? undefined
-      : selectedMerchantOption?.label ?? merchant.trim();
+      : merchantQuery.trim();
 
     if (!isIncomeTransaction && !normalizedMerchant) {
       Alert.alert("Missing merchant", "Select a merchant for this transaction.");
@@ -228,7 +231,7 @@ export default function EditTransactionModal() {
       return;
     }
 
-    if (isIncomeTransaction && !categoryId) {
+    if (!categoryId) {
       Alert.alert("Missing category", "Select a category before saving.");
       return;
     }
@@ -237,10 +240,11 @@ export default function EditTransactionModal() {
 
     try {
       await transactionsService.update(transaction.id, {
+        merchantId: isIncomeTransaction ? null : selectedMerchantOption?.merchantId ?? null,
         merchantName: normalizedMerchant,
         amount: numericAmount,
         type: normalizedType,
-        categoryId: isIncomeTransaction ? categoryId : transaction.categoryId,
+        categoryId,
       });
 
       router.back();
@@ -291,73 +295,77 @@ export default function EditTransactionModal() {
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {isIncomeTransaction ? (
-              <View style={styles.formSection}>
-                <Text style={[styles.label, ui.label]}>Category</Text>
-                <Pressable
-                  style={[styles.fieldSurface, ui.fieldSurface, styles.dropdownField]}
-                  onPress={() => setShowCategoryOptions((current) => !current)}>
-                  <Text style={[styles.fieldInput, ui.fieldText]}>
-                    {selectedCategory?.label ?? (categoryOptions.length ? "Select category" : "Loading categories...")}
-                  </Text>
-                  <Feather
-                    name={showCategoryOptions ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={ui.fieldText.color}
-                  />
-                </Pressable>
+            <View style={styles.formSection}>
+              <Text style={[styles.label, ui.label]}>Category</Text>
+              <Pressable
+                style={[styles.fieldSurface, ui.fieldSurface, styles.dropdownField]}
+                onPress={() => setShowCategoryOptions((current) => !current)}>
+                <Text style={[styles.fieldInput, ui.fieldText]}>
+                  {selectedCategory?.label ?? (categoryOptions.length ? "Select category" : "Loading categories...")}
+                </Text>
+                <Feather
+                  name={showCategoryOptions ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color={ui.fieldText.color}
+                />
+              </Pressable>
 
-                {showCategoryOptions ? (
-                  <View style={[styles.categoryList, ui.fieldSurface]}>
-                    {categoryOptions.map((option) => {
-                      const isSelected = option.id === selectedCategory?.id;
+              {showCategoryOptions ? (
+                <View style={[styles.categoryList, ui.fieldSurface]}>
+                  {categoryOptions.map((option) => {
+                    const isSelected = option.id === selectedCategory?.id;
 
-                      return (
-                        <Pressable
-                          key={option.id}
-                          style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
-                          onPress={() => {
-                            setCategoryId(option.id);
-                            setShowCategoryOptions(false);
-                          }}>
-                          <View style={[styles.categoryDot, { backgroundColor: option.color }]} />
-                          <Text style={[styles.categoryLabel, ui.fieldText]}>{option.label}</Text>
-                          {isSelected ? <Feather name="check" size={16} color="#1681DD" /> : null}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                ) : null}
-              </View>
-            ) : (
+                    return (
+                      <Pressable
+                        key={option.id}
+                        style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
+                        onPress={() => {
+                          setCategoryId(option.id);
+                          setShowCategoryOptions(false);
+                        }}>
+                        <View style={[styles.categoryDot, { backgroundColor: option.color }]} />
+                        <Text style={[styles.categoryLabel, ui.fieldText]}>{option.label}</Text>
+                        {isSelected ? <Feather name="check" size={16} color="#1681DD" /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+
+            {!isIncomeTransaction ? (
               <View style={styles.formSection}>
                 <Text style={[styles.label, ui.label]}>Merchant</Text>
-                <Pressable
-                  style={[styles.fieldSurface, ui.fieldSurface, styles.dropdownField]}
-                  onPress={() => setShowMerchantOptions((current) => !current)}>
-                  <Text style={[styles.fieldInput, ui.fieldText]}>
-                    {selectedMerchantOption?.label ??
-                      (merchant.trim() || (expenseMerchantOptions.length ? "Select merchant" : "No merchants available"))}
-                  </Text>
-                  <Feather
-                    name={showMerchantOptions ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={ui.fieldText.color}
-                  />
-                </Pressable>
+                <TextInput
+                  value={merchantQuery}
+                  onChangeText={(value) => {
+                    setMerchantQuery(value);
+                    if (
+                      selectedMerchantOption?.label.toLowerCase() !== value.trim().toLowerCase()
+                    ) {
+                      setSelectedMerchantId(null);
+                    }
+                  }}
+                  placeholder="Search or create merchant"
+                  placeholderTextColor={ui.placeholder.color}
+                  style={[styles.fieldSurface, styles.fieldInput, ui.fieldSurface, ui.fieldText]}
+                  selectionColor="#1681DD"
+                />
 
-                {showMerchantOptions ? (
+                {merchantQuery.trim() || expenseMerchantOptions.length ? (
                   <View style={[styles.categoryList, ui.fieldSurface]}>
                     {expenseMerchantOptions.map((option) => {
-                      const isSelected = option.label.toLowerCase() === merchant.trim().toLowerCase();
+                      const isSelected =
+                        option.merchantId === selectedMerchantId ||
+                        option.label.toLowerCase() === merchantQuery.trim().toLowerCase();
 
                       return (
                         <Pressable
                           key={option.id}
                           style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
                           onPress={() => {
-                            setMerchant(option.label);
-                            setShowMerchantOptions(false);
+                            setMerchantQuery(option.label);
+                            setSelectedMerchantId(option.merchantId);
                           }}>
                           <View style={[styles.categoryDot, { backgroundColor: option.color }]} />
                           <Text style={[styles.categoryLabel, ui.fieldText]}>{option.label}</Text>
@@ -368,7 +376,7 @@ export default function EditTransactionModal() {
                   </View>
                 ) : null}
               </View>
-            )}
+            ) : null}
 
             <View style={styles.formSection}>
               <Text style={[styles.label, ui.label]}>Amount</Text>

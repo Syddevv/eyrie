@@ -25,6 +25,11 @@ export class TransactionsRepository {
       orderBy: [desc(transactions.transactionDate), desc(transactions.createdAt)],
       with: {
         category: true,
+        merchant: {
+          with: {
+            defaultCategory: true,
+          },
+        },
         account: true,
         transferAccount: true,
       },
@@ -36,6 +41,11 @@ export class TransactionsRepository {
       where: eq(transactions.id, id),
       with: {
         category: true,
+        merchant: {
+          with: {
+            defaultCategory: true,
+          },
+        },
         account: true,
         transferAccount: true,
       },

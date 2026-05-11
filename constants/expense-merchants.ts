@@ -5,6 +5,8 @@ export type ExpenseMerchantOption = {
   color: string;
   textColor?: string;
   icon?: string;
+  defaultCategoryId?: string | null;
+  defaultCategoryName?: string | null;
 };
 
 type MerchantSeed = ExpenseMerchantOption;
@@ -442,6 +444,53 @@ const merchantCatalog: Record<string, MerchantSeed[]> = {
     merchant("merchant_unioil", "Unioil", "U", "#16A34A", "gas-station"),
   ],
 };
+
+const presetMap = new Map<string, ExpenseMerchantOption>();
+
+for (const [categoryKey, merchants] of Object.entries(merchantCatalog)) {
+  for (const option of merchants) {
+    const key = normalizeKey(option.label);
+    if (presetMap.has(key)) {
+      continue;
+    }
+
+    presetMap.set(key, {
+      ...option,
+      defaultCategoryName: categoryKey
+        .split("-")
+        .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+        .join(" ")
+        .replace(/\bAnd\b/g, "&"),
+    });
+  }
+}
+
+for (const option of defaultMerchants) {
+  const key = normalizeKey(option.label);
+  if (!presetMap.has(key)) {
+    presetMap.set(key, {
+      ...option,
+      defaultCategoryName: null,
+    });
+  }
+}
+
+export type MerchantPresetOption = ExpenseMerchantOption;
+
+export function getMerchantPresetByName(name?: string | null) {
+  return presetMap.get(normalizeKey(name));
+}
+
+export function searchMerchantPresets(query?: string | null) {
+  const normalizedQuery = normalizeKey(query);
+  const values = Array.from(presetMap.values());
+
+  if (!normalizedQuery) {
+    return values.slice(0, 16);
+  }
+
+  return values.filter((option) => normalizeKey(option.label).includes(normalizedQuery));
+}
 
 export function normalizeExpenseMerchantCategory(value?: string | null) {
   return normalizeKey(value);

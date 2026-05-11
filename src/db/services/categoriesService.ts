@@ -10,11 +10,16 @@ import {
 } from "../utils/validation";
 import { SYSTEM_CATEGORY_USER_ID } from "../utils/constants";
 
-export type CreateCategoryInput = Omit<NewCategory, "id" | "createdAt" | "updatedAt"> & {
+export type CreateCategoryInput = Omit<
+  NewCategory,
+  "id" | "createdAt" | "updatedAt"
+> & {
   id?: string;
 };
 
-export type ManagedCategory = Awaited<ReturnType<CategoriesRepositoryLike["findAllManagedByUser"]>>[number] & {
+export type ManagedCategory = Awaited<
+  ReturnType<CategoriesRepositoryLike["findAllManagedByUser"]>
+>[number] & {
   usageCount: number;
   transactionCount: number;
   budgetCount: number;
@@ -22,17 +27,18 @@ export type ManagedCategory = Awaited<ReturnType<CategoriesRepositoryLike["findA
 
 type CategoriesRepositoryLike = typeof categoriesRepository;
 
-type DeleteCategoryInput =
-  | { mode: "delete" }
-  | { mode: "archive" }
-  | { mode: "reassign"; targetCategoryId: string };
+type DeleteCategoryInput = { mode: "delete" } | { mode: "archive" };
 
 export class CategoriesService {
   async create(input: CreateCategoryInput) {
     assertRequiredText(input.name, "category name");
     assertCategoryType(input.type);
     assertCategoryIconType(input.iconType);
-    await this.ensureUniqueName(input.userId ?? SYSTEM_CATEGORY_USER_ID, input.name, input.type);
+    await this.ensureUniqueName(
+      input.userId ?? SYSTEM_CATEGORY_USER_ID,
+      input.name,
+      input.type,
+    );
 
     const created = await categoriesRepository.create({
       ...input,
@@ -65,8 +71,16 @@ export class CategoriesService {
 
     const nextType = input.type ?? existing.type;
     const nextName = input.name ?? existing.name;
-    if (nextType !== existing.type || nextName.trim().toLowerCase() !== existing.name.trim().toLowerCase()) {
-      await this.ensureUniqueName(existing.userId ?? SYSTEM_CATEGORY_USER_ID, nextName, nextType, id);
+    if (
+      nextType !== existing.type ||
+      nextName.trim().toLowerCase() !== existing.name.trim().toLowerCase()
+    ) {
+      await this.ensureUniqueName(
+        existing.userId ?? SYSTEM_CATEGORY_USER_ID,
+        nextName,
+        nextType,
+        id,
+      );
     }
 
     const updated = await categoriesRepository.update(id, {
@@ -110,12 +124,23 @@ export class CategoriesService {
     return categoriesRepository.findAllByUser(userId, type, includeArchived);
   }
 
-  async fetchManaged(userId: string, includeArchived = true): Promise<ManagedCategory[]> {
-    const rows = await categoriesRepository.findAllManagedByUser(userId, includeArchived);
-    const usageMap = await categoriesRepository.getUsageCountsByCategoryIds(rows.map((category) => category.id));
+  async fetchManaged(
+    userId: string,
+    includeArchived = true,
+  ): Promise<ManagedCategory[]> {
+    const rows = await categoriesRepository.findAllManagedByUser(
+      userId,
+      includeArchived,
+    );
+    const usageMap = await categoriesRepository.getUsageCountsByCategoryIds(
+      rows.map((category) => category.id),
+    );
 
     return rows.map((category) => {
-      const usage = usageMap.get(category.id) ?? { transactions: 0, budgets: 0 };
+      const usage = usageMap.get(category.id) ?? {
+        transactions: 0,
+        budgets: 0,
+      };
 
       return {
         ...category,
@@ -137,15 +162,7 @@ export class CategoriesService {
       throw new Error("Category not found.");
     }
 
-    if (input.mode === "reassign") {
-      if (!input.targetCategoryId || input.targetCategoryId === id) {
-        throw new Error("Choose a different category to reassign linked items.");
-      }
-
-      await categoriesRepository.reassignTransactions(id, input.targetCategoryId);
-    }
-
-    if (category.isSystem || input.mode === "archive" || input.mode === "reassign") {
+    if (category.isSystem || input.mode === "archive") {
       await this.archive(id);
       return;
     }
@@ -159,10 +176,16 @@ export class CategoriesService {
     type: string,
     ignoreId?: string,
   ) {
-    const existing = await categoriesRepository.findByUserAndName(userId, name.trim(), type);
+    const existing = await categoriesRepository.findByUserAndName(
+      userId,
+      name.trim(),
+      type,
+    );
 
     if (existing && existing.id !== ignoreId) {
-      throw new Error("A category with this name already exists for the selected type.");
+      throw new Error(
+        "A category with this name already exists for the selected type.",
+      );
     }
   }
 }

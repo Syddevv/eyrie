@@ -58,6 +58,10 @@ export function useCreateIncome() {
             user.currency_code,
           );
 
+          if (!cashAccount) {
+            return { success: false, error: "Unable to create the default cash account." };
+          }
+
           accountId = cashAccount.id;
         }
 

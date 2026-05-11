@@ -72,6 +72,7 @@ export async function getRecentTransactions(userId: string, limit = 10) {
     limit,
     with: {
       category: true,
+      merchant: true,
       account: true,
       transferAccount: true,
     },

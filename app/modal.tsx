@@ -16,7 +16,10 @@ import {
 } from "react-native";
 
 import { CategoryAvatar } from "@/components/category-avatar";
-import { CategoryEditorSheet, type CategoryDraft } from "@/components/category-editor-sheet";
+import {
+  CategoryEditorSheet,
+  type CategoryDraft,
+} from "@/components/category-editor-sheet";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -171,8 +174,10 @@ export default function AddTransactionModal() {
   const { create: createIncome, isLoading: isCreatingIncome } =
     useCreateIncome();
 
-  const { categories: expenseCategories, refresh: refreshExpenseCategories } = useExpenseCategories();
-  const { categories: incomeCategories, refresh: refreshIncomeCategories } = useIncomeCategories();
+  const { categories: expenseCategories, refresh: refreshExpenseCategories } =
+    useExpenseCategories();
+  const { categories: incomeCategories, refresh: refreshIncomeCategories } =
+    useIncomeCategories();
   const { methods: paymentMethods } = usePaymentMethods();
 
   const [entryType, setEntryType] = useState<EntryType>("expense");
@@ -184,7 +189,9 @@ export default function AddTransactionModal() {
   const [selectedIncomeCategory, setSelectedIncomeCategory] = useState<
     string | null
   >(null);
-  const [selectedMerchant, setSelectedMerchant] = useState<string | null>(null);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(
+    null,
+  );
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
     string | null
   >(null);
@@ -202,6 +209,16 @@ export default function AddTransactionModal() {
   const [isCategoryEditorVisible, setIsCategoryEditorVisible] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const merchantFade = useRef(new Animated.Value(0)).current;
+  const merchantOptions = useMerchantsByCategory(selectedExpenseCategoryLabel);
+
+  const categoryEditorInitialValue = useMemo(
+    () => ({
+      type: entryType,
+      color: entryType === "expense" ? "#F97316" : "#10B981",
+      iconName: entryType === "expense" ? "shopping-outline" : "wallet-outline",
+    }),
+    [entryType],
+  );
 
   useEffect(() => {
     const showEvent =
@@ -266,10 +283,6 @@ export default function AddTransactionModal() {
     () => expenseCategories.slice(PRIMARY_EXPENSE_CATEGORY_LIMIT),
     [expenseCategories],
   );
-  const selectedExpenseCategory =
-    expenseCategories.find(
-      (category) => category.id === selectedExpenseCategoryId,
-    ) ?? null;
   const incomeCategoryOptions = useMemo<CategoryOption[]>(
     () =>
       incomeCategories.map((category) => ({
@@ -288,8 +301,6 @@ export default function AddTransactionModal() {
     paymentMethods.find((method) => method.id === selectedPaymentMethodId) ??
     paymentMethods[0] ??
     null;
-  const showMerchantSection =
-    entryType === "expense" && Boolean(selectedExpenseCategoryLabel);
   const selectedExpensePaymentMethodIsInsufficient =
     entryType === "expense" &&
     Boolean(selectedPaymentMethod) &&
@@ -304,21 +315,16 @@ export default function AddTransactionModal() {
     (Boolean(selectedIncomeCategory) && Boolean(selectedPaymentMethodId));
   const activeCategories =
     entryType === "expense" ? expensePrimaryCategories : incomeCategoryOptions;
-  const activeExpenseCategory =
-    entryType === "expense" ? selectedExpenseCategory : null;
   const activePaymentMethod = selectedPaymentMethod;
-  const merchantOptions = useMerchantsByCategory(
-    selectedExpenseCategoryLabel ?? activeExpenseCategory?.label,
-  );
   const selectedMerchantOption =
-    merchantOptions.find((merchant) => merchant.id === selectedMerchant) ?? null;
+    merchantOptions.find((merchant) => merchant.id === selectedMerchantId) ??
+    null;
   const isExpenseSaveBlockedByInsufficientBalance = Boolean(
     selectedExpensePaymentMethodIsInsufficient,
   );
-  const insufficientBalanceMessage =
-    selectedExpensePaymentMethodIsInsufficient
-      ? "Selected account does not have enough balance for this expense."
-      : null;
+  const insufficientBalanceMessage = selectedExpensePaymentMethodIsInsufficient
+    ? "Selected account does not have enough balance for this expense."
+    : null;
   const isSaveEnabled =
     selectedAmount > 0 &&
     (entryType === "income"
@@ -326,12 +332,7 @@ export default function AddTransactionModal() {
       : isExpenseFormValid && !isExpenseSaveBlockedByInsufficientBalance);
 
   useEffect(() => {
-    if (!showMerchantSection || !merchantOptions.length) {
-      setSelectedMerchant(null);
-      return;
-    }
-
-    setSelectedMerchant((current) => {
+    setSelectedMerchantId((current) => {
       if (
         current &&
         merchantOptions.some((merchant) => merchant.id === current)
@@ -341,7 +342,7 @@ export default function AddTransactionModal() {
 
       return null;
     });
-  }, [merchantOptions, showMerchantSection]);
+  }, [merchantOptions]);
 
   useEffect(() => {
     if (!paymentMethods.length) {
@@ -359,35 +360,26 @@ export default function AddTransactionModal() {
   }, [paymentMethods]);
 
   useEffect(() => {
-    if (showMerchantSection) {
+    if (entryType !== "expense") {
       merchantFade.setValue(0);
-      Animated.timing(merchantFade, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
       return;
     }
 
     merchantFade.setValue(0);
-  }, [merchantFade, showMerchantSection]);
+    Animated.timing(merchantFade, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [entryType, merchantFade]);
 
-  // Debug logging
   useEffect(() => {
-    console.log("[Modal Debug]", {
-      entryType,
-      selectedExpenseCategoryId,
-      selectedExpenseCategoryLabel,
-      showMerchantSection,
-      merchantOptionsCount: merchantOptions.length,
-    });
-  }, [
-    entryType,
-    selectedExpenseCategoryId,
-    selectedExpenseCategoryLabel,
-    showMerchantSection,
-    merchantOptions.length,
-  ]);
+    if (entryType !== "expense") {
+      return;
+    }
+
+    setSelectedMerchantId(null);
+  }, [entryType, selectedExpenseCategoryId, selectedExpenseCategoryLabel]);
 
   const handleCreateCategory = async (draft: CategoryDraft) => {
     setIsSavingCategory(true);
@@ -769,7 +761,7 @@ export default function AddTransactionModal() {
               ) : null}
             </View>
 
-            {entryType === "expense" && showMerchantSection ? (
+            {entryType === "expense" ? (
               <Animated.View
                 style={[
                   styles.section,
@@ -789,59 +781,68 @@ export default function AddTransactionModal() {
                 <Text style={[styles.fieldLabel, ui.fieldLabel]}>
                   Merchant (optional)
                 </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.merchantRow}
-                >
-                  {merchantOptions.map((merchant) => {
-                    const isActive = selectedMerchant === merchant.id;
+                <Text style={[styles.fieldHelper, ui.mutedValue]}>
+                  Suggestions change based on the category you selected.
+                </Text>
+                {selectedExpenseCategoryId ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.merchantRow}
+                  >
+                    {merchantOptions.map((merchant) => {
+                      const isActive = selectedMerchantId === merchant.id;
 
-                    return (
-                      <Pressable
-                        key={merchant.id}
-                        style={[
-                          styles.merchantChip,
-                          ui.pillSurface,
-                          isActive && styles.merchantChipActive,
-                          isActive && { borderColor: colors.primary },
-                        ]}
-                        onPress={() =>
-                          setSelectedMerchant((current) =>
-                            current === merchant.id ? null : merchant.id,
-                          )
-                        }
-                      >
-                        <View
+                      return (
+                        <Pressable
+                          key={merchant.id}
                           style={[
-                            styles.merchantBadge,
-                            { backgroundColor: merchant.color },
+                            styles.merchantChip,
+                            ui.pillSurface,
+                            isActive && styles.merchantChipActive,
+                            isActive && { borderColor: colors.primary },
                           ]}
+                          onPress={() =>
+                            setSelectedMerchantId((current) =>
+                              current === merchant.id ? null : merchant.id,
+                            )
+                          }
                         >
-                          {merchant.icon ? (
-                            <MaterialCommunityIcons
-                              name={merchant.icon as any}
-                              size={14}
-                              color={merchant.textColor ?? "#FFFFFF"}
-                            />
-                          ) : (
-                            <Text
-                              style={[
-                                styles.merchantBadgeText,
-                                { color: merchant.textColor ?? "#FFFFFF" },
-                              ]}
-                            >
-                              {merchant.initials}
-                            </Text>
-                          )}
-                        </View>
-                        <Text style={[styles.merchantText, ui.chipText]}>
-                          {merchant.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+                          <View
+                            style={[
+                              styles.merchantBadge,
+                              { backgroundColor: merchant.color },
+                            ]}
+                          >
+                            {merchant.icon ? (
+                              <MaterialCommunityIcons
+                                name={merchant.icon as any}
+                                size={13}
+                                color={merchant.textColor ?? "#FFFFFF"}
+                              />
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.merchantBadgeText,
+                                  { color: merchant.textColor ?? "#FFFFFF" },
+                                ]}
+                              >
+                                {merchant.initials}
+                              </Text>
+                            )}
+                          </View>
+                          <Text style={[styles.merchantText, ui.chipText]}>
+                            {merchant.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : (
+                  <Text style={[styles.inlineHintText, ui.mutedValue]}>
+                    Pick a category first to see suggested merchants.
+                  </Text>
+                )}
               </Animated.View>
             ) : entryType === "income" ? (
               <View style={styles.section}>
@@ -1081,7 +1082,8 @@ export default function AddTransactionModal() {
                       amount: Number(amount),
                       categoryId: selectedExpenseCategoryId,
                       accountId: selectedPaymentMethodId,
-                      merchantName: selectedMerchantOption?.label ?? undefined,
+                      merchantName: selectedMerchantOption?.label || undefined,
+                      merchantDefaultCategoryId: selectedExpenseCategoryId,
                       notes: notes || undefined,
                       transactionDate: selectedDate,
                     });
@@ -1271,17 +1273,7 @@ export default function AddTransactionModal() {
           visible={isCategoryEditorVisible}
           title={`Create ${entryType === "expense" ? "Expense" : "Income"} Category`}
           saveLabel="Save Category"
-          initialValue={{
-            type: entryType,
-            color:
-              entryType === "expense"
-                ? "#F97316"
-                : "#10B981",
-            iconName:
-              entryType === "expense"
-                ? "shopping-outline"
-                : "wallet-outline",
-          }}
+          initialValue={categoryEditorInitialValue}
           isSaving={isSavingCategory}
           onClose={() => setIsCategoryEditorVisible(false)}
           onSave={handleCreateCategory}
@@ -1451,40 +1443,46 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.medium,
   },
   merchantRow: {
-    gap: 10,
+    gap: 8,
     paddingRight: 12,
   },
   merchantChip: {
-    minHeight: 42,
-    borderRadius: 17,
-    paddingHorizontal: 12,
+    minHeight: 38,
+    borderRadius: 16,
+    paddingHorizontal: 11,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     borderWidth: 1,
   },
   merchantChipActive: {
     borderWidth: 1,
   },
   merchantBadge: {
-    minWidth: 28,
-    height: 28,
+    minWidth: 24,
+    height: 24,
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
   },
   merchantBadgeText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 10,
-    lineHeight: 11,
+    fontSize: 9,
+    lineHeight: 10,
     fontWeight: fontWeights.bold,
   },
   merchantText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: fontWeights.medium,
+  },
+  inlineHintText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.regular,
   },
   textInput: {
     borderRadius: 18,

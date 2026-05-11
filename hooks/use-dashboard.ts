@@ -1,3 +1,4 @@
+import { getMerchantPresetByName } from "@/constants/expense-merchants";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect } from "react";
 import { create } from "zustand";
@@ -231,8 +232,10 @@ function normalizeMerchantName(value?: string | null) {
 function resolveTransactionVisual(
   categoryName?: string | null,
   type?: string | null,
+  merchantName?: string | null,
 ) {
   const normalizedCategory = categoryKey(categoryName);
+  const merchantPreset = getMerchantPresetByName(merchantName);
 
   if (type === "income") {
     return {
@@ -249,6 +252,15 @@ function resolveTransactionVisual(
       iconName: "swap-horizontal",
       iconColor: "#5B6475",
       iconBackground: withOpacity("#E9EDF3", 0.92),
+    };
+  }
+
+  if (merchantPreset?.icon || merchantPreset?.color) {
+    return {
+      iconLibrary: "material" as const,
+      iconName: merchantPreset.icon ?? "storefront-outline",
+      iconColor: merchantPreset.color ?? "#5B6475",
+      iconBackground: withOpacity(merchantPreset.color ?? "#E9EDF3", 0.2),
     };
   }
 
@@ -339,6 +351,7 @@ function mapRecentTransaction(
   source: Awaited<ReturnType<typeof getRecentTransactions>>[number],
 ): DashboardRecentTransaction {
   const merchant =
+    source.merchant?.name ||
     normalizeMerchantName(source.merchantName) ||
     source.category?.name ||
     source.account?.name ||
@@ -348,6 +361,7 @@ function mapRecentTransaction(
   const visual = resolveTransactionVisual(
     source.category?.name ?? categoryName,
     source.type,
+    merchant,
   );
   const isIncome = source.type === "income";
 

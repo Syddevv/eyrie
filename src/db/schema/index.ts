@@ -4,6 +4,7 @@ export * from "./categories";
 export * from "./currencies";
 export * from "./goals";
 export * from "./insights";
+export * from "./merchants";
 export * from "./notifications";
 export * from "./relations";
 export * from "./transactions";

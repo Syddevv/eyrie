@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { categoriesService, type ManagedCategory } from "@/src/db/services";
 import { onCategoriesChanged } from "@/src/lib/dbSync";
-import { SYSTEM_CATEGORY_USER_ID, type CategoryType } from "@/src/db/utils/constants";
+import {
+  SYSTEM_CATEGORY_USER_ID,
+  type CategoryType,
+} from "@/src/db/utils/constants";
 
 export type CategoryIconType = "vector" | "emoji" | "uploaded_image";
 
@@ -20,6 +23,7 @@ export type CategoryOption = {
   isDefault: boolean;
   isSystem: boolean;
   isArchived: boolean;
+  createdAt: string;
 };
 
 function mapCategoryOption(category: {
@@ -35,6 +39,7 @@ function mapCategoryOption(category: {
   isDefault?: boolean | null;
   isSystem?: boolean | null;
   isArchived?: boolean | null;
+  createdAt?: string;
 }): CategoryOption {
   const iconType = (category.iconType ?? "vector") as CategoryIconType;
   const iconName = category.iconName ?? category.icon ?? "shape-outline";
@@ -48,9 +53,9 @@ function mapCategoryOption(category: {
     iconType,
     icon:
       iconType === "emoji"
-        ? emoji ?? "🏷️"
+        ? (emoji ?? "🏷️")
         : iconType === "uploaded_image"
-          ? iconImageUri ?? ""
+          ? (iconImageUri ?? "")
           : iconName,
     iconName,
     iconImageUri,
@@ -59,6 +64,7 @@ function mapCategoryOption(category: {
     isDefault: Boolean(category.isDefault),
     isSystem: Boolean(category.isSystem),
     isArchived: Boolean(category.isArchived),
+    createdAt: category.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -69,6 +75,13 @@ function sortCategoryOptions(left: CategoryOption, right: CategoryOption) {
 
   if (left.isDefault !== right.isDefault) {
     return left.isDefault ? -1 : 1;
+  }
+
+  // Sort by creation date (newest first), then alphabetically
+  const dateComparison =
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  if (dateComparison !== 0) {
+    return dateComparison;
   }
 
   return left.label.localeCompare(right.label);
@@ -89,7 +102,9 @@ export function useCategories(type?: CategoryType, includeArchived = false) {
     setIsLoading(true);
     try {
       const rows = await categoriesService.fetch(userId, type, includeArchived);
-      const next = (rows ?? []).map(mapCategoryOption).sort(sortCategoryOptions);
+      const next = (rows ?? [])
+        .map(mapCategoryOption)
+        .sort(sortCategoryOptions);
       setCategories(next);
     } finally {
       setIsLoading(false);
@@ -132,7 +147,10 @@ export function useManagedCategories(includeArchived = true) {
 
     setIsLoading(true);
     try {
-      const rows = await categoriesService.fetchManaged(userId, includeArchived);
+      const rows = await categoriesService.fetchManaged(
+        userId,
+        includeArchived,
+      );
       setCategories(rows);
     } finally {
       setIsLoading(false);
@@ -154,4 +172,3 @@ export function useManagedCategories(includeArchived = true) {
     refresh,
   } as const;
 }
-

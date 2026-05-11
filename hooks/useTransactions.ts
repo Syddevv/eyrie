@@ -5,7 +5,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { transactionsService } from "@/src/db/services";
 import { onAccountsChanged } from "@/src/lib/dbSync";
-import { getMerchantForCategoryByLabel } from "@/constants/expense-merchants";
+import { getMerchantPresetByName } from "@/constants/expense-merchants";
 
 type IconLibrary = "feather" | "material";
 type TransactionTypeValue = "expense" | "income" | "transfer";
@@ -192,10 +192,7 @@ export function resolveTransactionVisual(
   },
 ) {
   const normalizedCategory = categoryKey(categoryName);
-  const matchedMerchant = getMerchantForCategoryByLabel(
-    categoryName,
-    options?.merchantName,
-  );
+  const matchedMerchant = getMerchantPresetByName(options?.merchantName);
 
   if (type === "income") {
     if (options?.categoryIcon || options?.categoryColor) {
@@ -311,6 +308,7 @@ export function resolveTransactionVisual(
 
 function mapTransactionRow(source: TransactionRow): TransactionListItem {
   const merchant =
+    source.merchant?.name ||
     normalizeMerchantName(source.merchantName) ||
     source.category?.name ||
     source.account?.name ||

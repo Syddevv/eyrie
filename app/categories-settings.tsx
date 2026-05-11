@@ -1,17 +1,33 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  Keyboard,
+} from "react-native";
 import Animated, { FadeInUp, LinearTransition } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import { useAuthStore } from "@/store/useAuthStore";
 
 import { CategoryAvatar } from "@/components/category-avatar";
 import { CategoryDeleteSheet } from "@/components/category-delete-sheet";
-import { CategoryEditorSheet, type CategoryDraft } from "@/components/category-editor-sheet";
+import {
+  CategoryEditorSheet,
+  type CategoryDraft,
+} from "@/components/category-editor-sheet";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
-import { useManagedCategories, type CategoryOption } from "@/hooks/useCategories";
+import {
+  useManagedCategories,
+  type CategoryOption,
+} from "@/hooks/useCategories";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { categoriesService } from "@/src/db/services";
@@ -25,14 +41,18 @@ export default function CategoriesSettingsScreen() {
   const isDark = colorScheme === "dark";
   const { user } = useCurrentUser();
   const { categories, isLoading, refresh } = useManagedCategories(true);
+  const showSnackbar = useAuthStore((s) => s.showSnackbar);
 
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [isEditorVisible, setIsEditorVisible] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(
+    null,
+  );
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [isUnarchivingId, setIsUnarchivingId] = useState<string | null>(null);
 
   const ui = useMemo(
     () => ({
@@ -41,11 +61,15 @@ export default function CategoriesSettingsScreen() {
       subtitle: { color: isDark ? "#9EA6B5" : "#5B6980" },
       fieldSurface: {
         backgroundColor: isDark ? "#101722" : colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(226,232,240,0.92)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(226,232,240,0.92)",
       },
       pillSurface: {
         backgroundColor: isDark ? "#101722" : colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(226,232,240,0.92)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(226,232,240,0.92)",
       },
       pillSelected: {
         backgroundColor: colors.primary,
@@ -53,18 +77,26 @@ export default function CategoriesSettingsScreen() {
       },
       card: {
         backgroundColor: isDark ? "#101722" : colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(226,232,240,0.92)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(226,232,240,0.92)",
       },
       badgeExpense: {
-        backgroundColor: isDark ? "rgba(249, 115, 22, 0.14)" : "rgba(255, 237, 213, 0.96)",
+        backgroundColor: isDark
+          ? "rgba(249, 115, 22, 0.14)"
+          : "rgba(255, 237, 213, 0.96)",
         color: isDark ? "#FDBA74" : "#EA580C",
       },
       badgeIncome: {
-        backgroundColor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(220, 252, 231, 0.96)",
+        backgroundColor: isDark
+          ? "rgba(16, 185, 129, 0.14)"
+          : "rgba(220, 252, 231, 0.96)",
         color: isDark ? "#6EE7B7" : "#059669",
       },
       archivedBadge: {
-        backgroundColor: isDark ? "rgba(148, 163, 184, 0.16)" : "rgba(226, 232, 240, 0.9)",
+        backgroundColor: isDark
+          ? "rgba(148, 163, 184, 0.16)"
+          : "rgba(226, 232, 240, 0.9)",
         color: isDark ? "#CBD5E1" : "#475569",
       },
       fab: { backgroundColor: colors.primary },
@@ -88,38 +120,35 @@ export default function CategoriesSettingsScreen() {
     });
   }, [categories, filterType, query]);
 
+  const activeCategories = useMemo(
+    () => visibleCategories.filter((cat) => !cat.isArchived),
+    [visibleCategories],
+  );
+
+  const archivedCategories = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return categories.filter((category) => {
+      if (!category.isArchived) {
+        return false;
+      }
+
+      if (filterType !== "all" && category.type !== filterType) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return category.name.toLowerCase().includes(normalizedQuery);
+    });
+  }, [categories, filterType, query]);
+
   const editingCategory =
     categories.find((category) => category.id === editingCategoryId) ?? null;
   const deleteCategory =
     categories.find((category) => category.id === deleteCategoryId) ?? null;
-
-  const deleteReassignOptions: CategoryOption[] = useMemo(() => {
-    if (!deleteCategory) {
-      return [];
-    }
-
-    return categories
-      .filter(
-        (category) =>
-          category.id !== deleteCategory.id &&
-          category.type === deleteCategory.type &&
-          !category.isArchived,
-      )
-      .map((category) => ({
-        id: category.id,
-        label: category.name,
-        type: category.type as "expense" | "income",
-        iconType: (category.iconType ?? "vector") as CategoryOption["iconType"],
-        icon: category.iconName ?? category.icon ?? "shape-outline",
-        iconName: category.iconName ?? category.icon ?? "shape-outline",
-        iconImageUri: category.iconImageUri ?? null,
-        emoji: category.emoji ?? null,
-        color: category.color ?? "#64748B",
-        isDefault: Boolean(category.isDefault),
-        isSystem: Boolean(category.isSystem),
-        isArchived: Boolean(category.isArchived),
-      }));
-  }, [categories, deleteCategory]);
 
   const openCreate = () => {
     setEditingCategoryId(null);
@@ -165,15 +194,21 @@ export default function CategoriesSettingsScreen() {
 
       setIsEditorVisible(false);
       setEditingCategoryId(null);
+      Keyboard.dismiss();
       await refresh();
+      if (!editingCategory) {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        );
+        showSnackbar("Category created successfully", "success");
+      }
     } finally {
       setIsSavingCategory(false);
     }
   };
 
   const handleDeleteCategory = async (payload: {
-    mode: "archive" | "delete" | "reassign";
-    targetCategoryId?: string;
+    mode: "archive" | "delete";
   }) => {
     if (!deleteCategory) {
       return;
@@ -182,11 +217,9 @@ export default function CategoriesSettingsScreen() {
     setIsDeletingCategory(true);
 
     try {
-      await categoriesService.deleteManaged(deleteCategory.id, payload.mode === "reassign"
-        ? { mode: "reassign", targetCategoryId: payload.targetCategoryId ?? "" }
-        : payload.mode === "archive"
-          ? { mode: "archive" }
-          : { mode: "delete" });
+      await categoriesService.deleteManaged(deleteCategory.id, {
+        mode: payload.mode,
+      });
       setDeleteCategoryId(null);
       await refresh();
     } finally {
@@ -194,17 +227,32 @@ export default function CategoriesSettingsScreen() {
     }
   };
 
+  const handleUnarchiveCategory = async (categoryId: string) => {
+    setIsUnarchivingId(categoryId);
+
+    try {
+      await categoriesService.restore(categoryId);
+      await refresh();
+    } finally {
+      setIsUnarchivingId(null);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, ui.background]}>
       <View style={styles.flex}>
         <View style={styles.headerRow}>
-          <Pressable style={[styles.iconButton, ui.fieldSurface]} onPress={() => router.back()}>
+          <Pressable
+            style={[styles.iconButton, ui.fieldSurface]}
+            onPress={() => router.back()}
+          >
             <Feather name="chevron-left" size={20} color={colors.foreground} />
           </Pressable>
           <View style={styles.headerTextBlock}>
             <Text style={[styles.title, ui.title]}>Categories</Text>
             <Text style={[styles.subtitle, ui.subtitle]}>
-              Manage the categories used in transactions, budgets, analytics, and insights.
+              Manage the categories used in transactions, budgets, analytics,
+              and insights.
             </Text>
           </View>
         </View>
@@ -232,29 +280,128 @@ export default function CategoriesSettingsScreen() {
                   ui.pillSurface,
                   isSelected && ui.pillSelected,
                 ]}
-                onPress={() => setFilterType(value)}>
-                <Text style={[styles.segmentText, { color: isSelected ? "#FFFFFF" : ui.title.color }]}>
-                  {value === "all" ? "All" : value === "expense" ? "Expense" : "Income"}
+                onPress={() => setFilterType(value)}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    { color: isSelected ? "#FFFFFF" : ui.title.color },
+                  ]}
+                >
+                  {value === "all"
+                    ? "All"
+                    : value === "expense"
+                      ? "Expense"
+                      : "Income"}
                 </Text>
               </Pressable>
             );
           })}
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {visibleCategories.map((category, index) => (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {archivedCategories.length ? (
+            <View style={styles.archivedSection}>
+              <Text style={[styles.archivedSectionTitle, ui.title]}>
+                Archived Categories
+              </Text>
+              <View style={styles.archivedCategoriesList}>
+                {archivedCategories.map((category) => (
+                  <View
+                    key={category.id}
+                    style={[styles.archivedCategoryCard, ui.card, shadows.soft]}
+                  >
+                    <View style={styles.archivedCardContent}>
+                      <View
+                        style={[
+                          styles.iconWrap,
+                          { backgroundColor: `${category.color}22` },
+                        ]}
+                      >
+                        <CategoryAvatar
+                          category={{
+                            iconType: (category.iconType ??
+                              "vector") as CategoryOption["iconType"],
+                            iconName:
+                              category.iconName ??
+                              category.icon ??
+                              "shape-outline",
+                            iconImageUri: category.iconImageUri ?? null,
+                            emoji: category.emoji ?? null,
+                            color: category.color ?? "#64748B",
+                          }}
+                          size={20}
+                        />
+                      </View>
+                      <View style={styles.cardTextBlock}>
+                        <Text style={[styles.cardTitle, ui.title]}>
+                          {category.name}
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      disabled={isUnarchivingId === category.id}
+                      style={[
+                        styles.unarchiveButton,
+                        isUnarchivingId === category.id &&
+                          styles.unarchiveButtonDisabled,
+                      ]}
+                      onPress={() => handleUnarchiveCategory(category.id)}
+                    >
+                      <Feather
+                        name="rotate-ccw"
+                        size={16}
+                        color={colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.unarchiveButtonText,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {isUnarchivingId === category.id
+                          ? "Restoring..."
+                          : "Restore"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {activeCategories.length ? (
+            <Text style={[styles.activeSectionTitle, ui.title]}>
+              Active Categories
+            </Text>
+          ) : null}
+
+          {activeCategories.map((category, index) => (
             <Animated.View
               key={category.id}
               entering={FadeInUp.delay(index * 24).duration(180)}
-              layout={LinearTransition.springify().damping(18).stiffness(180)}>
+              layout={LinearTransition.springify().damping(18).stiffness(180)}
+            >
               <View style={[styles.categoryCard, ui.card, shadows.soft]}>
                 <View style={styles.cardTopRow}>
                   <View style={styles.cardIdentity}>
-                    <View style={[styles.iconWrap, { backgroundColor: `${category.color}22` }]}>
+                    <View
+                      style={[
+                        styles.iconWrap,
+                        { backgroundColor: `${category.color}22` },
+                      ]}
+                    >
                       <CategoryAvatar
                         category={{
-                          iconType: (category.iconType ?? "vector") as CategoryOption["iconType"],
-                          iconName: category.iconName ?? category.icon ?? "shape-outline",
+                          iconType: (category.iconType ??
+                            "vector") as CategoryOption["iconType"],
+                          iconName:
+                            category.iconName ??
+                            category.icon ??
+                            "shape-outline",
                           iconImageUri: category.iconImageUri ?? null,
                           emoji: category.emoji ?? null,
                           color: category.color ?? "#64748B",
@@ -263,16 +410,32 @@ export default function CategoriesSettingsScreen() {
                       />
                     </View>
                     <View style={styles.cardTextBlock}>
-                      <Text style={[styles.cardTitle, ui.title]}>{category.name}</Text>
+                      <Text style={[styles.cardTitle, ui.title]}>
+                        {category.name}
+                      </Text>
                     </View>
                   </View>
 
                   <View style={styles.cardActions}>
-                    <Pressable style={[styles.actionButton, ui.fieldSurface]} onPress={() => openEdit(category.id)}>
-                      <Feather name="edit-3" size={16} color={colors.foreground} />
+                    <Pressable
+                      style={[styles.actionButton, ui.fieldSurface]}
+                      onPress={() => openEdit(category.id)}
+                    >
+                      <Feather
+                        name="edit-3"
+                        size={16}
+                        color={colors.foreground}
+                      />
                     </Pressable>
-                    <Pressable style={[styles.actionButton, ui.fieldSurface]} onPress={() => setDeleteCategoryId(category.id)}>
-                      <Feather name="trash-2" size={16} color={colors.foreground} />
+                    <Pressable
+                      style={[styles.actionButton, ui.fieldSurface]}
+                      onPress={() => setDeleteCategoryId(category.id)}
+                    >
+                      <Feather
+                        name="trash-2"
+                        size={16}
+                        color={colors.foreground}
+                      />
                     </Pressable>
                   </View>
                 </View>
@@ -281,20 +444,38 @@ export default function CategoriesSettingsScreen() {
                   <View
                     style={[
                       styles.badge,
-                      { backgroundColor: category.type === "expense" ? ui.badgeExpense.backgroundColor : ui.badgeIncome.backgroundColor },
-                    ]}>
+                      {
+                        backgroundColor:
+                          category.type === "expense"
+                            ? ui.badgeExpense.backgroundColor
+                            : ui.badgeIncome.backgroundColor,
+                      },
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.badgeText,
-                        { color: category.type === "expense" ? ui.badgeExpense.color : ui.badgeIncome.color },
-                      ]}>
+                        {
+                          color:
+                            category.type === "expense"
+                              ? ui.badgeExpense.color
+                              : ui.badgeIncome.color,
+                        },
+                      ]}
+                    >
                       {category.type === "expense" ? "Expense" : "Income"}
                     </Text>
                   </View>
-
-                  {category.isArchived ? (
-                    <View style={[styles.badge, { backgroundColor: ui.archivedBadge.backgroundColor }]}>
-                      <Text style={[styles.badgeText, { color: ui.archivedBadge.color }]}>Archived</Text>
+                  {category.isDefault ? (
+                    <View style={[styles.badge, ui.archivedBadge]}>
+                      <Text
+                        style={[
+                          styles.badgeText,
+                          { color: ui.archivedBadge.color },
+                        ]}
+                      >
+                        System Default
+                      </Text>
                     </View>
                   ) : null}
                 </View>
@@ -302,7 +483,7 @@ export default function CategoriesSettingsScreen() {
             </Animated.View>
           ))}
 
-          {!visibleCategories.length ? (
+          {!activeCategories.length && !archivedCategories.length ? (
             <View style={[styles.emptyCard, ui.card, shadows.soft]}>
               <Text style={[styles.emptyTitle, ui.title]}>
                 {isLoading ? "Loading categories..." : "No categories found"}
@@ -314,7 +495,10 @@ export default function CategoriesSettingsScreen() {
           ) : null}
         </ScrollView>
 
-        <Pressable style={[styles.fab, ui.fab, shadows.floating]} onPress={openCreate}>
+        <Pressable
+          style={[styles.fab, ui.fab, shadows.floating]}
+          onPress={openCreate}
+        >
           <Feather name="plus" size={22} color="#FFFFFF" />
           <Text style={styles.fabText}>Create Category</Text>
         </Pressable>
@@ -329,8 +513,12 @@ export default function CategoriesSettingsScreen() {
             ? {
                 name: editingCategory.name,
                 type: editingCategory.type as "expense" | "income",
-                iconType: (editingCategory.iconType ?? "vector") as CategoryDraft["iconType"],
-                iconName: editingCategory.iconName ?? editingCategory.icon ?? "shape-outline",
+                iconType: (editingCategory.iconType ??
+                  "vector") as CategoryDraft["iconType"],
+                iconName:
+                  editingCategory.iconName ??
+                  editingCategory.icon ??
+                  "shape-outline",
                 iconImageUri: editingCategory.iconImageUri ?? null,
                 emoji: editingCategory.emoji ?? "🏷️",
                 color: editingCategory.color ?? "#1495FF",
@@ -353,9 +541,16 @@ export default function CategoriesSettingsScreen() {
                 id: deleteCategory.id,
                 label: deleteCategory.name,
                 type: deleteCategory.type as "expense" | "income",
-                iconType: (deleteCategory.iconType ?? "vector") as CategoryOption["iconType"],
-                icon: deleteCategory.iconName ?? deleteCategory.icon ?? "shape-outline",
-                iconName: deleteCategory.iconName ?? deleteCategory.icon ?? "shape-outline",
+                iconType: (deleteCategory.iconType ??
+                  "vector") as CategoryOption["iconType"],
+                icon:
+                  deleteCategory.iconName ??
+                  deleteCategory.icon ??
+                  "shape-outline",
+                iconName:
+                  deleteCategory.iconName ??
+                  deleteCategory.icon ??
+                  "shape-outline",
                 iconImageUri: deleteCategory.iconImageUri ?? null,
                 emoji: deleteCategory.emoji ?? null,
                 color: deleteCategory.color ?? "#64748B",
@@ -368,7 +563,6 @@ export default function CategoriesSettingsScreen() {
               }
             : null
         }
-        reassignOptions={deleteReassignOptions}
         isSubmitting={isDeletingCategory}
         onCancel={() => {
           if (!isDeletingCategory) {
@@ -435,6 +629,7 @@ const styles = StyleSheet.create({
   segmentedRow: {
     marginTop: 14,
     marginHorizontal: 14,
+    paddingBottom: 14,
     flexDirection: "row",
     gap: 10,
   },
@@ -565,6 +760,61 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 15,
     lineHeight: 18,
+    fontWeight: fontWeights.bold,
+  },
+  archivedSection: {
+    marginTop: 20,
+  },
+  archivedSectionTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: fontWeights.bold,
+    marginBottom: 12,
+    marginHorizontal: 2,
+  },
+  activeSectionTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: fontWeights.bold,
+    marginBottom: 12,
+    marginHorizontal: 2,
+    marginTop: 20,
+  },
+  archivedCategoriesList: {
+    gap: 10,
+  },
+  archivedCategoryCard: {
+    borderRadius: 26,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  archivedCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  unarchiveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  unarchiveButtonDisabled: {
+    opacity: 0.5,
+  },
+  unarchiveButtonText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 16,
     fontWeight: fontWeights.bold,
   },
 });
