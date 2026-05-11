@@ -19,6 +19,8 @@ import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
 import { useExpenseMerchants } from "@/hooks/useExpenseMerchants";
+import { useMerchantsByCategory } from "@/hooks/useMerchantsByCategory";
+import { CategoryAvatar } from "@/components/category-avatar";
 import { useIncomeCategories } from "@/hooks/useIncomeCategories";
 import {
   getBackdropButtonColor,
@@ -36,13 +38,21 @@ import {
 import { transactionsService } from "@/src/db/services";
 
 function formatAmount(value: string) {
-  return value.replace(/[^\d.]/g, "").replace(/^(\d*\.?\d{0,2}).*$/, "$1").slice(0, 12);
+  return value
+    .replace(/[^\d.]/g, "")
+    .replace(/^(\d*\.?\d{0,2}).*$/, "$1")
+    .slice(0, 12);
 }
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
-    normalized.length === 3 ? normalized.split("").map((char) => char + char).join("") : normalized;
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const red = Number.parseInt(full.slice(0, 2), 16);
   const green = Number.parseInt(full.slice(2, 4), 16);
   const blue = Number.parseInt(full.slice(4, 6), 16);
@@ -55,20 +65,28 @@ export default function EditTransactionModal() {
   const params = useLocalSearchParams<{ transactionId?: string | string[] }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
-  const transactionId = Array.isArray(params.transactionId) ? params.transactionId[0] : params.transactionId;
+  const transactionId = Array.isArray(params.transactionId)
+    ? params.transactionId[0]
+    : params.transactionId;
   const { transaction, isLoading } = useTransaction(transactionId);
   const { categories: expenseCategories } = useExpenseCategories();
-  const { categories: incomeCategories, defaultCategoryId: defaultIncomeCategoryId } = useIncomeCategories();
+  const {
+    categories: incomeCategories,
+    defaultCategoryId: defaultIncomeCategoryId,
+  } = useIncomeCategories();
 
   const [merchantQuery, setMerchantQuery] = useState("");
-  const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(
+    null,
+  );
+  const [showMerchantOptions, setShowMerchantOptions] = useState(false);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [showCategoryOptions, setShowCategoryOptions] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const isIncomeTransaction = transaction?.typeValue === "income";
-  const { merchants: expenseMerchantOptions } = useExpenseMerchants(merchantQuery);
+  const { merchants: expenseMerchantOptions } = useExpenseMerchants();
 
   useEffect(() => {
     if (!transaction) {
@@ -76,14 +94,16 @@ export default function EditTransactionModal() {
     }
 
     setMerchantQuery(transaction.merchant || transaction.title);
-    setSelectedMerchantId(null);
+    setSelectedMerchantId(transaction.merchantId ?? null);
     setAmount(String(transaction.amount));
     setCategoryId(transaction.categoryId);
   }, [transaction]);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
@@ -99,12 +119,52 @@ export default function EditTransactionModal() {
     };
   }, []);
 
-  const categoryOptions = isIncomeTransaction ? incomeCategories : expenseCategories;
-  const selectedCategory = categoryOptions.find((option) => option.id === categoryId) ?? null;
+  const categoryOptions = isIncomeTransaction
+    ? incomeCategories
+    : expenseCategories;
+  const selectedCategory =
+    categoryOptions.find((option) => option.id === categoryId) ?? null;
+  const merchantOptions = useMerchantsByCategory(
+    selectedCategory?.label ?? null,
+  );
   const selectedMerchantOption =
-    expenseMerchantOptions.find((option) => option.merchantId === selectedMerchantId) ??
-    expenseMerchantOptions.find((option) => option.label.toLowerCase() === merchantQuery.trim().toLowerCase()) ??
+    merchantOptions.find((option) => option.id === selectedMerchantId) ??
+    merchantOptions.find(
+      (option) =>
+        option.label.toLowerCase() === merchantQuery.trim().toLowerCase(),
+    ) ??
     null;
+
+  useEffect(() => {
+    if (isIncomeTransaction) {
+      return;
+    }
+
+    if (!merchantOptions.length) {
+      setSelectedMerchantId(null);
+      setMerchantQuery("");
+      return;
+    }
+
+    setSelectedMerchantId((current) =>
+      current && merchantOptions.some((merchant) => merchant.id === current)
+        ? current
+        : null,
+    );
+
+    setMerchantQuery((current) => {
+      const normalized = current.trim().toLowerCase();
+      if (!normalized) {
+        return current;
+      }
+
+      return merchantOptions.some(
+        (merchant) => merchant.label.trim().toLowerCase() === normalized,
+      )
+        ? current
+        : "";
+    });
+  }, [isIncomeTransaction, merchantOptions]);
 
   useEffect(() => {
     if (!transaction || !isIncomeTransaction) {
@@ -154,49 +214,60 @@ export default function EditTransactionModal() {
     [isDark],
   );
 
-  const transactionIcon =
-    (() => {
-      if (!transaction) {
-        return {
-          iconLibrary: "feather" as const,
-          iconName: "circle",
-          iconColor: "#94A3B8",
-          iconBackgroundLight: "#EEF2F7",
-          iconBackgroundDark: "#1A2433",
-        };
-      }
+  const transactionIcon = (() => {
+    if (!transaction) {
+      return {
+        iconLibrary: "feather" as const,
+        iconName: "circle",
+        iconColor: "#94A3B8",
+        iconBackgroundLight: "#EEF2F7",
+        iconBackgroundDark: "#1A2433",
+      };
+    }
 
-      if (isIncomeTransaction) {
-        const previewColor = selectedCategory?.color ?? transaction.iconColor;
-        return {
-          ...resolveTransactionVisual(
-            selectedCategory?.label ?? transaction.category,
-            "income",
-            {
-              categoryIcon: selectedCategory?.icon ?? null,
-              categoryColor: selectedCategory?.color ?? null,
-            },
-          ),
-          iconBackgroundLight: withOpacity(previewColor, 0.16),
-          iconBackgroundDark: withOpacity(previewColor, 0.2),
-        };
-      }
+    if (isIncomeTransaction) {
+      const previewColor = selectedCategory?.color ?? transaction.iconColor;
+      return {
+        ...resolveTransactionVisual(
+          selectedCategory?.label ?? transaction.category,
+          "income",
+          {
+            categoryIcon: selectedCategory?.icon ?? null,
+            categoryColor: selectedCategory?.color ?? null,
+          },
+        ),
+        iconBackgroundLight: withOpacity(previewColor, 0.16),
+        iconBackgroundDark: withOpacity(previewColor, 0.2),
+      };
+    }
 
-      return resolveTransactionVisual(selectedCategory?.label ?? transaction.category, "expense", {
+    return resolveTransactionVisual(
+      selectedCategory?.label ?? transaction.category,
+      "expense",
+      {
         merchantName: selectedMerchantOption?.label ?? merchantQuery,
-      });
-    })();
+      },
+    );
+  })();
 
   const transactionIconNode =
     transactionIcon.iconLibrary === "material" ? (
       <MaterialCommunityIcons
-        name={transactionIcon.iconName as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+        name={
+          transactionIcon.iconName as React.ComponentProps<
+            typeof MaterialCommunityIcons
+          >["name"]
+        }
         size={22}
         color={transactionIcon.iconColor}
       />
     ) : (
       <Feather
-        name={transactionIcon.iconName as React.ComponentProps<typeof Feather>["name"]}
+        name={
+          transactionIcon.iconName as React.ComponentProps<
+            typeof Feather
+          >["name"]
+        }
         size={20}
         color={transactionIcon.iconColor}
       />
@@ -222,7 +293,10 @@ export default function EditTransactionModal() {
       : merchantQuery.trim();
 
     if (!isIncomeTransaction && !normalizedMerchant) {
-      Alert.alert("Missing merchant", "Select a merchant for this transaction.");
+      Alert.alert(
+        "Missing merchant",
+        "Select a merchant for this transaction.",
+      );
       return;
     }
 
@@ -240,7 +314,15 @@ export default function EditTransactionModal() {
 
     try {
       await transactionsService.update(transaction.id, {
-        merchantId: isIncomeTransaction ? null : selectedMerchantOption?.merchantId ?? null,
+        merchantId: isIncomeTransaction
+          ? null
+          : (expenseMerchantOptions.find(
+              (option) =>
+                option.label.trim().toLowerCase() ===
+                (selectedMerchantOption?.label ?? merchantQuery)
+                  .trim()
+                  .toLowerCase(),
+            )?.merchantId ?? null),
         merchantName: normalizedMerchant,
         amount: numericAmount,
         type: normalizedType,
@@ -249,14 +331,22 @@ export default function EditTransactionModal() {
 
       router.back();
     } catch (error) {
-      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to update transaction.");
+      Alert.alert(
+        "Save failed",
+        error instanceof Error
+          ? error.message
+          : "Unable to update transaction.",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardWrap}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardWrap}
+    >
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
@@ -265,8 +355,11 @@ export default function EditTransactionModal() {
             styles.sheet,
             ui.sheet,
             shadows.floating,
-            keyboardHeight > 0 && { marginBottom: Math.max(12, keyboardHeight - 8) },
-          ]}>
+            keyboardHeight > 0 && {
+              marginBottom: Math.max(12, keyboardHeight - 8),
+            },
+          ]}
+        >
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
@@ -280,28 +373,48 @@ export default function EditTransactionModal() {
                       : transactionIcon.iconBackgroundLight
                     : getFieldSurface(isDark),
                 },
-              ]}>
+              ]}
+            >
               {transactionIconNode}
             </View>
             <View style={styles.headerText}>
-              <Text style={[styles.title, ui.title]}>{transaction?.title ?? "Transaction"}</Text>
+              <Text style={[styles.title, ui.title]}>
+                {transaction?.title ?? "Transaction"}
+              </Text>
               <Text style={[styles.subtitle, ui.subtitle]}>
-                {transaction?.dateLabel ?? (isLoading ? "Loading transaction..." : "Transaction not found")}
+                {transaction?.dateLabel ??
+                  (isLoading
+                    ? "Loading transaction..."
+                    : "Transaction not found")}
               </Text>
             </View>
-            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+            <Pressable
+              style={[styles.closeButton, ui.closeButton]}
+              onPress={() => router.back()}
+            >
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.formSection}>
               <Text style={[styles.label, ui.label]}>Category</Text>
               <Pressable
-                style={[styles.fieldSurface, ui.fieldSurface, styles.dropdownField]}
-                onPress={() => setShowCategoryOptions((current) => !current)}>
+                style={[
+                  styles.fieldSurface,
+                  ui.fieldSurface,
+                  styles.dropdownField,
+                ]}
+                onPress={() => setShowCategoryOptions((current) => !current)}
+              >
                 <Text style={[styles.fieldInput, ui.fieldText]}>
-                  {selectedCategory?.label ?? (categoryOptions.length ? "Select category" : "Loading categories...")}
+                  {selectedCategory?.label ??
+                    (categoryOptions.length
+                      ? "Select category"
+                      : "Loading categories...")}
                 </Text>
                 <Feather
                   name={showCategoryOptions ? "chevron-up" : "chevron-down"}
@@ -318,14 +431,38 @@ export default function EditTransactionModal() {
                     return (
                       <Pressable
                         key={option.id}
-                        style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
+                        style={[
+                          styles.categoryOption,
+                          isSelected && styles.categoryOptionSelected,
+                        ]}
                         onPress={() => {
                           setCategoryId(option.id);
                           setShowCategoryOptions(false);
-                        }}>
-                        <View style={[styles.categoryDot, { backgroundColor: option.color }]} />
-                        <Text style={[styles.categoryLabel, ui.fieldText]}>{option.label}</Text>
-                        {isSelected ? <Feather name="check" size={16} color="#1681DD" /> : null}
+                        }}
+                      >
+                        <View
+                          style={[
+                            styles.iconSmallWrap,
+                            { backgroundColor: `${option.color}22` },
+                          ]}
+                        >
+                          <CategoryAvatar
+                            category={{
+                              iconType: option.iconType,
+                              iconName: option.iconName ?? option.icon,
+                              iconImageUri: option.iconImageUri ?? null,
+                              emoji: option.emoji ?? null,
+                              color: option.color ?? "#64748B",
+                            }}
+                            size={18}
+                          />
+                        </View>
+                        <Text style={[styles.categoryLabel, ui.fieldText]}>
+                          {option.label}
+                        </Text>
+                        {isSelected ? (
+                          <Feather name="check" size={16} color="#1681DD" />
+                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -336,43 +473,80 @@ export default function EditTransactionModal() {
             {!isIncomeTransaction ? (
               <View style={styles.formSection}>
                 <Text style={[styles.label, ui.label]}>Merchant</Text>
-                <TextInput
-                  value={merchantQuery}
-                  onChangeText={(value) => {
-                    setMerchantQuery(value);
-                    if (
-                      selectedMerchantOption?.label.toLowerCase() !== value.trim().toLowerCase()
-                    ) {
-                      setSelectedMerchantId(null);
-                    }
-                  }}
-                  placeholder="Search or create merchant"
-                  placeholderTextColor={ui.placeholder.color}
-                  style={[styles.fieldSurface, styles.fieldInput, ui.fieldSurface, ui.fieldText]}
-                  selectionColor="#1681DD"
-                />
+                <Pressable
+                  style={[
+                    styles.fieldSurface,
+                    ui.fieldSurface,
+                    styles.dropdownField,
+                  ]}
+                  onPress={() => setShowMerchantOptions((s) => !s)}
+                >
+                  <Text style={[styles.fieldInput, ui.fieldText]}>
+                    {selectedMerchantOption?.label ??
+                      (selectedCategory
+                        ? "Select merchant"
+                        : "Pick category first")}
+                  </Text>
+                  <Feather
+                    name={showMerchantOptions ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={ui.fieldText.color}
+                  />
+                </Pressable>
 
-                {merchantQuery.trim() || expenseMerchantOptions.length ? (
+                {showMerchantOptions ? (
                   <View style={[styles.categoryList, ui.fieldSurface]}>
-                    {expenseMerchantOptions.map((option) => {
-                      const isSelected =
-                        option.merchantId === selectedMerchantId ||
-                        option.label.toLowerCase() === merchantQuery.trim().toLowerCase();
+                    {!selectedCategory ? (
+                      <Text style={[styles.categoryLabel, ui.placeholder]}>
+                        Pick a category first to see related merchants.
+                      </Text>
+                    ) : (
+                      merchantOptions.map((option) => {
+                        const isSelected = option.id === selectedMerchantId;
 
-                      return (
-                        <Pressable
-                          key={option.id}
-                          style={[styles.categoryOption, isSelected && styles.categoryOptionSelected]}
-                          onPress={() => {
-                            setMerchantQuery(option.label);
-                            setSelectedMerchantId(option.merchantId);
-                          }}>
-                          <View style={[styles.categoryDot, { backgroundColor: option.color }]} />
-                          <Text style={[styles.categoryLabel, ui.fieldText]}>{option.label}</Text>
-                          {isSelected ? <Feather name="check" size={16} color="#1681DD" /> : null}
-                        </Pressable>
-                      );
-                    })}
+                        return (
+                          <Pressable
+                            key={option.id}
+                            style={[
+                              styles.categoryOption,
+                              isSelected && styles.categoryOptionSelected,
+                            ]}
+                            onPress={() => {
+                              setMerchantQuery(option.label);
+                              setSelectedMerchantId(option.id);
+                              setShowMerchantOptions(false);
+                            }}
+                          >
+                            {option.icon ? (
+                              <MaterialCommunityIcons
+                                name={option.icon as any}
+                                size={18}
+                                color={option.color}
+                              />
+                            ) : (
+                              <View
+                                style={[
+                                  styles.iconSmallWrap,
+                                  { backgroundColor: option.color },
+                                ]}
+                              >
+                                <Text
+                                  style={[styles.badgeText, { color: "#fff" }]}
+                                >
+                                  {option.initials}
+                                </Text>
+                              </View>
+                            )}
+                            <Text style={[styles.categoryLabel, ui.fieldText]}>
+                              {option.label}
+                            </Text>
+                            {isSelected ? (
+                              <Feather name="check" size={16} color="#1681DD" />
+                            ) : null}
+                          </Pressable>
+                        );
+                      })
+                    )}
                   </View>
                 ) : null}
               </View>
@@ -380,7 +554,13 @@ export default function EditTransactionModal() {
 
             <View style={styles.formSection}>
               <Text style={[styles.label, ui.label]}>Amount</Text>
-              <View style={[styles.fieldSurface, ui.fieldSurface, styles.balanceField]}>
+              <View
+                style={[
+                  styles.fieldSurface,
+                  ui.fieldSurface,
+                  styles.balanceField,
+                ]}
+              >
                 <Text style={[styles.peso, ui.peso]}>₱</Text>
                 <TextInput
                   value={amount}
@@ -396,14 +576,31 @@ export default function EditTransactionModal() {
           </ScrollView>
 
           <View style={styles.actionsRow}>
-            <Pressable disabled={isSaving} style={[styles.secondaryButton, ui.secondaryButton]} onPress={returnToDetails}>
-              <Text style={[styles.secondaryButtonText, ui.secondaryButtonText]}>Cancel</Text>
+            <Pressable
+              disabled={isSaving}
+              style={[styles.secondaryButton, ui.secondaryButton]}
+              onPress={returnToDetails}
+            >
+              <Text
+                style={[styles.secondaryButtonText, ui.secondaryButtonText]}
+              >
+                Cancel
+              </Text>
             </Pressable>
             <Pressable
               disabled={!transaction || isSaving}
-              style={[styles.primaryButton, ui.primaryButton, (!transaction || isSaving) && styles.disabledButton]}
-              onPress={handleSave}>
-              <Feather name="check" size={16} color={ui.primaryButtonText.color} />
+              style={[
+                styles.primaryButton,
+                ui.primaryButton,
+                (!transaction || isSaving) && styles.disabledButton,
+              ]}
+              onPress={handleSave}
+            >
+              <Feather
+                name="check"
+                size={16}
+                color={ui.primaryButtonText.color}
+              />
               <Text style={[styles.primaryButtonText, ui.primaryButtonText]}>
                 {isSaving ? "Saving..." : "Save Changes"}
               </Text>
@@ -534,6 +731,20 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 15,
     lineHeight: 20,
+  },
+  iconSmallWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  badgeText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.bold,
   },
   actionsRow: {
     marginTop: 24,
