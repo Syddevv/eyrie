@@ -29,6 +29,9 @@ export default function GoalDetailsModal() {
   const { goal, isLoading } = useSavingsGoal(goalId);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDeleteContributionId, setPendingDeleteContributionId] =
+    useState<string | null>(null);
+  const [isDeletingContribution, setIsDeletingContribution] = useState(false);
   const contributionPlan = goal ? getGoalContributionPlan(goal) : null;
 
   const ui = useMemo(
@@ -49,7 +52,7 @@ export default function GoalDetailsModal() {
       muted: { color: colors.mutedForeground },
       closeButton: { backgroundColor: colors.secondary },
       statCard: {
-        backgroundColor: isDark ? "#1B2432" : "#F8FAFD",
+        backgroundColor: isDark ? "#243147" : "#FFFFFF",
         borderColor: isDark
           ? "rgba(255,255,255,0.06)"
           : "rgba(226,232,240,0.88)",
@@ -123,6 +126,22 @@ export default function GoalDetailsModal() {
     });
   };
 
+  const handleDeleteContribution = async (contributionId: string) => {
+    if (isDeletingContribution) {
+      return;
+    }
+
+    setIsDeletingContribution(true);
+
+    try {
+      await goalsService.deleteContribution(contributionId);
+      await Haptics.selectionAsync();
+      setPendingDeleteContributionId(null);
+    } finally {
+      setIsDeletingContribution(false);
+    }
+  };
+
   return (
     <View style={[styles.overlay, ui.overlay]}>
       <Pressable style={styles.backdrop} onPress={close} />
@@ -171,8 +190,8 @@ export default function GoalDetailsModal() {
           <LinearGradient
             colors={
               isDark
-                ? ["#119B63", "#0C7A4E", "#085C3A"]
-                : ["#18C47E", "#10B981", "#0E9F6E"]
+                ? ["#1B6445", "#134E35"]
+                : ["#34D399", "#10B981"]
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -181,7 +200,7 @@ export default function GoalDetailsModal() {
             <View style={styles.progressGlowPrimary} />
             <View style={styles.progressGlowSecondary} />
             <LinearGradient
-              colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0)"]}
+              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0)"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 0.8, y: 0.6 }}
               style={styles.progressGloss}
@@ -194,20 +213,21 @@ export default function GoalDetailsModal() {
                 </Text>
               </View>
               <View style={styles.progressTopRight}>
-                <Text style={styles.progressPill}>
-                  {goal.metrics.isCompleted ? "Done" : `${goal.metrics.daysRemaining}d left`}
-                </Text>
-                <Text style={styles.goalAmount}>
-                  {`of ${formatCurrency(goal.targetAmount)}`}
-                </Text>
+                <View style={styles.progressPillGlass}>
+                  <Text style={styles.progressPill}>
+                    {goal.metrics.isCompleted
+                      ? "Goal reached"
+                      : `${goal.metrics.daysRemaining} days left`}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            <View style={styles.progressBottomSection}>
+            <View style={styles.progressBottomSectionGlass}>
               <View style={styles.progressHeaderRow}>
-                <Text style={styles.progressSectionLabel}>Progress</Text>
+                <Text style={styles.progressSectionLabel}>Progress target</Text>
                 <Text style={styles.progressSectionValue}>
-                  {`${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)}`}
+                  {`${formatCurrency(goal.targetAmount)}`}
                 </Text>
               </View>
 
@@ -221,7 +241,7 @@ export default function GoalDetailsModal() {
                   ]}
                 >
                   <LinearGradient
-                    colors={["#D7FFF0", "#FFFFFF", "#E5FFF7"]}
+                    colors={["#E2FFF4", "#FFFFFF"]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                     style={styles.progressFill}
@@ -233,13 +253,13 @@ export default function GoalDetailsModal() {
               <View style={styles.progressBottomRow}>
                 <Text style={styles.achievedText}>
                   {goal.metrics.isCompleted
-                    ? "Goal completed"
+                    ? "100% complete"
                     : `${Math.round(goal.metrics.progressPercentage)}% complete`}
                 </Text>
                 <Text style={styles.remainingText}>
                   {goal.metrics.isCompleted
                     ? "Completed"
-                    : `${formatCurrency(goal.metrics.remainingAmount)} left`}
+                    : `${formatCurrency(goal.metrics.remainingAmount)} left to goal`}
                 </Text>
               </View>
             </View>
@@ -334,9 +354,24 @@ export default function GoalDetailsModal() {
                         </Text>
                       </View>
                     </View>
-                    <Text
-                      style={[styles.historyAmount, ui.positiveAmount]}
-                    >{`+${formatCurrency(entry.amount)}`}</Text>
+                    <View style={styles.historyRight}>
+                      <Text
+                        style={[styles.historyAmount, ui.positiveAmount]}
+                      >{`+${formatCurrency(entry.amount)}`}</Text>
+                      <Pressable
+                        style={[
+                          styles.deleteContributionButton,
+                          ui.secondaryButton,
+                        ]}
+                        onPress={() => setPendingDeleteContributionId(entry.id)}
+                      >
+                        <Feather
+                          name="trash-2"
+                          size={14}
+                          color={colors.mutedForeground}
+                        />
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -408,6 +443,23 @@ export default function GoalDetailsModal() {
             void handleDelete();
           }}
         />
+
+        <DeleteConfirmationModal
+          visible={pendingDeleteContributionId !== null}
+          title="Remove contribution?"
+          message="This will remove the selected contribution from the goal."
+          isDeleting={isDeletingContribution}
+          onCancel={() => {
+            if (!isDeletingContribution) {
+              setPendingDeleteContributionId(null);
+            }
+          }}
+          onConfirm={() => {
+            if (pendingDeleteContributionId) {
+              void handleDeleteContribution(pendingDeleteContributionId);
+            }
+          }}
+        />
       </View>
     </View>
   );
@@ -476,36 +528,39 @@ const styles = StyleSheet.create({
   progressCard: {
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 18,
+    borderColor: "rgba(255,255,255,0.15)",
+    padding: 18,
     overflow: "hidden",
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
   },
   progressGlowPrimary: {
     position: "absolute",
-    width: 180,
-    height: 180,
+    width: 220,
+    height: 220,
     borderRadius: radius.full,
-    top: -70,
-    right: -42,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    top: -80,
+    right: -60,
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   progressGlowSecondary: {
     position: "absolute",
-    width: 110,
-    height: 110,
+    width: 140,
+    height: 140,
     borderRadius: radius.full,
-    bottom: -46,
-    left: -20,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    bottom: -60,
+    left: -40,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   progressGloss: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: 96,
+    height: 110,
   },
   progressTopRow: {
     flexDirection: "row",
@@ -514,14 +569,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   progressEyebrow: {
-    color: "rgba(234,255,245,0.74)",
+    color: "rgba(255,255,255,0.8)",
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.medium,
+    letterSpacing: 0.3,
   },
   savedAmount: {
-    marginTop: 6,
+    marginTop: 4,
     color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
     fontSize: 28,
@@ -532,30 +588,28 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
   },
+  progressPillGlass: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
   progressPill: {
     color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: fontWeights.bold,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.14)",
   },
-  goalAmount: {
-    color: "rgba(239,255,247,0.82)",
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: fontWeights.medium,
-  },
-  progressBottomSection: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.12)",
+  progressBottomSectionGlass: {
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   progressHeaderRow: {
     flexDirection: "row",
@@ -564,10 +618,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   progressSectionLabel: {
-    color: "rgba(234,255,245,0.74)",
+    color: "rgba(255,255,255,0.8)",
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: fontWeights.medium,
   },
   progressSectionValue: {
@@ -579,12 +633,12 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     marginTop: 12,
-    height: 12,
+    height: 10,
     borderRadius: radius.full,
     overflow: "hidden",
   },
   progressTrackPremium: {
-    backgroundColor: "rgba(7, 24, 37, 0.24)",
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
   },
   progressFillWrap: { height: "100%" },
   progressFill: { height: "100%", borderRadius: radius.full },
@@ -593,38 +647,43 @@ const styles = StyleSheet.create({
     top: 2,
     bottom: 2,
     right: 4,
-    width: 26,
+    width: 20,
     borderRadius: radius.full,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.4)",
   },
   progressBottomRow: {
-    marginTop: 12,
+    marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   achievedText: {
-    color: "rgba(239,255,247,0.78)",
+    color: "rgba(255,255,255,0.8)",
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   remainingText: {
     color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: fontWeights.bold,
   },
-  summaryRow: { marginTop: 16, flexDirection: "row", gap: 12 },
+  summaryRow: { marginTop: 12, flexDirection: "row", gap: 12 },
   summaryCard: {
     flex: 1,
     borderRadius: 20,
     borderWidth: 1,
-    minHeight: 108,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    minHeight: 88,
+    padding: 14,
     justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   summaryLabel: {
     fontFamily: fontFamilies.sans,
@@ -634,8 +693,8 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: fontWeights.bold,
   },
   infoCard: {
@@ -712,10 +771,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.bold,
   },
+  historyRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  deleteContributionButton: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   contributeButton: {
-    marginTop: 16,
-    height: 52,
-    borderRadius: 22,
+    marginTop: 20,
+    height: 56,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -724,7 +795,7 @@ const styles = StyleSheet.create({
   contributeButtonText: {
     color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 20,
     fontWeight: fontWeights.bold,
   },
