@@ -160,7 +160,9 @@ export default function AddContributionModal() {
 
   const selectedWallet =
     methods.find((method) => method.id === walletId) ?? null;
-  const remainingAmount = goal ? Math.max(0, goal.targetAmount - goal.currentAmount) : 0;
+  const remainingAmount = goal
+    ? Math.max(0, goal.targetAmount - goal.currentAmount)
+    : 0;
   const isOverTarget = parsedAmount > remainingAmount;
   const isAddEnabled = parsedAmount > 0 && !isOverTarget;
   const isKeyboardOpen = keyboardHeight > 0;
@@ -332,7 +334,9 @@ export default function AddContributionModal() {
                 <View
                   style={{
                     marginTop: 12,
-                    backgroundColor: isDark ? "rgba(239, 68, 68, 0.1)" : "#FEF2F2",
+                    backgroundColor: isDark
+                      ? "rgba(239, 68, 68, 0.1)"
+                      : "#FEF2F2",
                     borderColor: isDark ? "rgba(239, 68, 68, 0.2)" : "#FECACA",
                     borderWidth: 1,
                     borderRadius: 12,
@@ -368,7 +372,8 @@ export default function AddContributionModal() {
                         fontFamily: fontFamilies.sans,
                       }}
                     >
-                      You only need {formatCurrency(remainingAmount)} to reach your goal.
+                      You only need {formatCurrency(remainingAmount)} to reach
+                      your goal.
                     </Text>
                   </View>
                 </View>
