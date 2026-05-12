@@ -1,18 +1,15 @@
-import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
-  Platform,
   StyleSheet,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import Svg, { Defs, Pattern, Rect, Circle } from "react-native-svg";
 
 import { defaultBrandTheme, type BrandTheme } from "@/constants/brand-themes";
 
-type PremiumCardGradientProps = {
+type SimplePremiumCardProps = {
   theme?: BrandTheme | null;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -21,8 +18,16 @@ type PremiumCardGradientProps = {
   variant?: "card" | "wallet";
 };
 
-function withOpacity(hex: string, opacity: number) {
-  const normalized = hex.replace("#", "");
+function withOpacity(color: string, opacity: number) {
+  if (color.startsWith("rgba")) {
+    return color.replace(/rgba\(([^)]+),\s*[\d.]+\)/, `rgba($1, ${opacity})`);
+  }
+
+  if (color.startsWith("rgb(")) {
+    return color.replace("rgb(", "rgba(").replace(")", `, ${opacity})`);
+  }
+
+  const normalized = color.replace("#", "");
   const full =
     normalized.length === 3
       ? normalized
@@ -37,6 +42,35 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function getCirclePlacement(themeId: string, variant: "card" | "wallet") {
+  const size = variant === "wallet" ? 152 : 142;
+
+  switch (themeId) {
+    case "bpi":
+    case "shopeepay":
+    case "maribank":
+      return { size, top: -34, right: -20 };
+    case "landbank":
+    case "maya":
+    case "pdax":
+      return { size, bottom: -38, right: -18 };
+    case "gcash":
+    case "bdo":
+    case "coinsph":
+      return { size, top: -22, left: 72 };
+    case "gotyme":
+    case "paypal":
+    case "securitybank":
+      return { size, bottom: -24, left: 58 };
+    case "visa":
+    case "mastercard":
+    case "metrobank":
+      return { size, top: 18, right: -28 };
+    default:
+      return { size, top: -28, right: -22 };
+  }
+}
+
 export function CardGlowOverlay({
   theme,
   isDark,
@@ -46,36 +80,28 @@ export function CardGlowOverlay({
   isDark?: boolean;
   variant?: "card" | "wallet";
 }) {
-  const topGlowSize = variant === "wallet" ? 132 : 124;
-  const bottomGlowSize = variant === "wallet" ? 90 : 82;
+  const placement = getCirclePlacement(theme.id, variant);
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <BlurView
-        intensity={Platform.OS === "android" ? 18 : 28}
-        tint={isDark ? "dark" : "light"}
-        style={[
-          styles.glow,
-          styles.glowTopRight,
-          {
-            width: topGlowSize,
-            height: topGlowSize,
-            borderRadius: topGlowSize / 2,
-            backgroundColor: withOpacity(theme.glow, isDark ? 0.36 : 0.48),
-          },
+      <LinearGradient
+        colors={[
+          withOpacity(theme.secondary, isDark ? 0.24 : 0.3),
+          withOpacity(theme.primary, isDark ? 0.12 : 0.16),
+          "rgba(255,255,255,0)",
         ]}
-      />
-      <BlurView
-        intensity={Platform.OS === "android" ? 14 : 22}
-        tint={isDark ? "dark" : "light"}
+        start={{ x: 0.18, y: 0.18 }}
+        end={{ x: 1, y: 1 }}
         style={[
           styles.glow,
-          styles.glowBottomLeft,
           {
-            width: bottomGlowSize,
-            height: bottomGlowSize,
-            borderRadius: bottomGlowSize / 2,
-            backgroundColor: withOpacity(theme.secondary, isDark ? 0.14 : 0.22),
+            width: placement.size,
+            height: placement.size,
+            borderRadius: placement.size / 2,
+            top: placement.top,
+            right: placement.right,
+            bottom: placement.bottom,
+            left: placement.left,
           },
         ]}
       />
@@ -83,113 +109,37 @@ export function CardGlowOverlay({
   );
 }
 
-export function GlassReflection({ isDark }: { isDark?: boolean }) {
+export function AmbientGradientLayer({
+  isDark,
+}: {
+  isDark?: boolean;
+}) {
   return (
     <LinearGradient
       colors={
         isDark
-          ? [
-              "rgba(255,255,255,0.18)",
-              "rgba(255,255,255,0.06)",
-              "rgba(255,255,255,0)",
-            ]
-          : [
-              "rgba(255,255,255,0.28)",
-              "rgba(255,255,255,0.1)",
-              "rgba(255,255,255,0)",
-            ]
+          ? ["rgba(255,255,255,0.06)", "rgba(255,255,255,0)"]
+          : ["rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]
       }
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.reflection, { opacity: isDark ? 0.26 : 0.4 }]}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
+      style={styles.edgeHighlight}
     />
   );
 }
 
-export function AmbientGradientLayer({
-  theme,
-  isDark,
-}: {
-  theme: BrandTheme;
-  isDark?: boolean;
-}) {
-  return (
-    <>
-      <LinearGradient
-        colors={
-          isDark
-            ? [
-                withOpacity(
-                  theme.text === "#FFFFFF" ? "#FFFFFF" : theme.primary,
-                  0.12,
-                ),
-                "rgba(255,255,255,0)",
-              ]
-            : [withOpacity("#FFFFFF", 0.24), "rgba(255,255,255,0)"]
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.ambientTopLeft}
-      />
-      <LinearGradient
-        colors={
-          isDark
-            ? ["rgba(0,0,0,0)", "rgba(0,0,0,0.28)"]
-            : ["rgba(0,0,0,0)", "rgba(0,0,0,0.18)"]
-        }
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={styles.bottomVignette}
-      />
-      <LinearGradient
-        colors={
-          isDark
-            ? ["rgba(255,255,255,0.05)", "rgba(255,255,255,0)"]
-            : ["rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]
-        }
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.edgeHighlight}
-      />
-    </>
-  );
-}
-
-function CardNoiseTexture({ isDark }: { isDark?: boolean }) {
-  const opacity = isDark ? 0.045 : 0.065;
-
-  return (
-    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} opacity={opacity}>
-      <Defs>
-        <Pattern
-          id="grain"
-          width="16"
-          height="16"
-          patternUnits="userSpaceOnUse"
-        >
-          <Rect width="16" height="16" fill="transparent" />
-          <Circle cx="3" cy="4" r="0.5" fill="#FFFFFF" opacity="0.36" />
-          <Circle cx="12" cy="7" r="0.35" fill="#FFFFFF" opacity="0.28" />
-          <Circle cx="8" cy="13" r="0.4" fill="#FFFFFF" opacity="0.24" />
-        </Pattern>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#grain)" />
-    </Svg>
-  );
-}
-
-export function PremiumCardGradient({
+export function SimplePremiumCard({
   theme,
   children,
   style,
   contentStyle,
   isDark,
   variant = "card",
-}: PremiumCardGradientProps) {
+}: SimplePremiumCardProps) {
   const resolvedTheme = theme ?? defaultBrandTheme;
   const surfaceBorder =
     resolvedTheme.border ??
-    (isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.16)");
+    (isDark ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.24)");
 
   return (
     <View
@@ -200,13 +150,10 @@ export function PremiumCardGradient({
       ]}
     >
       <LinearGradient
-        colors={[
-          resolvedTheme.gradient[0],
-          resolvedTheme.gradient[1],
-          resolvedTheme.gradient[1],
-        ]}
-        start={{ x: 0.04, y: 0.04 }}
-        end={{ x: 0.96, y: 1 }}
+        colors={[resolvedTheme.gradient[0], resolvedTheme.gradient[1]]}
+        locations={[0, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
       <CardGlowOverlay
@@ -214,66 +161,35 @@ export function PremiumCardGradient({
         isDark={isDark}
         variant={variant}
       />
-      <GlassReflection isDark={isDark} />
-      <AmbientGradientLayer theme={resolvedTheme} isDark={isDark} />
-      <CardNoiseTexture isDark={isDark} />
+      <AmbientGradientLayer isDark={isDark} />
       <View style={[styles.content, contentStyle]}>{children}</View>
     </View>
   );
 }
 
+export const PremiumCardGradient = SimplePremiumCard;
+
 const styles = StyleSheet.create({
   surface: {
     overflow: "hidden",
     borderWidth: 1,
-    shadowOpacity: 0.16,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
   },
   content: {
-    flex: 1,
     position: "relative",
   },
   glow: {
     position: "absolute",
-    opacity: 0.9,
-  },
-  glowTopRight: {
-    top: -14,
-    right: -16,
-  },
-  glowBottomLeft: {
-    left: -18,
-    bottom: -18,
-  },
-  reflection: {
-    position: "absolute",
-    top: -18,
-    left: -24,
-    width: "140%",
-    height: 84,
-    transform: [{ rotate: "-18deg" }],
-  },
-  ambientTopLeft: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "48%",
-  },
-  bottomVignette: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "58%",
+    opacity: 0.72,
   },
   edgeHighlight: {
     position: "absolute",
     left: 0,
     right: 0,
     top: 0,
-    height: 22,
+    height: 1,
   },
 });

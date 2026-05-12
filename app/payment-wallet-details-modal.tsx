@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -33,15 +32,35 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function formatLastUpdated(dateValue?: string | null) {
+  if (!dateValue) return "Recently";
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Recently";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export default function PaymentWalletDetailsModal() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ accountId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    accountId?: string | string[];
+    hideActions?: string | string[];
+  }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
   const { accounts } = useAccounts();
   const accountId = Array.isArray(params.accountId)
     ? params.accountId[0]
     : params.accountId;
+  const hideActions = Array.isArray(params.hideActions)
+    ? params.hideActions[0] === "1"
+    : params.hideActions === "1";
   const account = accounts.find((a) => a.id === accountId);
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
@@ -158,13 +177,15 @@ export default function PaymentWalletDetailsModal() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={styles.backRow}
-          onPress={() => router.replace("/payment-methods-modal")}
-        >
-          <Feather name="chevron-left" size={18} color={ui.backText.color} />
-          <Text style={[styles.backText, ui.backText]}>Back</Text>
-        </Pressable>
+        {!hideActions ? (
+          <Pressable
+            style={styles.backRow}
+            onPress={() => router.replace("/payment-methods-modal")}
+          >
+            <Feather name="chevron-left" size={18} color={ui.backText.color} />
+            <Text style={[styles.backText, ui.backText]}>Back</Text>
+          </Pressable>
+        ) : null}
 
         <PremiumCardGradient
           theme={brandTheme}
@@ -210,29 +231,41 @@ export default function PaymentWalletDetailsModal() {
               {formatCurrency(account?.balance ?? 0, account?.currencyCode)}
             </Text>
           </View>
+          {hideActions ? (
+            <View style={[styles.detailCard, ui.detailCard]}>
+              <Text style={[styles.detailLabel, ui.detailLabel]}>
+                Last updated
+              </Text>
+              <Text style={[styles.detailValue, ui.detailValue]}>
+                {formatLastUpdated(account?.updatedAt)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <View style={styles.actionsRow}>
-          <Pressable
-            style={[styles.primaryButton, ui.actionButton]}
-            onPress={() =>
-              router.replace({
-                pathname: "/edit-payment-wallet-modal",
-                params: { accountId: account?.id },
-              })
-            }
-          >
-            <Feather name="edit-2" size={16} color={ui.actionText.color} />
-            <Text style={[styles.primaryButtonText, ui.actionText]}>
-              Edit Details
-            </Text>
-          </Pressable>
-          <Pressable style={[styles.secondaryButton, ui.secondaryButton]}>
-            <Text style={[styles.secondaryButtonText, ui.secondaryButtonText]}>
-              Set as Default
-            </Text>
-          </Pressable>
-        </View>
+        {!hideActions ? (
+          <View style={styles.actionsRow}>
+            <Pressable
+              style={[styles.primaryButton, ui.actionButton]}
+              onPress={() =>
+                router.replace({
+                  pathname: "/edit-payment-wallet-modal",
+                  params: { accountId: account?.id },
+                })
+              }
+            >
+              <Feather name="edit-2" size={16} color={ui.actionText.color} />
+              <Text style={[styles.primaryButtonText, ui.actionText]}>
+                Edit Details
+              </Text>
+            </Pressable>
+            <Pressable style={[styles.secondaryButton, ui.secondaryButton]}>
+              <Text style={[styles.secondaryButtonText, ui.secondaryButtonText]}>
+                Set as Default
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </View>
   );

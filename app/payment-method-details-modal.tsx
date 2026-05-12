@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -116,17 +115,6 @@ export default function PaymentMethodDetailsModal() {
                 {method.name}
               </Text>
             </View>
-            <View
-              style={[
-                styles.cardBadge,
-                {
-                  backgroundColor: withOpacity(
-                    brandTheme.text,
-                    isDark ? 0.14 : 0.18,
-                  ),
-                },
-              ]}
-            />
           </View>
 
           <Text style={[styles.cardAmount, { color: brandTheme.text }]}>
@@ -270,11 +258,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: fontWeights.bold,
     color: "#FFFFFF",
-  },
-  cardBadge: {
-    width: 40,
-    height: 28,
-    borderRadius: 6,
   },
   cardAmount: {
     marginTop: 28,

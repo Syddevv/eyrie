@@ -2,7 +2,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useMemo, type ComponentProps } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { themeColors } from "@/constants/colors";
 import { useAccounts } from "@/hooks/useAccounts";
 import { WALLETS } from "@/constants/wallets";
@@ -84,6 +85,9 @@ function renderDashboardIcon(
 }
 
 const HOME_CONTENT_WIDTH = Dimensions.get("window").width - 32;
+const HOME_CARD_GAP = 12;
+const HOME_CARD_WIDTH = (HOME_CONTENT_WIDTH - HOME_CARD_GAP) / 2;
+const HOME_CARD_HEIGHT = 138;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -98,10 +102,20 @@ export default function HomeScreen() {
   const isLoading = useDashboardLoading();
   const error = useDashboardError();
   const { accounts: allAccounts, isLoading: accountsLoading } = useAccounts();
+  const [showCardsSwipeHint, setShowCardsSwipeHint] = useState(true);
+  const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
+  const [showTotalBalance, setShowTotalBalance] = useState(true);
+  const [showCardBalances, setShowCardBalances] = useState(true);
 
   useDashboardBootstrap(currentUser?.id);
 
   const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
+  const cardAccounts = visibleAccounts.filter(
+    (account) => account.type === "bank" || account.type === "credit",
+  );
+  const walletAccounts = visibleAccounts.filter(
+    (account) => account.type === "ewallet" || account.type === "cash",
+  );
 
   const resolveBrandName = (account: any) => {
     const nameLower = (account?.name || "").toLowerCase();
@@ -173,6 +187,8 @@ export default function HomeScreen() {
   );
 
   const totalBalanceValue = summary?.totalBalance ?? totalBalanceIncludingCash;
+  const hiddenMoneyValue = "••••••";
+  const hiddenCardDigits = "••••";
 
   const pageStyles = useMemo(
     () => ({
@@ -195,6 +211,13 @@ export default function HomeScreen() {
       topButton: {
         backgroundColor: withOpacity(colors.secondary, 0.72),
         borderColor: withOpacity(colors.border, 0.84),
+      },
+      sectionHintChip: {
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(255,255,255,0.78)"
+            : withOpacity(colors.secondary, 0.36),
+        borderColor: withOpacity(colors.border, 0.72),
       },
       insightGradient: ["#37D3C2", "#2DBBBA"] as const,
       insightBubble: withOpacity("#FFFFFF", 0.1),
@@ -346,7 +369,13 @@ export default function HomeScreen() {
                 <Text style={[styles.balanceLabel, pageStyles.mutedText]}>
                   Total Balance
                 </Text>
-                <Feather name="eye" size={16} color={colors.mutedForeground} />
+                <Pressable onPress={() => setShowTotalBalance((value) => !value)}>
+                  <Feather
+                    name={showTotalBalance ? "eye" : "eye-off"}
+                    size={16}
+                    color={colors.mutedForeground}
+                  />
+                </Pressable>
               </View>
               <View
                 style={[
@@ -366,9 +395,11 @@ export default function HomeScreen() {
               <Text
                 style={[styles.balanceAmount, { color: colors.foreground }]}
               >
-                {isLoading && !summary
-                  ? "---"
-                  : formatCurrency(totalBalanceValue).replace("₱", "")}
+                {!showTotalBalance
+                  ? hiddenMoneyValue
+                  : isLoading && !summary
+                    ? "---"
+                    : formatCurrency(totalBalanceValue).replace("₱", "")}
               </Text>
             </View>
 
@@ -383,7 +414,11 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.incomeAmount}>
-                  {summary ? formatCurrency(summary.totalIncome) : "---"}
+                  {showTotalBalance
+                    ? summary
+                      ? formatCurrency(summary.totalIncome)
+                      : "---"
+                    : hiddenMoneyValue}
                 </Text>
               </View>
 
@@ -397,32 +432,66 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.expenseAmount}>
-                  {summary ? formatCurrency(summary.totalExpenses) : "---"}
+                  {showTotalBalance
+                    ? summary
+                      ? formatCurrency(summary.totalExpenses)
+                      : "---"
+                    : hiddenMoneyValue}
                 </Text>
               </View>
             </View>
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Cards
-            </Text>
-            <View style={styles.hideRow}>
-              <Feather name="eye" size={16} color={colors.mutedForeground} />
-              <Text style={[styles.hideText, pageStyles.mutedText]}>Hide</Text>
+            <View>
+              <Text
+                style={[styles.sectionTitle, { color: colors.foreground }]}
+              >
+                Cards
+              </Text>
+              <View
+                style={[styles.sectionHintChip, pageStyles.sectionHintChip]}
+              >
+                <Feather
+                  name="arrow-up-right"
+                  size={11}
+                  color={colors.mutedForeground}
+                />
+                <Text style={[styles.sectionHintText, pageStyles.mutedText]}>
+                  Tap to view details
+                </Text>
+              </View>
             </View>
+            <Pressable
+              style={styles.hideRow}
+              onPress={() => setShowCardBalances((value) => !value)}
+            >
+              <Feather
+                name={showCardBalances ? "eye" : "eye-off"}
+                size={16}
+                color={colors.mutedForeground}
+              />
+              <Text style={[styles.hideText, pageStyles.mutedText]}>
+                {showCardBalances ? "Hide" : "Show"}
+              </Text>
+            </Pressable>
           </View>
 
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsRow}
+            onScroll={(event) => {
+              if (
+                showCardsSwipeHint &&
+                event.nativeEvent.contentOffset.x > 8
+              ) {
+                setShowCardsSwipeHint(false);
+              }
+            }}
+            scrollEventThrottle={16}
           >
             {(() => {
-              const cardAccounts = visibleAccounts.filter(
-                (a) => a.type === "bank" || a.type === "credit",
-              );
-
               if (!accountsLoading && cardAccounts.length === 0) {
                 return (
                   <View
@@ -502,73 +571,75 @@ export default function HomeScreen() {
                         style={styles.cardPressable}
                         onPress={() =>
                           router.push({
-                            pathname: "/payment-method-details-modal",
-                            params: { methodId: acct.id },
+                            pathname: "/payment-card-details-modal",
+                            params: {
+                              accountId: acct.id,
+                              hideActions: "1",
+                            },
                           })
                         }
                       >
-                        <LinearGradient
-                          colors={[
-                            brandTheme.gradient[0],
-                            brandTheme.gradient[1],
-                            brandTheme.primary,
-                          ]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
+                        <PremiumCardGradient
+                          theme={brandTheme}
+                          isDark={colorScheme === "dark"}
+                          variant="card"
                           style={styles.accountCard}
                         >
-                          <View
-                            style={[
-                              styles.cardBubbleLarge,
-                              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                            ]}
-                          />
-                          <View
-                            style={[
-                              styles.cardBubbleSmall,
-                              { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                            ]}
-                          />
                           <View style={styles.cardTopRow}>
                             <View
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 10,
-                              }}
+                              style={styles.cardBrandRow}
                             >
                               <Logo
-                                size={40}
+                                size={34}
                                 logo={resolveLogo(acct)}
                                 name={resolveBrandName(acct)}
                                 backgroundColor={brandTheme.primary}
                               />
-                              <Text style={styles.cardName}>
+                              <Text
+                                numberOfLines={1}
+                                style={[
+                                  styles.cardName,
+                                  { color: brandTheme.text },
+                                ]}
+                              >
                                 {resolveBrandName(acct)}
                               </Text>
                             </View>
-                            <View
-                              style={[
-                                styles.cardBadge,
-                                { backgroundColor: brandTheme.secondary },
-                              ]}
-                            />
                           </View>
-                          <Text style={styles.cardAmount}>
-                            {formatCurrency(
-                              acct.balance ?? 0,
-                              acct.currencyCode,
-                            )}
+                          <Text
+                            style={[
+                              styles.cardAmount,
+                              { color: brandTheme.text },
+                            ]}
+                          >
+                            {showCardBalances
+                              ? formatCurrency(
+                                  acct.balance ?? 0,
+                                  acct.currencyCode,
+                                )
+                              : hiddenMoneyValue}
                           </Text>
                           <View style={styles.cardBottomRow}>
-                            <Text style={styles.cardDigits}>
-                              •••• {acct.accountNumberLast4 ?? ""}
+                            <Text
+                              style={[
+                                styles.cardDigits,
+                                { color: withOpacity(brandTheme.text, 0.78) },
+                              ]}
+                            >
+                              {showCardBalances
+                                ? `•••• ${acct.accountNumberLast4 ?? ""}`
+                                : hiddenCardDigits}
                             </Text>
-                            <Text style={styles.cardType}>
+                            <Text
+                              style={[
+                                styles.cardType,
+                                { color: withOpacity(brandTheme.text, 0.76) },
+                              ]}
+                            >
                               {acct.type === "credit" ? "CREDIT" : "DEBIT"}
                             </Text>
                           </View>
-                        </LinearGradient>
+                        </PremiumCardGradient>
                       </Pressable>
                     );
                   })(),
@@ -606,6 +677,23 @@ export default function HomeScreen() {
               ];
             })()}
           </ScrollView>
+          {cardAccounts.length >= 2 && showCardsSwipeHint ? (
+            <View style={styles.swipeHintRow}>
+              <View style={styles.swipeHintDots}>
+                <View style={[styles.swipeHintDot, styles.swipeHintDotActive]} />
+                <View style={styles.swipeHintDot} />
+                <View style={styles.swipeHintDot} />
+              </View>
+              <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
+                Swipe to view more
+              </Text>
+              <Feather
+                name="chevron-right"
+                size={14}
+                color={colors.mutedForeground}
+              />
+            </View>
+          ) : null}
 
           <View style={[styles.sectionHeader, styles.walletsHeader]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -617,12 +705,17 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsRow}
+            onScroll={(event) => {
+              if (
+                showWalletsSwipeHint &&
+                event.nativeEvent.contentOffset.x > 8
+              ) {
+                setShowWalletsSwipeHint(false);
+              }
+            }}
+            scrollEventThrottle={16}
           >
             {(() => {
-              const walletAccounts = visibleAccounts.filter(
-                (a) => a.type === "ewallet" || a.type === "cash",
-              );
-
               if (!accountsLoading && walletAccounts.length === 0) {
                 return (
                   <View
@@ -705,57 +798,71 @@ export default function HomeScreen() {
                         style={styles.cardPressable}
                         onPress={() =>
                           router.push({
-                            pathname: "/payment-method-details-modal",
-                            params: { methodId: acct.id },
+                            pathname: "/payment-wallet-details-modal",
+                            params: {
+                              accountId: acct.id,
+                              hideActions: "1",
+                            },
                           })
                         }
                       >
-                        <LinearGradient
-                          colors={[
-                            brandTheme.gradient[0],
-                            brandTheme.gradient[1],
-                            brandTheme.primary,
-                          ]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
+                        <PremiumCardGradient
+                          theme={brandTheme}
+                          isDark={colorScheme === "dark"}
+                          variant="wallet"
                           style={styles.accountCard}
                         >
-                          <View
-                            style={[
-                              styles.cardBubbleLarge,
-                              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                            ]}
-                          />
-                          <View
-                            style={[
-                              styles.cardBubbleSmall,
-                              { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                            ]}
-                          />
                           <View style={styles.cardTopRow}>
-                            <View>
-                              <Text style={styles.cardLabel}>
+                            <View style={styles.cardBrandRow}>
+                              <Logo
+                                size={34}
+                                logo={resolveLogo(acct)}
+                                name={resolveBrandName(acct)}
+                                backgroundColor={brandTheme.primary}
+                              />
+                              <Text
+                                numberOfLines={1}
+                                style={[
+                                  styles.cardName,
+                                  { color: brandTheme.text },
+                                ]}
+                              >
                                 {resolveBrandName(acct)}
                               </Text>
                             </View>
-                            <Logo
-                              size={48}
-                              logo={resolveLogo(acct)}
-                              name={resolveBrandName(acct)}
-                              backgroundColor={brandTheme.primary}
-                              style={{ marginLeft: 12 }}
-                            />
                           </View>
-                          <Text style={styles.walletAmount}>
-                            {formatCurrency(
-                              acct.balance ?? 0,
-                              acct.currencyCode,
-                            )}
+                          <Text
+                            style={[
+                              styles.walletAmount,
+                              { color: brandTheme.text },
+                            ]}
+                          >
+                            {showCardBalances
+                              ? formatCurrency(
+                                  acct.balance ?? 0,
+                                  acct.currencyCode,
+                                )
+                              : hiddenMoneyValue}
                           </Text>
-                          <Text style={styles.walletType}>
-                            {resolveBrandName(acct)}
-                          </Text>
-                        </LinearGradient>
+                          <View style={styles.cardBottomRow}>
+                            <Text
+                              style={[
+                                styles.cardDigits,
+                                { color: withOpacity(brandTheme.text, 0.78) },
+                              ]}
+                            >
+                              {hiddenCardDigits}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.cardType,
+                                { color: withOpacity(brandTheme.text, 0.76) },
+                              ]}
+                            >
+                              {acct.type === "cash" ? "CASH" : "E-WALLET"}
+                            </Text>
+                          </View>
+                        </PremiumCardGradient>
                       </Pressable>
                     );
                   })(),
@@ -793,6 +900,23 @@ export default function HomeScreen() {
               ];
             })()}
           </ScrollView>
+          {walletAccounts.length >= 2 && showWalletsSwipeHint ? (
+            <View style={styles.swipeHintRow}>
+              <View style={styles.swipeHintDots}>
+                <View style={[styles.swipeHintDot, styles.swipeHintDotActive]} />
+                <View style={styles.swipeHintDot} />
+                <View style={styles.swipeHintDot} />
+              </View>
+              <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
+                Swipe to view more
+              </Text>
+              <Feather
+                name="chevron-right"
+                size={14}
+                color={colors.mutedForeground}
+              />
+            </View>
+          ) : null}
 
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
@@ -1351,6 +1475,24 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: fontWeights.bold,
   },
+  sectionHintChip: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sectionHintText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    letterSpacing: 0.3,
+  },
   hideRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1362,26 +1504,54 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cardsRow: {
-    marginTop: 14,
+    marginTop: 12,
     flexGrow: 1,
     justifyContent: "center",
-    gap: 12,
+    gap: HOME_CARD_GAP,
+  },
+  swipeHintRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+  },
+  swipeHintDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  swipeHintDot: {
+    width: 4,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(107, 114, 128, 0.28)",
+  },
+  swipeHintDotActive: {
+    width: 14,
+    backgroundColor: "rgba(14, 103, 247, 0.42)",
+  },
+  swipeHintText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   cardPressable: {
-    width: 164,
+    width: HOME_CARD_WIDTH,
+    height: HOME_CARD_HEIGHT,
   },
   addAccountCardPressable: {
-    width: 164,
-    minHeight: 120,
+    height: HOME_CARD_HEIGHT,
   },
   addAccountCard: {
-    minHeight: 120,
-    borderRadius: 24,
+    height: HOME_CARD_HEIGHT,
+    borderRadius: 28,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    paddingHorizontal: 10,
+    gap: 8,
+    paddingHorizontal: 12,
     backgroundColor: "#F9F1ED",
   },
   addAccountIconWrap: {
@@ -1400,10 +1570,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   accountCard: {
-    minHeight: 120,
-    borderRadius: 24,
+    height: HOME_CARD_HEIGHT,
+    borderRadius: 28,
     paddingHorizontal: 12,
-    paddingTop: 11,
+    paddingTop: 12,
     paddingBottom: 12,
     overflow: "hidden",
   },
@@ -1425,9 +1595,16 @@ const styles = StyleSheet.create({
   },
   cardTopRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  cardBrandRow: {
+    minWidth: 0,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   cardLabel: {
     fontFamily: fontFamilies.sans,
@@ -1437,42 +1614,23 @@ const styles = StyleSheet.create({
     color: withOpacity("#FFFFFF", 0.72),
   },
   cardName: {
-    marginTop: 2,
+    flex: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 13,
-    lineHeight: 17,
-    fontWeight: fontWeights.bold,
-    color: "#FFFFFF",
-  },
-  cardBadge: {
-    width: 32,
-    height: 26,
-    borderRadius: 6,
-  },
-  walletBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  walletBadgeText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 16,
-    fontWeight: fontWeights.bold,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
     color: "#FFFFFF",
   },
   cardAmount: {
-    marginTop: 18,
+    marginTop: 20,
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: fontWeights.bold,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: fontWeights.semibold,
     color: "#FFFFFF",
   },
   cardBottomRow: {
-    marginTop: 10,
+    marginTop: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -1487,17 +1645,18 @@ const styles = StyleSheet.create({
   },
   cardType: {
     fontFamily: fontFamilies.sans,
-    fontSize: 11,
+    fontSize: 10,
     lineHeight: 14,
-    fontWeight: fontWeights.medium,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: 0.6,
     color: withOpacity("#FFFFFF", 0.68),
   },
   walletAmount: {
-    marginTop: 18,
+    marginTop: 20,
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: fontWeights.bold,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: fontWeights.semibold,
     color: "#FFFFFF",
   },
   walletType: {

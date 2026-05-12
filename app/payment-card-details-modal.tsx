@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -33,15 +32,35 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function formatLastUpdated(dateValue?: string | null) {
+  if (!dateValue) return "Recently";
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Recently";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export default function PaymentCardDetailsModal() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ accountId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    accountId?: string | string[];
+    hideActions?: string | string[];
+  }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
   const { accounts } = useAccounts();
   const accountId = Array.isArray(params.accountId)
     ? params.accountId[0]
     : params.accountId;
+  const hideActions = Array.isArray(params.hideActions)
+    ? params.hideActions[0] === "1"
+    : params.hideActions === "1";
   const account = accounts.find((a) => a.id === accountId);
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
@@ -165,37 +184,22 @@ export default function PaymentCardDetailsModal() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={styles.backRow}
-          onPress={() => router.replace("/payment-methods-modal")}
-        >
-          <Feather name="chevron-left" size={18} color={ui.backText.color} />
-          <Text style={[styles.backText, ui.backText]}>Back</Text>
-        </Pressable>
+        {!hideActions ? (
+          <Pressable
+            style={styles.backRow}
+            onPress={() => router.replace("/payment-methods-modal")}
+          >
+            <Feather name="chevron-left" size={18} color={ui.backText.color} />
+            <Text style={[styles.backText, ui.backText]}>Back</Text>
+          </Pressable>
+        ) : null}
 
-        <LinearGradient
-          colors={[
-            brandTheme.gradient[0],
-            brandTheme.gradient[1],
-            brandTheme.primary,
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <PremiumCardGradient
+          theme={brandTheme}
+          isDark={isDark}
+          variant="card"
           style={styles.cardHero}
         >
-          <View
-            style={[
-              styles.heroBubbleLarge,
-              { backgroundColor: withOpacity("#FFFFFF", 0.12) },
-            ]}
-          />
-          <View
-            style={[
-              styles.heroBubbleSmall,
-              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-            ]}
-          />
-
           <View style={styles.heroTopRow}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
@@ -254,7 +258,7 @@ export default function PaymentCardDetailsModal() {
               </Text>
             </View>
           </View>
-        </LinearGradient>
+        </PremiumCardGradient>
 
         <View style={styles.detailList}>
           <View style={[styles.detailCard, ui.detailCard]}>
@@ -271,20 +275,32 @@ export default function PaymentCardDetailsModal() {
               {account?.accountNumberLast4 || "N/A"}
             </Text>
           </View>
+          {hideActions ? (
+            <View style={[styles.detailCard, ui.detailCard]}>
+              <Text style={[styles.detailLabel, ui.detailLabel]}>
+                Last updated
+              </Text>
+              <Text style={[styles.detailValue, ui.detailValue]}>
+                {formatLastUpdated(account?.updatedAt)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <Pressable
-          style={[styles.actionButton, ui.actionButton]}
-          onPress={() =>
-            router.replace({
-              pathname: "/edit-payment-card-modal",
-              params: { accountId: account?.id },
-            })
-          }
-        >
-          <Feather name="edit-2" size={16} color={ui.actionText.color} />
-          <Text style={[styles.actionText, ui.actionText]}>Edit Details</Text>
-        </Pressable>
+        {!hideActions ? (
+          <Pressable
+            style={[styles.actionButton, ui.actionButton]}
+            onPress={() =>
+              router.replace({
+                pathname: "/edit-payment-card-modal",
+                params: { accountId: account?.id },
+              })
+            }
+          >
+            <Feather name="edit-2" size={16} color={ui.actionText.color} />
+            <Text style={[styles.actionText, ui.actionText]}>Edit Details</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

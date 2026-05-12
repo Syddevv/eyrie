@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -25,6 +24,7 @@ import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
 import Logo from "@/components/logo";
 import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
+import { PremiumCardGradient } from "@/components/premium-card-gradient";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -274,29 +274,12 @@ export default function EditPaymentCardModal() {
             <Text style={[styles.backText, ui.backText]}>Back</Text>
           </Pressable>
 
-          <LinearGradient
-            colors={[
-              brandTheme.gradient[0],
-              brandTheme.gradient[1],
-              brandTheme.primary,
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <PremiumCardGradient
+            theme={brandTheme}
+            isDark={isDark}
+            variant="card"
             style={styles.cardHero}
           >
-            <View
-              style={[
-                styles.heroBubbleLarge,
-                { backgroundColor: withOpacity("#FFFFFF", 0.12) },
-              ]}
-            />
-            <View
-              style={[
-                styles.heroBubbleSmall,
-                { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-              ]}
-            />
-
             <View style={styles.heroTopRow}>
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
@@ -346,7 +329,7 @@ export default function EditPaymentCardModal() {
                 </Text>
               </View>
             </View>
-          </LinearGradient>
+          </PremiumCardGradient>
 
           <View style={styles.formSection}>
             <Text style={[styles.label, ui.label]}>Account Name</Text>
