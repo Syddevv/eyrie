@@ -190,21 +190,13 @@ export default function GoalDetailsModal() {
           <LinearGradient
             colors={
               isDark
-                ? ["#1B6445", "#134E35"]
-                : ["#34D399", "#10B981"]
+                ? ["#227A54", "#16583A"]
+                : ["#6EE7B7", "#34D399"]
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.progressCard}
           >
-            <View style={styles.progressGlowPrimary} />
-            <View style={styles.progressGlowSecondary} />
-            <LinearGradient
-              colors={["rgba(255,255,255,0.15)", "rgba(255,255,255,0)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.8, y: 0.6 }}
-              style={styles.progressGloss}
-            />
             <View style={styles.progressTopRow}>
               <View>
                 <Text style={styles.progressEyebrow}>Total Saved</Text>
@@ -429,38 +421,39 @@ export default function GoalDetailsModal() {
           </Pressable>
         </View>
 
-        <DeleteConfirmationModal
-          visible={showDeleteConfirm}
-          title="Delete goal?"
-          message="This permanently removes the goal and its contribution history."
-          isDeleting={isDeleting}
-          onCancel={() => {
-            if (!isDeleting) {
-              setShowDeleteConfirm(false);
-            }
-          }}
-          onConfirm={() => {
-            void handleDelete();
-          }}
-        />
-
-        <DeleteConfirmationModal
-          visible={pendingDeleteContributionId !== null}
-          title="Remove contribution?"
-          message="This will remove the selected contribution from the goal."
-          isDeleting={isDeletingContribution}
-          onCancel={() => {
-            if (!isDeletingContribution) {
-              setPendingDeleteContributionId(null);
-            }
-          }}
-          onConfirm={() => {
-            if (pendingDeleteContributionId) {
-              void handleDeleteContribution(pendingDeleteContributionId);
-            }
-          }}
-        />
       </View>
+
+      <DeleteConfirmationModal
+        visible={showDeleteConfirm}
+        title="Delete goal?"
+        message="This permanently removes the goal and its contribution history."
+        isDeleting={isDeleting}
+        onCancel={() => {
+          if (!isDeleting) {
+            setShowDeleteConfirm(false);
+          }
+        }}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+      />
+
+      <DeleteConfirmationModal
+        visible={pendingDeleteContributionId !== null}
+        title="Remove contribution?"
+        message="This will remove the selected contribution from the goal."
+        isDeleting={isDeletingContribution}
+        onCancel={() => {
+          if (!isDeletingContribution) {
+            setPendingDeleteContributionId(null);
+          }
+        }}
+        onConfirm={() => {
+          if (pendingDeleteContributionId) {
+            void handleDeleteContribution(pendingDeleteContributionId);
+          }
+        }}
+      />
     </View>
   );
 }
@@ -526,41 +519,13 @@ const styles = StyleSheet.create({
   bodyScroll: { marginTop: 14 },
   bodyContent: { paddingBottom: 4 },
   progressCard: {
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
-    padding: 18,
+    padding: 14,
     overflow: "hidden",
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  progressGlowPrimary: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: radius.full,
-    top: -80,
-    right: -60,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  progressGlowSecondary: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: radius.full,
-    bottom: -60,
-    left: -40,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  progressGloss: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 110,
+    shadowColor: "transparent",
+    elevation: 0,
   },
   progressTopRow: {
     flexDirection: "row",
@@ -577,11 +542,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   savedAmount: {
-    marginTop: 4,
+    marginTop: 2,
     color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 24,
+    lineHeight: 28,
     fontWeight: fontWeights.bold,
   },
   progressTopRight: {
@@ -604,9 +569,9 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
   progressBottomSectionGlass: {
-    marginTop: 18,
-    padding: 14,
-    borderRadius: 20,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.12)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -671,30 +636,30 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: fontWeights.bold,
   },
-  summaryRow: { marginTop: 12, flexDirection: "row", gap: 12 },
+  summaryRow: { marginTop: 10, flexDirection: "row", gap: 10 },
   summaryCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    minHeight: 88,
-    padding: 14,
+    minHeight: 64,
+    padding: 10,
     justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   summaryLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: fontWeights.medium,
   },
   summaryValue: {
     fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 13,
+    lineHeight: 17,
     fontWeight: fontWeights.bold,
   },
   infoCard: {
@@ -784,13 +749,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   contributeButton: {
-    marginTop: 20,
+    marginTop: 16,
     height: 56,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
+    shadowColor: "transparent",
+    elevation: 0,
   },
   contributeButtonText: {
     color: "#FFFFFF",

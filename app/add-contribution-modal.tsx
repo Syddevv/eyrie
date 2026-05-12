@@ -679,6 +679,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "transparent",
+    elevation: 0,
   },
   footerButtonText: {
     fontFamily: fontFamilies.sans,
