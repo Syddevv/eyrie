@@ -79,8 +79,6 @@ function NotificationRow({
   bodyColor,
   cardStyle,
   unreadDotStyle,
-  categoryChipStyle,
-  categoryChipTextStyle,
   onPress,
   onToggleRead,
   onDelete,
@@ -90,8 +88,6 @@ function NotificationRow({
   bodyColor: string;
   cardStyle: object;
   unreadDotStyle: object;
-  categoryChipStyle: object;
-  categoryChipTextStyle: object;
   onPress: () => void;
   onToggleRead: () => void;
   onDelete: () => void;
@@ -128,7 +124,7 @@ function NotificationRow({
       exiting={FadeOutUp.duration(180)}
       layout={LinearTransition.springify()}
     >
-      <View style={[styles.notificationShell, cardStyle, shadows.soft]}>
+      <View style={[styles.notificationCardContainer, cardStyle, shadows.soft]}>
         <Swipeable
           renderLeftActions={leftAction}
           renderRightActions={rightAction}
@@ -138,72 +134,71 @@ function NotificationRow({
           <Pressable
             onPress={onPress}
             style={({ pressed }) => [
-              styles.notificationCard,
+              styles.notificationCardInner,
               pressed && styles.notificationCardPressed,
             ]}
           >
-            <View style={styles.notificationTopRow}>
+            <View style={styles.notificationCardContent}>
               <View
                 style={[
-                  styles.notificationIconWrap,
+                  styles.notificationIconContainer,
                   {
                     backgroundColor: withOpacity(
                       item.color,
-                      item.is_read ? 0.12 : 0.18,
+                      item.is_read ? 0.1 : 0.14,
+                    ),
+                    borderColor: withOpacity(
+                      item.color,
+                      item.is_read ? 0.08 : 0.12,
                     ),
                   },
                 ]}
               >
-                <Feather name={item.icon as any} size={20} color={item.color} />
+                <Feather name={item.icon as any} size={22} color={item.color} />
               </View>
 
-              <View style={styles.cardBody}>
-                <View style={styles.cardHeaderRow}>
+              <View style={styles.contentSection}>
+                <View style={styles.titleRow}>
                   <Text
                     style={[
-                      styles.cardTitle,
-                      { color: titleColor, opacity: item.is_read ? 0.84 : 1 },
+                      styles.notificationTitle,
+                      {
+                        color: titleColor,
+                        fontWeight: item.is_read ? "600" : "700",
+                        opacity: item.is_read ? 0.7 : 1,
+                      },
                     ]}
+                    numberOfLines={2}
                   >
                     {item.title}
                   </Text>
                   {!item.is_read ? (
-                    <View style={[styles.unreadDot, unreadDotStyle]} />
+                    <View style={[styles.unreadIndicator, unreadDotStyle]} />
                   ) : null}
                 </View>
 
                 <Text
+                  numberOfLines={2}
                   style={[
-                    styles.cardMessage,
-                    { color: bodyColor, opacity: item.is_read ? 0.78 : 1 },
+                    styles.notificationBody,
+                    {
+                      color: bodyColor,
+                      opacity: item.is_read ? 0.6 : 0.8,
+                    },
                   ]}
                 >
                   {item.message}
                 </Text>
 
-                <View style={styles.cardFooterRow}>
-                  <Text style={[styles.cardMeta, { color: bodyColor }]}>
+                <View style={styles.metadataRow}>
+                  <Text style={[styles.notificationTime, { color: bodyColor }]}>
                     {formatRelativeTime(item.created_at)}
                   </Text>
-                  <View
-                    style={[
-                      styles.categoryChip,
-                      categoryChipStyle,
-                      { borderColor: withOpacity(item.color, 0.26) },
-                    ]}
+                  <Text
+                    style={[styles.notificationCategory, { color: item.color }]}
                   >
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        categoryChipTextStyle,
-                        { color: item.color },
-                      ]}
-                    >
-                      {item.category.replace(/^\w/, (char) =>
-                        char.toUpperCase(),
-                      )}
-                    </Text>
-                  </View>
+                    {item.category.replace(/^\w/, (char) => char.toUpperCase())}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -268,14 +263,7 @@ export default function NotificationsScreen() {
       swipeHintText: {
         color: isDark ? "#8F9AAF" : "#6B7485",
       },
-      categoryChip: {
-        backgroundColor: isDark
-          ? "rgba(255,255,255,0.03)"
-          : "rgba(15,23,42,0.035)",
-      },
-      categoryChipText: {
-        color: isDark ? "#D7DFEA" : "#344256",
-      },
+
       titleText: isDark ? "#FFFFFF" : colors.foreground,
       bodyText: isDark ? "#9EA6B5" : "#6B7485",
       unreadDot: { backgroundColor: "#1495FF" },
@@ -419,8 +407,6 @@ export default function NotificationsScreen() {
                   item.is_read ? pageStyles.readCard : pageStyles.unreadCard
                 }
                 unreadDotStyle={pageStyles.unreadDot}
-                categoryChipStyle={pageStyles.categoryChip}
-                categoryChipTextStyle={pageStyles.categoryChipText}
                 onPress={() => {
                   if (!item.is_read) {
                     void toggleRead(item, true);
@@ -450,7 +436,7 @@ const styles = StyleSheet.create({
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 14,
   },
   topRow: {
     flexDirection: "row",
@@ -480,19 +466,19 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 14,
     paddingTop: 10,
-    paddingBottom: 30,
+    paddingBottom: 32,
   },
   infoCard: {
-    borderRadius: 24,
+    borderRadius: 26,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
     flexDirection: "row",
-    gap: 12,
+    gap: 13,
   },
   infoAvatarFrame: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
     borderRadius: radius.full,
     backgroundColor: "#D8F7EC",
     borderWidth: 2,
@@ -500,120 +486,118 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    flexShrink: 0,
   },
   infoAvatar: {
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 36,
     borderRadius: radius.full,
   },
   infoBody: { flex: 1 },
   infoTitle: {
     fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: fontWeights.bold,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: fontWeights.semibold,
   },
   infoText: {
-    marginTop: 4,
+    marginTop: 3,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
+    opacity: 0.8,
   },
   swipeHintChip: {
-    marginTop: 12,
+    marginTop: 14,
     borderRadius: radius.full,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    alignSelf: "flex-start",
   },
   swipeHintText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: fontWeights.medium,
+    opacity: 0.85,
   },
   cardsList: {
-    marginTop: 22,
-    gap: 16,
+    marginTop: 24,
+    gap: 14,
+    paddingHorizontal: 0,
   },
-  notificationShell: {
-    borderRadius: 20,
+  notificationCardContainer: {
+    borderRadius: 28,
     borderWidth: 1,
     overflow: "hidden",
   },
-  notificationCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  notificationCardInner: {
     width: "100%",
-    alignSelf: "stretch",
-    overflow: "hidden",
+  },
+  notificationCardContent: {
+    flexDirection: "row",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    alignItems: "flex-start",
+    gap: 14,
   },
   notificationCardPressed: {
-    transform: [{ scale: 0.988 }],
+    opacity: 0.92,
   },
-  notificationTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 13,
-  },
-  notificationIconWrap: {
-    width: 52,
-    height: 52,
+  notificationIconContainer: {
+    width: 56,
+    height: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    borderWidth: 1,
   },
-  cardBody: { flex: 1 },
-  cardHeaderRow: {
+  contentSection: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 6,
+  },
+  notificationTitle: {
+    flex: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "700",
+    flexWrap: "wrap",
+  },
+  unreadIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.full,
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  notificationBody: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  metadataRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  cardTitle: {
-    flex: 1,
-    fontFamily: fontFamilies.sans,
-    fontSize: 18,
-    lineHeight: 25,
-    fontWeight: fontWeights.bold,
-  },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.full,
-    marginTop: 8,
-  },
-  cardMessage: {
-    marginTop: 7,
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  cardFooterRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  cardMeta: {
+  notificationTime: {
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: fontWeights.medium,
   },
-  categoryChip: {
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    flexShrink: 0,
-  },
-  categoryChipText: {
+  notificationCategory: {
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,

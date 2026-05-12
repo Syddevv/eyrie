@@ -2,6 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   ActivityIndicator,
   Keyboard,
@@ -37,8 +38,11 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCreateExpense } from "@/hooks/useCreateExpense";
 import { useCreateIncome } from "@/hooks/useCreateIncome";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useBudgetWarning } from "@/hooks/useBudgetWarning";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { categoriesService } from "@/src/db/services";
+import { getBudgetProgress } from "@/src/db/queries/dashboard";
+import { FadeInDown } from "react-native-reanimated";
 
 type EntryType = "expense" | "income";
 
@@ -214,8 +218,17 @@ export default function AddTransactionModal() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCategoryEditorVisible, setIsCategoryEditorVisible] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [budgetExceededWarning, setBudgetExceededWarning] = useState<{
+    categoryName: string;
+    spent: number;
+    limit: number;
+    status: "alreadyOver" | "willExceed";
+  } | null>(null);
   const merchantFade = useRef(new Animated.Value(0)).current;
   const merchantOptions = useMerchantsByCategory(selectedExpenseCategoryLabel);
+  const budgetWarning = useBudgetWarning(
+    entryType === "expense" ? selectedExpenseCategoryId : null,
+  );
 
   const categoryEditorInitialValue = useMemo(
     () => ({
@@ -350,6 +363,47 @@ export default function AddTransactionModal() {
     });
   }, [merchantOptions]);
 
+  // Check budget when category or amount changes
+  useEffect(() => {
+    const checkBudgetStatus = async () => {
+      if (entryType !== "expense" || !selectedExpenseCategoryId || !user?.id) {
+        setBudgetExceededWarning(null);
+        return;
+      }
+
+      try {
+        const budgets = await getBudgetProgress(user.id);
+        const categoryBudget = budgets.find(
+          (b) => b.categoryId === selectedExpenseCategoryId,
+        );
+
+        if (categoryBudget) {
+          const isAlreadyOver = categoryBudget.spent >= categoryBudget.amount;
+          const newTotal = categoryBudget.spent + selectedAmount;
+          const willExceed = newTotal > categoryBudget.amount;
+
+          if (isAlreadyOver || willExceed) {
+            setBudgetExceededWarning({
+              categoryName: categoryBudget.categoryName,
+              spent: categoryBudget.spent,
+              limit: categoryBudget.amount,
+              status: isAlreadyOver ? "alreadyOver" : "willExceed",
+            });
+          } else {
+            setBudgetExceededWarning(null);
+          }
+        } else {
+          setBudgetExceededWarning(null);
+        }
+      } catch (error) {
+        console.error("Error checking budget:", error);
+        setBudgetExceededWarning(null);
+      }
+    };
+
+    void checkBudgetStatus();
+  }, [entryType, selectedExpenseCategoryId, selectedAmount, user?.id]);
+
   useEffect(() => {
     if (!paymentMethods.length) {
       setSelectedPaymentMethodId(null);
@@ -428,6 +482,82 @@ export default function AddTransactionModal() {
   const openQuickCreateCategory = () => {
     setErrorMessage(null);
     setIsCategoryEditorVisible(true);
+  };
+
+  const handleSaveTransaction = async () => {
+    if (!isSaveEnabled) {
+      showIncompleteFormAlert();
+      return;
+    }
+
+    setErrorMessage(null);
+
+    try {
+      if (entryType === "expense") {
+        // Validate expense fields
+        if (!selectedExpenseCategoryId) {
+          setErrorMessage("Please select a category");
+          return;
+        }
+
+        if (!selectedPaymentMethodId) {
+          setErrorMessage(accountRequiredMessage);
+          return;
+        }
+
+        if (selectedExpensePaymentMethodIsInsufficient) {
+          setErrorMessage("Selected account does not have enough balance.");
+          return;
+        }
+
+        const result = await createExpense({
+          amount: Number(amount),
+          categoryId: selectedExpenseCategoryId,
+          accountId: selectedPaymentMethodId,
+          merchantName: selectedMerchantOption?.label || undefined,
+          merchantDefaultCategoryId: selectedExpenseCategoryId,
+          notes: notes || undefined,
+          transactionDate: selectedDate,
+        });
+
+        if (!result.success) {
+          setErrorMessage(result.error || "Failed to create expense");
+          return;
+        }
+      } else {
+        // Income transaction
+        if (!selectedIncomeCategory) {
+          setErrorMessage("Please select a category");
+          return;
+        }
+
+        if (!selectedPaymentMethodId) {
+          setErrorMessage(accountRequiredMessage);
+          return;
+        }
+
+        const result = await createIncome({
+          amount: Number(amount),
+          categoryId: selectedIncomeCategory,
+          accountId: selectedPaymentMethodId,
+          source: source || undefined,
+          notes: notes || undefined,
+          transactionDate: selectedDate,
+        });
+
+        if (!result.success) {
+          setErrorMessage(result.error || "Failed to create income");
+          return;
+        }
+      }
+
+      // Success - close modal
+      router.back();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "An error occurred";
+      setErrorMessage(message);
+    }
   };
 
   const ui = useMemo(
@@ -766,6 +896,68 @@ export default function AddTransactionModal() {
                 </ScrollView>
               ) : null}
             </View>
+
+            {budgetExceededWarning ? (
+              <View
+                style={{
+                  backgroundColor: isDark
+                    ? budgetExceededWarning.status === "alreadyOver"
+                      ? "rgba(127, 29, 29, 0.5)"
+                      : "rgba(127, 29, 29, 0.4)"
+                    : budgetExceededWarning.status === "alreadyOver"
+                      ? "rgba(127, 29, 29, 0.2)"
+                      : "rgba(127, 29, 29, 0.15)",
+                  borderColor: isDark
+                    ? budgetExceededWarning.status === "alreadyOver"
+                      ? "rgba(239, 68, 68, 0.7)"
+                      : "rgba(239, 68, 68, 0.5)"
+                    : budgetExceededWarning.status === "alreadyOver"
+                      ? "rgba(239, 68, 68, 0.5)"
+                      : "rgba(239, 68, 68, 0.3)",
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  padding: 14,
+                  marginVertical: 8,
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 12,
+                }}
+              >
+                <Feather
+                  name="alert-triangle"
+                  size={18}
+                  color={colors.destructive ?? "#EF4444"}
+                  style={{ marginTop: 2 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: colors.destructive ?? "#EF4444",
+                      fontSize: 14,
+                      fontWeight: "600",
+                      marginBottom: 4,
+                      fontFamily: fontFamilies.medium,
+                    }}
+                  >
+                    {budgetExceededWarning.status === "alreadyOver"
+                      ? "Budget Already Exceeded"
+                      : "Budget Will Exceed"}
+                  </Text>
+                  <Text
+                    style={{
+                      color: isDark ? "#CBD5E1" : "#64748B",
+                      fontSize: 13,
+                      lineHeight: 18,
+                      fontFamily: fontFamilies.regular,
+                    }}
+                  >
+                    {budgetExceededWarning.status === "alreadyOver"
+                      ? `Budget already exceeded! You've spent ₱${budgetExceededWarning.spent.toFixed(2)} of your ₱${budgetExceededWarning.limit.toFixed(2)} limit for this category.`
+                      : `Budget limit will exceed! You've spent ₱${budgetExceededWarning.spent.toFixed(2)}, adding this expense will go over your ₱${budgetExceededWarning.limit.toFixed(2)} limit.`}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
             {entryType === "expense" ? (
               <Animated.View
@@ -1176,89 +1368,7 @@ export default function AddTransactionModal() {
                 isCreatingIncome ||
                 isExpenseSaveBlockedByInsufficientBalance
               }
-              onPress={async () => {
-                if (!isSaveEnabled) {
-                  showIncompleteFormAlert();
-                  return;
-                }
-
-                setErrorMessage(null);
-
-                try {
-                  if (entryType === "expense") {
-                    // Validate expense fields
-                    if (!selectedExpenseCategoryId) {
-                      setErrorMessage("Please select a category");
-                      return;
-                    }
-
-                    if (!selectedPaymentMethodId) {
-                      setErrorMessage(accountRequiredMessage);
-                      return;
-                    }
-
-                    if (selectedExpensePaymentMethodIsInsufficient) {
-                      setErrorMessage(
-                        "Selected account does not have enough balance.",
-                      );
-                      return;
-                    }
-
-                    const result = await createExpense({
-                      amount: Number(amount),
-                      categoryId: selectedExpenseCategoryId,
-                      accountId: selectedPaymentMethodId,
-                      merchantName: selectedMerchantOption?.label || undefined,
-                      merchantDefaultCategoryId: selectedExpenseCategoryId,
-                      notes: notes || undefined,
-                      transactionDate: selectedDate,
-                    });
-
-                    if (!result.success) {
-                      setErrorMessage(
-                        result.error || "Failed to create expense",
-                      );
-                      return;
-                    }
-                  } else {
-                    // Income transaction
-                    if (!selectedIncomeCategory) {
-                      setErrorMessage("Please select a category");
-                      return;
-                    }
-
-                    if (!selectedPaymentMethodId) {
-                      setErrorMessage(accountRequiredMessage);
-                      return;
-                    }
-
-                    const result = await createIncome({
-                      amount: Number(amount),
-                      categoryId: selectedIncomeCategory,
-                      accountId: selectedPaymentMethodId,
-                      source: source || undefined,
-                      notes: notes || undefined,
-                      transactionDate: selectedDate,
-                    });
-
-                    if (!result.success) {
-                      setErrorMessage(
-                        result.error || "Failed to create income",
-                      );
-                      return;
-                    }
-                  }
-
-                  // Success - close modal
-                  router.back();
-                } catch (error) {
-                  const message =
-                    error instanceof Error
-                      ? error.message
-                      : "An error occurred";
-                  setErrorMessage(message);
-                }
-              }}
+              onPress={handleSaveTransaction}
             >
               {isCreatingExpense || isCreatingIncome ? (
                 <ActivityIndicator
@@ -1852,6 +1962,32 @@ const styles = StyleSheet.create({
   },
   inlineWarningMessage: {
     marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+  },
+  warningContent: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 2,
+  },
+  warningTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: fontWeights.semibold,
+  },
+  warningMessage: {
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
