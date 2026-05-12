@@ -75,14 +75,28 @@ export default function GoalsScreen() {
       headerAction: {
         backgroundColor: colorScheme === "light" ? colors.primary : "#1495FF",
       },
+      summaryGradient: colorScheme === "light"
+        ? (["#31DC95", "#1CCB7F", "#14915E"] as const)
+        : (["#1AB877", "#119B63", "#096A44"] as const),
       summaryCard: {
-        backgroundColor: "#10B47A",
-        borderColor: "#10B47A",
+        borderColor: colorScheme === "light"
+          ? "rgba(255, 255, 255, 0.12)"
+          : "rgba(255, 255, 255, 0.06)",
+        shadowOpacity: colorScheme === "light" ? 0.12 : 0.14,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 12 },
+        elevation: 4,
       },
-      summaryLabelText: { color: "#D6FFF0" },
+      summaryLabelText: { color: "rgba(244,255,249,0.76)" },
       summaryTitleText: { color: "#FFFFFF" },
+      summaryMiniDivider: {
+        backgroundColor: "rgba(255,255,255,0.12)",
+      },
+      summaryBottomBorder: {
+        borderTopColor: "rgba(255,255,255,0.14)",
+      },
       summaryTrack: {
-        backgroundColor: "rgba(255,255,255,0.25)",
+        backgroundColor: "rgba(255,255,255,0.20)",
       },
       goalCard: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
@@ -163,8 +177,11 @@ export default function GoalsScreen() {
             />
           }
         >
-          <View
-            style={[styles.summaryCard, pageStyles.summaryCard, shadows.card]}
+          <LinearGradient
+            colors={pageStyles.summaryGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.summaryCard, pageStyles.summaryCard]}
           >
             <View style={styles.summaryTopRow}>
               <Text style={[styles.summaryLabel, pageStyles.summaryLabelText]}>
@@ -189,6 +206,12 @@ export default function GoalsScreen() {
                     Active
                   </Text>
                 </View>
+                <View
+                  style={[
+                    styles.summaryMiniDivider,
+                    pageStyles.summaryMiniDivider,
+                  ]}
+                />
                 <View style={styles.summaryMiniStat}>
                   <Text
                     style={[
@@ -214,41 +237,45 @@ export default function GoalsScreen() {
               {formatCurrency(overview.totalSaved)}
             </Text>
 
-            <View style={styles.summaryProgressRow}>
-              <Text
-                style={[
-                  styles.summaryProgressLabel,
-                  pageStyles.summaryLabelText,
-                ]}
-              >
-                Progress
-              </Text>
-              <Text
-                style={[
-                  styles.summaryProgressValue,
-                  pageStyles.summaryTitleText,
-                ]}
-              >
-                {`${formatCurrency(overview.totalSaved)} / ${formatCurrency(overview.totalTarget)}`}
-              </Text>
-            </View>
+            <View
+              style={[styles.summaryBottom, pageStyles.summaryBottomBorder]}
+            >
+              <View style={styles.summaryProgressRow}>
+                <Text
+                  style={[
+                    styles.summaryProgressLabel,
+                    pageStyles.summaryLabelText,
+                  ]}
+                >
+                  Progress
+                </Text>
+                <Text
+                  style={[
+                    styles.summaryProgressValue,
+                    pageStyles.summaryTitleText,
+                  ]}
+                >
+                  {`${formatCurrency(overview.totalSaved)} / ${formatCurrency(overview.totalTarget)}`}
+                </Text>
+              </View>
 
-            <View style={[styles.summaryTrack, pageStyles.summaryTrack]}>
-              <View
-                style={[
-                  styles.summaryFillWrap,
-                  { width: `${overview.overallProgress}%` },
-                ]}
-              >
-                <LinearGradient
-                  colors={["#FFFFFF", "#F5FFF8"]}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={styles.summaryFill}
-                />
+              <View style={[styles.summaryTrack, pageStyles.summaryTrack]}>
+                <View
+                  style={[
+                    styles.summaryFillWrap,
+                    { width: `${overview.overallProgress}%` },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["rgba(255,255,255,0.98)", "rgba(223,255,241,0.92)"]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.summaryFill}
+                  />
+                </View>
               </View>
             </View>
-          </View>
+          </LinearGradient>
 
           {!activeGoals.length ? (
             <View style={[styles.emptyCard, pageStyles.chipCard, shadows.soft]}>
@@ -571,43 +598,65 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   summaryCard: {
-    marginTop: 22,
-    borderRadius: 28,
+    marginTop: 18,
+    borderRadius: 30,
     borderWidth: 1,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 18,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+    overflow: "hidden",
   },
   summaryTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   },
-  summaryLabel: { fontFamily: fontFamilies.sans, fontSize: 16, lineHeight: 22 },
-  summaryRight: { flexDirection: "row", gap: 12 },
+  summaryLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: fontWeights.regular,
+    letterSpacing: 0.2,
+  },
+  summaryRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   summaryMiniStat: { alignItems: "flex-end" },
+  summaryMiniDivider: {
+    width: 1,
+    height: 22,
+  },
   summaryMiniValue: {
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: fontWeights.bold,
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+    fontVariant: ["tabular-nums"],
   },
   summaryMiniLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.regular,
   },
   summaryAmount: {
-    marginTop: 10,
+    marginTop: 14,
     fontFamily: fontFamilies.sans,
-    fontSize: 28,
-    lineHeight: 34,
-    fontWeight: fontWeights.bold,
-    letterSpacing: -0.6,
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: fontWeights.semibold,
+    letterSpacing: -0.8,
+    fontVariant: ["tabular-nums"],
+  },
+  summaryBottom: {
+    marginTop: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
   summaryProgressRow: {
-    marginTop: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -615,23 +664,25 @@ const styles = StyleSheet.create({
   },
   summaryProgressLabel: {
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: fontWeights.regular,
   },
   summaryProgressValue: {
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: fontWeights.bold,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: fontWeights.medium,
+    fontVariant: ["tabular-nums"],
   },
   summaryTrack: {
-    marginTop: 14,
-    height: 12,
+    marginTop: 10,
+    height: 10,
     borderRadius: radius.full,
     overflow: "hidden",
   },
-  summaryFillWrap: { height: "100%" },
-  summaryFill: { width: "100%", height: "100%" },
+  summaryFillWrap: { height: "100%", borderRadius: radius.full, overflow: "hidden" },
+  summaryFill: { width: "100%", height: "100%", borderRadius: radius.full },
   goalsList: { gap: 16, marginTop: 18 },
   goalCard: {
     borderRadius: 28,

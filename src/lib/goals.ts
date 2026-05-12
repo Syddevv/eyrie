@@ -39,6 +39,7 @@ export type GoalMetrics = {
   currentAmount: number;
   remainingAmount: number;
   progressPercentage: number;
+  daysRemaining: number;
   monthsRemaining: number;
   weeklyTarget: number;
   monthlyTarget: number;
@@ -59,6 +60,12 @@ export type GoalsOverview = {
   activeGoalsCount: number;
   completedGoalsCount: number;
   archivedGoalsCount: number;
+};
+
+export type GoalContributionPlan = {
+  label: string;
+  amount: number;
+  suffix: "/day" | "/week" | "/month";
 };
 
 export function formatCurrency(value: number, currencyCode = "PHP") {
@@ -123,6 +130,7 @@ export function getGoalMetrics(goal: GoalWithDetails, referenceDate = new Date()
     currentAmount,
     remainingAmount,
     progressPercentage,
+    daysRemaining: dayCount,
     monthsRemaining,
     weeklyTarget,
     monthlyTarget,
@@ -134,6 +142,35 @@ export function getGoalMetrics(goal: GoalWithDetails, referenceDate = new Date()
     recentContributionAt,
     daysSinceLastContribution,
     isCompleted: Boolean(goal.isCompleted) || progressPercentage >= 100,
+  };
+}
+
+export function getGoalContributionPlan(
+  goal: GoalWithDetails,
+  referenceDate = new Date(),
+): GoalContributionPlan {
+  const metrics = getGoalMetrics(goal, referenceDate);
+
+  if (metrics.daysRemaining <= 14) {
+    return {
+      label: "Daily target",
+      amount: metrics.dailyTarget,
+      suffix: "/day",
+    };
+  }
+
+  if (metrics.daysRemaining <= 90) {
+    return {
+      label: "Weekly target",
+      amount: metrics.weeklyTarget,
+      suffix: "/week",
+    };
+  }
+
+  return {
+    label: "Monthly target",
+    amount: metrics.monthlyTarget,
+    suffix: "/month",
   };
 }
 
@@ -187,9 +224,10 @@ export function getGoalInsights(goal: GoalWithDetails, referenceDate = new Date(
   }
 
   if (!insights.length) {
+    const contributionPlan = getGoalContributionPlan(goal, referenceDate);
     insights.push({
       id: "target",
-      message: `You need about ${formatCurrency(metrics.monthlyTarget)} a month to stay on course.`,
+      message: `You need about ${formatCurrency(contributionPlan.amount)} ${contributionPlan.suffix.slice(1)} to stay on course.`,
       tone: "neutral",
     });
   }

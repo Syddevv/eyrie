@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -16,6 +17,7 @@ import {
   formatCurrency,
   formatMonthYear,
   formatShortDate,
+  getGoalContributionPlan,
 } from "@/src/lib/goals";
 
 export default function GoalDetailsModal() {
@@ -27,6 +29,7 @@ export default function GoalDetailsModal() {
   const { goal, isLoading } = useSavingsGoal(goalId);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const contributionPlan = goal ? getGoalContributionPlan(goal) : null;
 
   const ui = useMemo(
     () => ({
@@ -46,30 +49,32 @@ export default function GoalDetailsModal() {
       muted: { color: colors.mutedForeground },
       closeButton: { backgroundColor: colors.secondary },
       statCard: {
-        backgroundColor: colors.secondary,
+        backgroundColor: isDark ? "#1B2432" : "#F8FAFD",
         borderColor: isDark
-          ? "rgba(255,255,255,0.05)"
-          : "rgba(226,232,240,0.92)",
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(226,232,240,0.88)",
       },
       progressTrack: {
-        backgroundColor: isDark ? "#1B2433" : "#EEF2F7",
+        backgroundColor: isDark ? "#162131" : "#E7EDF6",
       },
       historyRow: {
-        backgroundColor: colors.secondary,
+        backgroundColor: isDark ? "#182230" : "#F8FAFD",
       },
       positiveAmount: { color: "#10B981" },
       primaryButton: { backgroundColor: colors.primary },
-      secondaryButton: { backgroundColor: colors.secondary },
+      secondaryButton: {
+        backgroundColor: isDark ? "#1A2331" : "#EEF3F9",
+      },
+      archiveButton: {
+        backgroundColor: isDark ? "#18212E" : "#F1F4F8",
+      },
       destructiveButton: {
         backgroundColor: isDark
-          ? "rgba(239, 68, 68, 0.12)"
-          : "rgba(239, 68, 68, 0.08)",
+          ? "rgba(239, 68, 68, 0.14)"
+          : "rgba(239, 68, 68, 0.1)",
       },
       destructiveText: { color: "#EF4444" },
       infoCard: {
-        backgroundColor: isDark
-          ? "rgba(20,149,255,0.12)"
-          : "rgba(20,149,255,0.08)",
         borderColor: isDark ? "rgba(20,149,255,0.18)" : "rgba(20,149,255,0.16)",
       },
     }),
@@ -163,49 +168,92 @@ export default function GoalDetailsModal() {
           contentContainerStyle={styles.bodyContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.progressCard, ui.statCard]}>
+          <LinearGradient
+            colors={
+              isDark
+                ? ["#119B63", "#0C7A4E", "#085C3A"]
+                : ["#18C47E", "#10B981", "#0E9F6E"]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.progressCard}
+          >
+            <View style={styles.progressGlowPrimary} />
+            <View style={styles.progressGlowSecondary} />
+            <LinearGradient
+              colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.8, y: 0.6 }}
+              style={styles.progressGloss}
+            />
             <View style={styles.progressTopRow}>
-              <Text style={[styles.savedAmount, ui.title]}>
-                {formatCurrency(goal.currentAmount)}
-              </Text>
-              <Text
-                style={[styles.goalAmount, ui.muted]}
-              >{`of ${formatCurrency(goal.targetAmount)}`}</Text>
+              <View>
+                <Text style={styles.progressEyebrow}>Total Saved</Text>
+                <Text style={styles.savedAmount}>
+                  {formatCurrency(goal.currentAmount)}
+                </Text>
+              </View>
+              <View style={styles.progressTopRight}>
+                <Text style={styles.progressPill}>
+                  {goal.metrics.isCompleted ? "Done" : `${goal.metrics.daysRemaining}d left`}
+                </Text>
+                <Text style={styles.goalAmount}>
+                  {`of ${formatCurrency(goal.targetAmount)}`}
+                </Text>
+              </View>
             </View>
 
-            <View style={[styles.progressTrack, ui.progressTrack]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${goal.metrics.progressPercentage}%`,
-                    backgroundColor: goal.metrics.isCompleted
-                      ? "#10B981"
-                      : (goal.color ?? "#1482E9"),
-                  },
-                ]}
-              />
-            </View>
+            <View style={styles.progressBottomSection}>
+              <View style={styles.progressHeaderRow}>
+                <Text style={styles.progressSectionLabel}>Progress</Text>
+                <Text style={styles.progressSectionValue}>
+                  {`${formatCurrency(goal.currentAmount)} / ${formatCurrency(goal.targetAmount)}`}
+                </Text>
+              </View>
 
-            <View style={styles.progressBottomRow}>
-              <Text
-                style={[styles.achievedText, ui.muted]}
-              >{`${Math.round(goal.metrics.progressPercentage)}% complete`}</Text>
-              <Text style={[styles.remainingText, ui.title]}>
-                {goal.metrics.isCompleted
-                  ? "Completed"
-                  : `${formatCurrency(goal.metrics.remainingAmount)} left`}
-              </Text>
+              <View style={[styles.progressTrack, styles.progressTrackPremium]}>
+                <View
+                  style={[
+                    styles.progressFillWrap,
+                    {
+                      width: `${goal.metrics.progressPercentage}%`,
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={["#D7FFF0", "#FFFFFF", "#E5FFF7"]}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.progressFill}
+                  />
+                  <View style={styles.progressFillGlow} />
+                </View>
+              </View>
+
+              <View style={styles.progressBottomRow}>
+                <Text style={styles.achievedText}>
+                  {goal.metrics.isCompleted
+                    ? "Goal completed"
+                    : `${Math.round(goal.metrics.progressPercentage)}% complete`}
+                </Text>
+                <Text style={styles.remainingText}>
+                  {goal.metrics.isCompleted
+                    ? "Completed"
+                    : `${formatCurrency(goal.metrics.remainingAmount)} left`}
+                </Text>
+              </View>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, ui.statCard]}>
               <Text style={[styles.summaryLabel, ui.muted]}>
-                Monthly target
+                {contributionPlan?.label ?? "Target"}
               </Text>
               <Text style={[styles.summaryValue, ui.title]}>
-                {formatCurrency(goal.metrics.monthlyTarget)}
+                {contributionPlan
+                  ? `${formatCurrency(contributionPlan.amount)}${contributionPlan.suffix}`
+                  : "Build target"}
               </Text>
             </View>
             <View style={[styles.summaryCard, ui.statCard]}>
@@ -233,7 +281,16 @@ export default function GoalDetailsModal() {
             </View>
           </View>
 
-          <View style={[styles.infoCard, ui.infoCard]}>
+          <LinearGradient
+            colors={
+              isDark
+                ? ["rgba(21,109,220,0.28)", "rgba(15,62,125,0.24)"]
+                : ["rgba(54,139,255,0.18)", "rgba(27,104,214,0.12)"]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.infoCard, ui.infoCard]}
+          >
             <Text style={[styles.infoTitle, ui.title]}>Insight</Text>
             <Text style={[styles.infoBody, ui.muted]}>
               {goal.insights[0]?.message}
@@ -242,7 +299,7 @@ export default function GoalDetailsModal() {
               Contributions transfer money into savings goals. They are not
               counted as expenses.
             </Text>
-          </View>
+          </LinearGradient>
 
           <Text style={[styles.sectionTitle, ui.title]}>
             Contribution History
@@ -314,7 +371,7 @@ export default function GoalDetailsModal() {
             <Text style={[styles.footerButtonText, ui.title]}>Edit Goal</Text>
           </Pressable>
           <Pressable
-            style={[styles.footerButton, ui.secondaryButton]}
+            style={[styles.footerButton, ui.archiveButton]}
             onPress={handleArchiveToggle}
           >
             <Feather
@@ -417,84 +474,193 @@ const styles = StyleSheet.create({
   bodyScroll: { marginTop: 14 },
   bodyContent: { paddingBottom: 4 },
   progressCard: {
-    borderRadius: 22,
+    borderRadius: 28,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
+    borderColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 18,
+    overflow: "hidden",
+  },
+  progressGlowPrimary: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: radius.full,
+    top: -70,
+    right: -42,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  progressGlowSecondary: {
+    position: "absolute",
+    width: 110,
+    height: 110,
+    borderRadius: radius.full,
+    bottom: -46,
+    left: -20,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  progressGloss: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 96,
   },
   progressTopRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   },
-  savedAmount: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: fontWeights.bold,
-  },
-  goalAmount: {
+  progressEyebrow: {
+    color: "rgba(234,255,245,0.74)",
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.medium,
   },
-  progressTrack: {
-    marginTop: 12,
-    height: 8,
+  savedAmount: {
+    marginTop: 6,
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.sans,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: fontWeights.bold,
+  },
+  progressTopRight: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  progressPill: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.bold,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radius.full,
     overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
-  progressFill: { height: "100%", borderRadius: radius.full },
-  progressBottomRow: {
-    marginTop: 10,
+  goalAmount: {
+    color: "rgba(239,255,247,0.82)",
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+  },
+  progressBottomSection: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.12)",
+  },
+  progressHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
   },
-  achievedText: { fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 17 },
-  remainingText: {
+  progressSectionLabel: {
+    color: "rgba(234,255,245,0.74)",
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: fontWeights.bold,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
   },
-  summaryRow: { marginTop: 14, flexDirection: "row", gap: 10 },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  summaryLabel: { fontFamily: fontFamilies.sans, fontSize: 13, lineHeight: 17 },
-  summaryValue: {
-    marginTop: 6,
+  progressSectionValue: {
+    color: "#FFFFFF",
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.bold,
   },
-  infoCard: { marginTop: 14, borderRadius: 20, borderWidth: 1, padding: 14 },
+  progressTrack: {
+    marginTop: 12,
+    height: 12,
+    borderRadius: radius.full,
+    overflow: "hidden",
+  },
+  progressTrackPremium: {
+    backgroundColor: "rgba(7, 24, 37, 0.24)",
+  },
+  progressFillWrap: { height: "100%" },
+  progressFill: { height: "100%", borderRadius: radius.full },
+  progressFillGlow: {
+    position: "absolute",
+    top: 2,
+    bottom: 2,
+    right: 4,
+    width: 26,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  progressBottomRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  achievedText: {
+    color: "rgba(239,255,247,0.78)",
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  remainingText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.bold,
+  },
+  summaryRow: { marginTop: 16, flexDirection: "row", gap: 12 },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    minHeight: 108,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    justifyContent: "space-between",
+  },
+  summaryLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: fontWeights.medium,
+  },
+  summaryValue: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: fontWeights.bold,
+  },
+  infoCard: {
+    marginTop: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 16,
+  },
   infoTitle: {
     fontFamily: fontFamilies.sans,
-    fontSize: 15,
-    lineHeight: 19,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: fontWeights.bold,
   },
   infoBody: {
-    marginTop: 6,
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  infoCaption: {
     marginTop: 8,
     fontFamily: fontFamilies.sans,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  infoCaption: {
+    marginTop: 12,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 17,
   },
   sectionTitle: {
     marginTop: 18,
@@ -547,9 +713,9 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
   contributeButton: {
-    marginTop: 14,
-    height: 46,
-    borderRadius: 20,
+    marginTop: 16,
+    height: 52,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -562,11 +728,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: fontWeights.bold,
   },
-  footerActions: { marginTop: 12, flexDirection: "row", gap: 8 },
+  footerActions: { marginTop: 12, flexDirection: "row", gap: 10 },
   footerButton: {
     flex: 1,
-    minHeight: 42,
-    borderRadius: 16,
+    minHeight: 46,
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
