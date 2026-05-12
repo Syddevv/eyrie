@@ -25,7 +25,10 @@ export default function RootLayout() {
             <Stack.Screen name="sign-in" options={{ headerShown: false }} />
             <Stack.Screen name="sign-up" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="transactions" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="transactions"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="transaction-details-modal"
               options={{
@@ -44,8 +47,14 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: "transparent" },
               }}
             />
-            <Stack.Screen name="notifications" options={{ headerShown: false }} />
-            <Stack.Screen name="categories-settings" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="notifications"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="categories-settings"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="goal-details-modal"
               options={{
