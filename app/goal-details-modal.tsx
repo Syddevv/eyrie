@@ -188,11 +188,7 @@ export default function GoalDetailsModal() {
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={
-              isDark
-                ? ["#227A54", "#16583A"]
-                : ["#6EE7B7", "#34D399"]
-            }
+            colors={isDark ? ["#227A54", "#16583A"] : ["#6EE7B7", "#34D399"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.progressCard}
@@ -336,11 +332,11 @@ export default function GoalDetailsModal() {
                           color="#10B981"
                         />
                       </View>
-                      <View>
+                      <View style={styles.historyTextWrap}>
                         <Text style={[styles.historyDate, ui.title]}>
                           {formatShortDate(entry.createdAt)}
                         </Text>
-                        <Text style={[styles.historyMeta, ui.muted]}>
+                        <Text style={[styles.historyMeta, ui.muted]} numberOfLines={2}>
                           {entry.wallet?.name ?? "Manual contribution"}
                           {entry.note ? ` • ${entry.note}` : ""}
                         </Text>
@@ -422,7 +418,6 @@ export default function GoalDetailsModal() {
             </Text>
           </Pressable>
         </View>
-
       </View>
 
       <DeleteConfirmationModal
@@ -712,6 +707,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   historyLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  historyTextWrap: { flex: 1, paddingRight: 8 },
   historyIconWrap: {
     width: 24,
     height: 24,

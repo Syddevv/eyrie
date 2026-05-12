@@ -122,7 +122,7 @@ export default function AddContributionModal() {
       coachText: { color: "#10B981" },
       primaryButton: { backgroundColor: colors.primary },
       secondaryButton: { backgroundColor: colors.secondary },
-      primaryButtonDisabled: { backgroundColor: "#7CB8EE" },
+      primaryButtonDisabled: { backgroundColor: colors.primary, opacity: 0.5 },
       primaryText: { color: "#FFFFFF" },
       secondaryText: { color: colors.foreground },
       disabledText: { color: colors.mutedForeground, opacity: 0.5 },
@@ -160,7 +160,9 @@ export default function AddContributionModal() {
 
   const selectedWallet =
     methods.find((method) => method.id === walletId) ?? null;
-  const isAddEnabled = parsedAmount > 0;
+  const remainingAmount = goal ? Math.max(0, goal.targetAmount - goal.currentAmount) : 0;
+  const isOverTarget = parsedAmount > remainingAmount;
+  const isAddEnabled = parsedAmount > 0 && !isOverTarget;
   const isKeyboardOpen = keyboardHeight > 0;
   const maxSheetHeight = Math.min(
     windowHeight * 0.82,
@@ -200,10 +202,12 @@ export default function AddContributionModal() {
 
   const handleAdd = () => {
     if (!isAddEnabled) {
-      Alert.alert(
-        "Contribution required",
-        "Enter a contribution amount before continuing.",
-      );
+      if (!isOverTarget) {
+        Alert.alert(
+          "Contribution required",
+          "Enter a contribution amount before continuing.",
+        );
+      }
       return;
     }
 
@@ -324,6 +328,51 @@ export default function AddContributionModal() {
                   ]}
                 />
               </View>
+              {isOverTarget && (
+                <View
+                  style={{
+                    marginTop: 12,
+                    backgroundColor: isDark ? "rgba(239, 68, 68, 0.1)" : "#FEF2F2",
+                    borderColor: isDark ? "rgba(239, 68, 68, 0.2)" : "#FECACA",
+                    borderWidth: 1,
+                    borderRadius: 12,
+                    padding: 12,
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 12,
+                  }}
+                >
+                  <Feather
+                    name="alert-circle"
+                    size={18}
+                    color="#EF4444"
+                    style={{ marginTop: 2 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: "#EF4444",
+                        fontSize: 14,
+                        fontWeight: "600",
+                        marginBottom: 4,
+                        fontFamily: fontFamilies.sans,
+                      }}
+                    >
+                      Target Exceeded
+                    </Text>
+                    <Text
+                      style={{
+                        color: isDark ? "#CBD5E1" : "#64748B",
+                        fontSize: 13,
+                        lineHeight: 18,
+                        fontFamily: fontFamilies.sans,
+                      }}
+                    >
+                      You only need {formatCurrency(remainingAmount)} to reach your goal.
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             <View
@@ -480,7 +529,7 @@ export default function AddContributionModal() {
                 !isAddEnabled && ui.primaryButtonDisabled,
               ]}
               onPress={handleAdd}
-              disabled={isSaving}
+              disabled={isSaving || !isAddEnabled}
             >
               <Text style={[styles.footerButtonText, ui.primaryText]}>
                 {isSaving
