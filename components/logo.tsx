@@ -8,7 +8,8 @@ type Props = {
   size?: number;
   style?: any;
   backgroundColor?: string;
-  uri?: string; // optional remote/local URI if available
+  uri?: string; // optional remote URI if available
+  logo?: any; // optional local require(...) asset or remote URI string
 };
 
 export default function Logo({
@@ -19,7 +20,21 @@ export default function Logo({
   style,
   backgroundColor,
   uri,
+  logo,
 }: Props) {
+  // Prefer explicit local `logo` asset (require(...))
+  if (logo) {
+    // logo can be a number (require) or a string URI
+    const source = typeof logo === "string" ? { uri: logo } : logo;
+    return (
+      <Image
+        source={source}
+        style={[{ width: size, height: size, borderRadius: size / 8 }, style]}
+        resizeMode="contain"
+      />
+    );
+  }
+
   if (uri) {
     return (
       <Image

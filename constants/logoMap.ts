@@ -1,38 +1,29 @@
-export const LOGO_MAP: Record<string, string> = {
-  // banks
-  bpi: "@/assets/logos/banks/bpi.svg",
-  bdo: "@/assets/logos/banks/bdo.svg",
-  metrobank: "@/assets/logos/banks/metrobank.svg",
-  unionbank: "@/assets/logos/banks/unionbank.svg",
-  landbank: "@/assets/logos/banks/landbank.svg",
-  rcbc: "@/assets/logos/banks/rcbc.svg",
-  securitybank: "@/assets/logos/banks/securitybank.svg",
-  pnb: "@/assets/logos/banks/pnb.svg",
+export const LOGO_MAP: Record<string, any> = {
+  // banks (local assets)
+  bpi: require("../assets/Logos/BPI.png"),
+  bdo: require("../assets/Logos/BDO.jpg"),
+  metrobank: require("../assets/Logos/MetroBank.png"),
+  unionbank: require("../assets/Logos/UnionBank.jpeg"),
+  landbank: require("../assets/Logos/Landbank.png"),
+  rcbc: require("../assets/Logos/RCBC.png"),
+  securitybank: require("../assets/Logos/Security Bank.png"),
+  pnb: require("../assets/Logos/PNB.webp"),
 
-  // ewallets/digital
-  gcash: "@/assets/logos/ewallets/gcash.svg",
-  maya: "@/assets/logos/ewallets/maya.svg",
-  grabpay: "@/assets/logos/ewallets/grab.svg",
-  shopeepay: "@/assets/logos/ewallets/shopee.svg",
-  coinsph: "@/assets/logos/ewallets/coinsph.svg",
-  lazada: "@/assets/logos/ewallets/lazada.svg",
-  paypal: "@/assets/logos/ewallets/paypal.svg",
-  dragonpay: "@/assets/logos/ewallets/dragonpay.svg",
-  cliiq: "@/assets/logos/ewallets/cliqq.svg",
-  gotyme: "@/assets/logos/ewallets/gotyme.svg",
-  maribank: "@/assets/logos/ewallets/maribank.svg",
-  cimb: "@/assets/logos/ewallets/cimb.svg",
-  tonik: "@/assets/logos/ewallets/tonik.svg",
-  unobank: "@/assets/logos/ewallets/unobank.svg",
-  komo: "@/assets/logos/ewallets/komo.svg",
-  binance: "@/assets/logos/ewallets/binance.svg",
-  pdax: "@/assets/logos/ewallets/pdax.svg",
-  cryptocom: "@/assets/logos/ewallets/cryptocom.svg",
+  // ewallets/digital (local assets where available)
+  gcash: require("../assets/Logos/GCash.png"),
+  maya: require("../assets/Logos/Maya.jpg"),
+  shopeepay: require("../assets/Logos/ShoppePay.webp"),
+  coinsph: require("../assets/Logos/CoinsPH.png"),
+  lazada: require("../assets/Logos/Lazada Wallet.png"),
+  paypal: require("../assets/Logos/Paypal.png"),
+  gotyme: require("../assets/Logos/GoTyme.png"),
+  maribank: require("../assets/Logos/Maribank.png"),
+  cimb: require("../assets/Logos/CIMB.jpg"),
+  pdax: require("../assets/Logos/PDAX.png"),
 
   // cards
-  visa: "@/assets/logos/cards/visa.svg",
-  mastercard: "@/assets/logos/cards/mastercard.svg",
-  amex: "@/assets/logos/cards/amex.svg",
+  visa: require("../assets/Logos/VISA.jpg"),
+  mastercard: require("../assets/Logos/Mastercard.png"),
 };
 
 export default LOGO_MAP;

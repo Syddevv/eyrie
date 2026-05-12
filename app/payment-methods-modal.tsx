@@ -5,8 +5,12 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
+import Logo from "@/components/logo";
 import { settingsPaymentMethods } from "@/constants/settings-payment-methods";
 import { useAccounts } from "@/hooks/useAccounts";
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
 import { useTotalAssets } from "@/hooks/useTotalAssets";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { radius, shadows } from "@/constants/theme";
@@ -32,6 +36,69 @@ export default function PaymentMethodsModal() {
     () => accounts.filter((account) => !account.isHidden),
     [accounts],
   );
+
+  const resolveBrandName = (acct: any) => {
+    const nameLower = (acct?.name || "").toLowerCase();
+
+    // Try exact name matching (e.g., "MariBank" or "GCash")
+    let matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+
+    if (matchWallet) return matchWallet.name;
+
+    // Try bank matching
+    let matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+
+    if (matchBank) return matchBank.name;
+
+    // Try logo map key matching
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return key.toUpperCase();
+
+    // Fallback based on account type
+    if (acct?.type === "ewallet") return "E-WALLET";
+    if (acct?.type === "cash") return "CASH";
+    if (acct?.type === "credit") return "Credit";
+
+    return "Bank";
+  };
+
+  const resolveLogo = (acct: any) => {
+    const nameLower = (acct?.name || "").toLowerCase();
+
+    // Try exact name matching
+    let matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+    if (matchWallet?.logo) return matchWallet.logo;
+
+    // Try bank matching
+    let matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+    if (matchBank?.logo) return matchBank.logo;
+
+    // Try logo map key matching
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return LOGO_MAP[key];
+
+    return undefined;
+  };
 
   const accountToDelete = useMemo(
     () => visibleAccounts.find((a) => a.id === deletingAccountId),
@@ -200,23 +267,17 @@ export default function PaymentMethodsModal() {
                     })
                   }
                 >
-                  <View
-                    style={[
-                      styles.brandBubble,
-                      { backgroundColor: acct.color ?? "#6DB2EE" },
-                    ]}
-                  >
-                    <Text style={styles.brandText}>
-                      {(acct.name || "").slice(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
+                  <Logo
+                    size={44}
+                    logo={resolveLogo(acct)}
+                    name={resolveBrandName(acct)}
+                    backgroundColor={acct.color ?? "#6DB2EE"}
+                    style={{ marginRight: 14 }}
+                  />
 
                   <View style={styles.methodInfo}>
                     <Text style={[styles.methodTitle, ui.methodTitle]}>
-                      {acct.name}
-                    </Text>
-                    <Text style={[styles.methodDetails, ui.methodDetails]}>
-                      {acct.type}
+                      {resolveBrandName(acct)}
                     </Text>
                     <Text style={[styles.methodBalance, ui.methodBalance]}>
                       {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
@@ -387,6 +448,7 @@ const styles = StyleSheet.create({
   methodInfo: {
     flex: 1,
     paddingRight: 10,
+    gap: 4,
   },
   methodTitle: {
     fontFamily: fontFamilies.sans,
@@ -402,7 +464,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.regular,
   },
   methodBalance: {
-    marginTop: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,

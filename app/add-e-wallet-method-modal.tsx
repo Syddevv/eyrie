@@ -141,6 +141,7 @@ export default function AddEWalletMethodModal() {
                   styles.walletCard,
                   ui.walletCard,
                   isSelected && ui.walletCardSelected,
+                  isSelected && { borderColor: wallet.primaryColor },
                   isSelected && styles.walletCardActive,
                 ]}
                 onPress={() => setSelectedWallet(wallet.id)}
@@ -150,6 +151,7 @@ export default function AddEWalletMethodModal() {
                   name={wallet.name}
                   shortName={wallet.shortName}
                   size={36}
+                  logo={wallet.logo}
                   backgroundColor={wallet.primaryColor}
                 />
 

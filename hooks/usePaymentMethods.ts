@@ -38,6 +38,10 @@ function formatMethodLabel(
   return name;
 }
 
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
+
 export function usePaymentMethods() {
   const { accounts, isLoading, refresh } = useAccounts();
 
@@ -88,19 +92,47 @@ export function usePaymentMethods() {
         account.accountNumberLast4,
       );
 
+      // resolve brand name for display (prefer canonical names from constants)
+      const nameLower = (account.name || "").toLowerCase();
+
+      const matchWallet = WALLETS.find(
+        (w) =>
+          (w.name && nameLower.includes(w.name.toLowerCase())) ||
+          (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+          nameLower.includes(w.id),
+      );
+
+      const matchBank = BANKS.find(
+        (b) =>
+          (b.name && nameLower.includes(b.name.toLowerCase())) ||
+          (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+          nameLower.includes(b.id),
+      );
+
+      let brandLabel: string | null = null;
+
+      if (matchWallet) brandLabel = matchWallet.name;
+      else if (matchBank) brandLabel = matchBank.name;
+      else {
+        const key = nameLower.replace(/[^a-z0-9]/g, "");
+        if (LOGO_MAP[key]) brandLabel = key.toUpperCase();
+      }
+
+      const fallbackLabel =
+        account.type === "cash"
+          ? "Cash"
+          : account.type === "ewallet"
+            ? "E-Wallet"
+            : account.type === "credit"
+              ? "Credit account"
+              : "Bank account";
+
       return {
         id: account.id,
         accountId: account.id,
         kind: account.type as PaymentMethodOption["kind"],
         label,
-        sublabel:
-          account.type === "cash"
-            ? "Cash account"
-            : account.type === "ewallet"
-              ? "E-Wallet"
-              : account.type === "credit"
-                ? "Credit account"
-                : "Bank account",
+        sublabel: brandLabel ?? fallbackLabel,
         balance: Number(account.balance) || 0,
         balanceLabel: formatCurrency(
           Number(account.balance) || 0,

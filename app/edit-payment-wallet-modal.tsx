@@ -20,6 +20,11 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { accountsService } from "@/src/db/services";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useAuthStore } from "@/store/useAuthStore";
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
+import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
+import Logo from "@/components/logo";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -45,6 +50,70 @@ function formatBalance(value: string) {
   return formatDigits(value, 10);
 }
 
+function resolveBrandName(account: any) {
+  const nameLower = (account?.name || "").toLowerCase();
+
+  const matchWallet = WALLETS.find(
+    (w) =>
+      (w.name && nameLower.includes(w.name.toLowerCase())) ||
+      (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+      nameLower.includes(w.id),
+  );
+
+  if (matchWallet) return matchWallet.name;
+
+  const matchBank = BANKS.find(
+    (b) =>
+      (b.name && nameLower.includes(b.name.toLowerCase())) ||
+      (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+      nameLower.includes(b.id),
+  );
+
+  if (matchBank) return matchBank.name;
+
+  const key = nameLower.replace(/[^a-z0-9]/g, "");
+  if (LOGO_MAP[key]) return key.toUpperCase();
+
+  if (account?.type === "ewallet") return "E-WALLET";
+  if (account?.type === "cash") return "CASH";
+  if (account?.type === "credit") return "Credit";
+
+  return "Bank";
+}
+
+function resolveLogo(account: any) {
+  const nameLower = (account?.name || "").toLowerCase();
+
+  const matchWallet = WALLETS.find(
+    (w) =>
+      (w.name && nameLower.includes(w.name.toLowerCase())) ||
+      (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+      nameLower.includes(w.id),
+  );
+  if (matchWallet?.logo) return matchWallet.logo;
+
+  const matchBank = BANKS.find(
+    (b) =>
+      (b.name && nameLower.includes(b.name.toLowerCase())) ||
+      (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+      nameLower.includes(b.id),
+  );
+  if (matchBank?.logo) return matchBank.logo;
+
+  const key = nameLower.replace(/[^a-z0-9]/g, "");
+  if (LOGO_MAP[key]) return LOGO_MAP[key];
+
+  return undefined;
+}
+
+function extractUserName(accountName: string) {
+  // Extract the user name part from "BrandName - UserName" format
+  // If there's a " - " separator, return the part after it
+  // Otherwise, return the full name as is
+  const parts = accountName.split(" - ");
+  return parts.length > 1 ? parts.slice(1).join(" - ") : accountName;
+}
+
 export default function EditPaymentWalletModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{ accountId?: string | string[] }>();
@@ -56,8 +125,11 @@ export default function EditPaymentWalletModal() {
     ? params.accountId[0]
     : params.accountId;
   const account = accounts.find((a) => a.id === accountId);
+  const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
-  const [accountName, setAccountName] = useState(account?.name ?? "");
+  const [accountName, setAccountName] = useState(
+    account ? extractUserName(account.name ?? "") : "",
+  );
   const [balance, setBalance] = useState((account?.balance ?? 0).toString());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,7 +156,7 @@ export default function EditPaymentWalletModal() {
 
   useEffect(() => {
     if (account) {
-      setAccountName(account.name ?? "");
+      setAccountName(extractUserName(account.name ?? ""));
       setBalance((account.balance ?? 0).toString());
     }
   }, [account]);
@@ -136,8 +208,14 @@ export default function EditPaymentWalletModal() {
 
     setIsSaving(true);
     try {
+      const brandName = resolveBrandName(account);
+      const userNameInput = accountName.trim();
+      const fullName = userNameInput
+        ? `${brandName} - ${userNameInput}`
+        : brandName;
+
       await accountsService.update(account.id, {
-        name: accountName,
+        name: fullName,
         balance: parseFloat(balance) || 0,
       });
 
@@ -176,7 +254,7 @@ export default function EditPaymentWalletModal() {
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>
-              {account?.name || "Edit Wallet"}
+              {account ? resolveBrandName(account) : "Edit Wallet"}
             </Text>
             <Pressable
               style={[styles.closeButton, ui.closeButton]}
@@ -186,13 +264,22 @@ export default function EditPaymentWalletModal() {
             </Pressable>
           </View>
 
-          <Pressable style={styles.backRow} onPress={() => router.back()}>
+          <Pressable
+            style={styles.backRow}
+            onPress={() =>
+              router.replace({ pathname: "/payment-methods-modal" })
+            }
+          >
             <Feather name="chevron-left" size={18} color={ui.backText.color} />
             <Text style={[styles.backText, ui.backText]}>Back</Text>
           </Pressable>
 
           <LinearGradient
-            colors={["#3C83F0", "#3373EA", "#3173EA"]}
+            colors={[
+              brandTheme.gradient[0],
+              brandTheme.gradient[1],
+              brandTheme.primary,
+            ]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.walletHero}
@@ -211,8 +298,19 @@ export default function EditPaymentWalletModal() {
             />
 
             <View style={styles.heroTopRow}>
-              <Text style={styles.heroLabel}>E-WALLET</Text>
-              <Text style={styles.heroBrand}>{account?.name || "WALLET"}</Text>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <Logo
+                  size={44}
+                  logo={resolveLogo(account)}
+                  name={resolveBrandName(account)}
+                  backgroundColor={brandTheme.primary}
+                />
+                <Text style={styles.heroLabel}>
+                  {resolveBrandName(account)}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.heroBalanceBlock}>
@@ -232,7 +330,9 @@ export default function EditPaymentWalletModal() {
               <TextInput
                 value={accountName}
                 onChangeText={setAccountName}
-                placeholder={account?.name || "Enter account name"}
+                placeholder={
+                  account ? extractUserName(account.name ?? "") : "Enter name"
+                }
                 placeholderTextColor={ui.placeholder.color}
                 selectionColor="#1681DD"
                 style={[styles.fieldInput, ui.fieldText]}

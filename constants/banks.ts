@@ -1,3 +1,5 @@
+import { getBrandTheme } from "./brand-themes";
+
 export type BankItem = {
   id: string;
   name: string;
@@ -5,7 +7,7 @@ export type BankItem = {
   type?: "bank";
   logo?: string;
   primaryColor?: string;
-  gradient?: string[];
+  gradient?: readonly string[];
 };
 
 export const BANKS: BankItem[] = [
@@ -14,72 +16,72 @@ export const BANKS: BankItem[] = [
     name: "BPI",
     shortName: "BPI",
     type: "bank",
-    logo: "@/assets/logos/banks/bpi.svg",
-    primaryColor: "#E50914",
-    gradient: ["#E50914", "#C41612"],
+    logo: require("../assets/Logos/BPI.png"),
+    primaryColor: getBrandTheme({ id: "bpi" }).primary,
+    gradient: getBrandTheme({ id: "bpi" }).gradient,
   },
   {
     id: "bdo",
     name: "BDO",
     shortName: "BDO",
     type: "bank",
-    logo: "@/assets/logos/banks/bdo.svg",
-    primaryColor: "#1D4ED8",
-    gradient: ["#1D4ED8", "#1741B8"],
+    logo: require("../assets/Logos/BDO.jpg"),
+    primaryColor: getBrandTheme({ id: "bdo" }).primary,
+    gradient: getBrandTheme({ id: "bdo" }).gradient,
   },
   {
     id: "metrobank",
     name: "Metrobank",
     shortName: "Metro",
     type: "bank",
-    logo: "@/assets/logos/banks/metrobank.svg",
-    primaryColor: "#1E3A8A",
-    gradient: ["#1E3A8A", "#162B63"],
+    logo: require("../assets/Logos/MetroBank.png"),
+    primaryColor: getBrandTheme({ id: "metrobank" }).primary,
+    gradient: getBrandTheme({ id: "metrobank" }).gradient,
   },
   {
     id: "unionbank",
     name: "UnionBank",
     shortName: "Union",
     type: "bank",
-    logo: "@/assets/logos/banks/unionbank.svg",
-    primaryColor: "#F97316",
-    gradient: ["#F97316", "#D35F13"],
+    logo: require("../assets/Logos/UnionBank.jpeg"),
+    primaryColor: getBrandTheme({ id: "unionbank" }).primary,
+    gradient: getBrandTheme({ id: "unionbank" }).gradient,
   },
   {
     id: "landbank",
     name: "Landbank",
     shortName: "Landbank",
     type: "bank",
-    logo: "@/assets/logos/banks/landbank.svg",
-    primaryColor: "#0F8A46",
-    gradient: ["#0F8A46", "#0C6A35"],
+    logo: require("../assets/Logos/Landbank.png"),
+    primaryColor: getBrandTheme({ id: "landbank" }).primary,
+    gradient: getBrandTheme({ id: "landbank" }).gradient,
   },
   {
     id: "rcbc",
     name: "RCBC",
     shortName: "RCBC",
     type: "bank",
-    logo: "@/assets/logos/banks/rcbc.svg",
-    primaryColor: "#0EA5A4",
-    gradient: ["#0EA5A4", "#0B8D8B"],
+    logo: require("../assets/Logos/RCBC.png"),
+    primaryColor: getBrandTheme({ id: "rcbc" }).primary,
+    gradient: getBrandTheme({ id: "rcbc" }).gradient,
   },
   {
     id: "securitybank",
     name: "Security Bank",
     shortName: "Security",
     type: "bank",
-    logo: "@/assets/logos/banks/securitybank.svg",
-    primaryColor: "#0F172A",
-    gradient: ["#0F172A", "#0B1220"],
+    logo: require("../assets/Logos/Security Bank.png"),
+    primaryColor: getBrandTheme({ id: "securitybank" }).primary,
+    gradient: getBrandTheme({ id: "securitybank" }).gradient,
   },
   {
     id: "pnb",
     name: "PNB",
     shortName: "PNB",
     type: "bank",
-    logo: "@/assets/logos/banks/pnb.svg",
-    primaryColor: "#1E40AF",
-    gradient: ["#1E40AF", "#172F92"],
+    logo: require("../assets/Logos/PNB.webp"),
+    primaryColor: getBrandTheme({ id: "pnb" }).primary,
+    gradient: getBrandTheme({ id: "pnb" }).gradient,
   },
 ];
 

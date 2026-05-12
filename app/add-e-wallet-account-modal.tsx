@@ -20,6 +20,8 @@ import { accountsService } from "@/src/db/services";
 import { WALLETS } from "@/constants/wallets";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { emitAccountsChanged } from "@/src/lib/dbSync";
+import Logo from "@/components/logo";
+import { getBrandTheme } from "@/constants/brand-themes";
 
 type WalletDetails = {
   code: string;
@@ -34,35 +36,35 @@ const walletMap: Record<string, WalletDetails> = {
     code: "G",
     name: "GCash",
     label: "E-Wallet",
-    color: "#3B82F6",
+    color: getBrandTheme({ id: "gcash" }).primary,
     buttonLabel: "Connect GCash",
   },
   maya: {
     code: "M",
     name: "Maya",
     label: "E-Wallet",
-    color: "#16C347",
+    color: getBrandTheme({ id: "maya" }).primary,
     buttonLabel: "Connect Maya",
   },
   grabpay: {
     code: "G",
     name: "GrabPay",
     label: "E-Wallet",
-    color: "#16A34A",
+    color: getBrandTheme({ id: "gotyme" }).primary,
     buttonLabel: "Connect GrabPay",
   },
   shopeepay: {
     code: "S",
     name: "ShopeePay",
     label: "E-Wallet",
-    color: "#F97316",
+    color: getBrandTheme({ id: "shopeepay" }).primary,
     buttonLabel: "Connect ShopeePay",
   },
   coinsph: {
     code: "C",
     name: "Coins.ph",
     label: "E-Wallet",
-    color: "#2563EB",
+    color: getBrandTheme({ id: "coinsph" }).primary,
     buttonLabel: "Connect Coins.ph",
   },
 };
@@ -116,6 +118,11 @@ export default function AddEWalletAccountModal() {
     : params.selectedWallet || "gcash";
 
   const walletFromConstants = WALLETS.find((w) => w.id === selectedWalletId);
+  const selectedWalletTheme = getBrandTheme({
+    id: selectedWalletId,
+    name: walletFromConstants?.name,
+    shortName: walletFromConstants?.shortName,
+  });
 
   const selectedWallet = walletFromConstants
     ? {
@@ -125,7 +132,7 @@ export default function AddEWalletAccountModal() {
         name: walletFromConstants.name,
         label:
           walletFromConstants.type === "digital" ? "Digital Bank" : "E-Wallet",
-        color: walletFromConstants.primaryColor || "#2563EB",
+        color: walletFromConstants.primaryColor || selectedWalletTheme.primary,
         buttonLabel: `Connect ${walletFromConstants.name}`,
       }
     : (walletMap[selectedWalletId] ?? walletMap.gcash);
@@ -239,7 +246,7 @@ export default function AddEWalletAccountModal() {
             style={styles.backRow}
             onPress={() =>
               router.replace({
-                pathname: returnTo,
+                pathname: returnTo as any,
                 params: {
                   returnTo: "/add-payment-method-modal",
                   parentTo,
@@ -258,14 +265,15 @@ export default function AddEWalletAccountModal() {
           </Text>
 
           <View style={[styles.walletCard, ui.walletCard]}>
-            <View
-              style={[
-                styles.logoBubble,
-                { backgroundColor: selectedWallet.color },
-              ]}
-            >
-              <Text style={styles.logoText}>{selectedWallet.code}</Text>
-            </View>
+            <Logo
+              id={selectedWalletId}
+              name={selectedWallet.name}
+              shortName={(selectedWallet.name || "").slice(0, 2)}
+              size={48}
+              logo={walletFromConstants?.logo}
+              backgroundColor={selectedWallet.color}
+              style={{ marginRight: 12 }}
+            />
             <View>
               <Text style={[styles.walletName, ui.walletTitle]}>
                 {selectedWallet.name}
@@ -348,7 +356,9 @@ export default function AddEWalletAccountModal() {
               try {
                 await accountsService.create({
                   userId: user?.id ?? "",
-                  name: accountName.trim() || selectedWallet.name,
+                  name: accountName.trim()
+                    ? `${selectedWallet.name} - ${accountName.trim()}`
+                    : selectedWallet.name,
                   type: "ewallet",
                   balance: Number(balance) || 0,
                   currencyCode: undefined as any,

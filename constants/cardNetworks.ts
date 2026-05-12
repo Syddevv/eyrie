@@ -1,3 +1,5 @@
+import { getBrandTheme } from "./brand-themes";
+
 export type CardNetwork = {
   id: string;
   name: string;
@@ -11,15 +13,15 @@ export const CARD_NETWORKS: CardNetwork[] = [
     id: "visa",
     name: "Visa",
     shortName: "Visa",
-    logo: "@/assets/logos/cards/visa.svg",
-    primaryColor: "#2563EB",
+    logo: require("../assets/Logos/VISA.jpg"),
+    primaryColor: getBrandTheme({ id: "visa" }).primary,
   },
   {
     id: "mastercard",
     name: "Mastercard",
     shortName: "Mastercard",
-    logo: "@/assets/logos/cards/mastercard.svg",
-    primaryColor: "#F97316",
+    logo: require("../assets/Logos/Mastercard.png"),
+    primaryColor: getBrandTheme({ id: "mastercard" }).primary,
   },
 ];
 

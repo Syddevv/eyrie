@@ -295,12 +295,15 @@ export default function AddBankAccountModal() {
               try {
                 await accountsService.create({
                   userId: user?.id ?? "",
-                  name: cardholderName.trim(),
+                  name: selectedBank
+                    ? `${selectedBank.name} - ${cardholderName.trim()}`
+                    : cardholderName.trim(),
                   type: "bank",
                   balance: Number(balance) || 0,
                   currencyCode: undefined as any,
-                  color: "#6DB2EE",
-                  icon: null,
+                  color: selectedBank?.primaryColor || "#6DB2EE",
+                  // store selected card network id so we can show Visa/Mastercard later
+                  icon: selectedCardType?.id ?? null,
                 });
 
                 emitAccountsChanged();

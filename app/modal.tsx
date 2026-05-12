@@ -28,6 +28,11 @@ import { useExpenseCategories } from "@/hooks/useExpenseCategories";
 import { useIncomeCategories } from "@/hooks/useIncomeCategories";
 import { useMerchantsByCategory } from "@/hooks/useMerchantsByCategory";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { useAccounts } from "@/hooks/useAccounts";
+import Logo from "@/components/logo";
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCreateExpense } from "@/hooks/useCreateExpense";
 import { useCreateIncome } from "@/hooks/useCreateIncome";
@@ -179,6 +184,7 @@ export default function AddTransactionModal() {
   const { categories: incomeCategories, refresh: refreshIncomeCategories } =
     useIncomeCategories();
   const { methods: paymentMethods } = usePaymentMethods();
+  const { accounts } = useAccounts();
 
   const [entryType, setEntryType] = useState<EntryType>("expense");
   const [selectedExpenseCategoryId, setSelectedExpenseCategoryId] = useState<
@@ -876,9 +882,71 @@ export default function AddTransactionModal() {
                   }
                 }}
               >
-                <Text style={[styles.selectValue, ui.valueText]}>
-                  {activePaymentMethod?.label ?? "Cash"}
-                </Text>
+                <View style={styles.selectFieldContent}>
+                  {(() => {
+                    const account = accounts.find(
+                      (a) => a.id === activePaymentMethod?.accountId,
+                    );
+
+                    let logoAsset: any = null;
+
+                    if (account) {
+                      const nameLower = (account.name || "").toLowerCase();
+
+                      const matchWallet = WALLETS.find(
+                        (w) =>
+                          (w.name &&
+                            nameLower.includes(w.name.toLowerCase())) ||
+                          (w.shortName &&
+                            nameLower.includes(w.shortName.toLowerCase())) ||
+                          nameLower.includes(w.id),
+                      );
+
+                      const matchBank = BANKS.find(
+                        (b) =>
+                          (b.name &&
+                            nameLower.includes(b.name.toLowerCase())) ||
+                          (b.shortName &&
+                            nameLower.includes(b.shortName.toLowerCase())) ||
+                          nameLower.includes(b.id),
+                      );
+
+                      if (matchWallet) {
+                        logoAsset = matchWallet.logo;
+                      } else if (matchBank) {
+                        logoAsset = matchBank.logo;
+                      } else {
+                        const key = account.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]/g, "");
+                        logoAsset = LOGO_MAP[key];
+                      }
+                    }
+
+                    if (logoAsset) {
+                      return (
+                        <Logo
+                          logo={logoAsset}
+                          size={24}
+                          backgroundColor={account?.color || colors.secondary}
+                          style={{ marginRight: 10 }}
+                        />
+                      );
+                    }
+
+                    return null;
+                  })()}
+                  <View style={styles.selectFieldText}>
+                    <Text
+                      style={[styles.selectValue, ui.valueText]}
+                      numberOfLines={1}
+                    >
+                      {activePaymentMethod?.sublabel ??
+                        activePaymentMethod?.label ??
+                        "Cash"}
+                    </Text>
+                  </View>
+                </View>
                 <Feather name="chevron-down" size={18} color={ui.iconTint} />
               </Pressable>
 
@@ -911,41 +979,99 @@ export default function AddTransactionModal() {
                         }}
                       >
                         <View style={styles.methodItemLeft}>
-                          <View
-                            style={[
-                              styles.methodBadge,
-                              {
-                                backgroundColor: isSelected
-                                  ? colors.primary
-                                  : colors.secondary,
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.methodBadgeText,
-                                {
-                                  color: isSelected
-                                    ? "#FFFFFF"
-                                    : colors.foreground,
-                                },
-                              ]}
-                            >
-                              {method.kind === "virtual-cash"
-                                ? "C"
-                                : method.label.charAt(0)}
-                            </Text>
-                          </View>
+                          {/* render logo if available, else fallback to badge */}
+                          {(() => {
+                            const account = accounts.find(
+                              (a) => a.id === method.accountId,
+                            );
+
+                            // try matching by known wallets/banks
+                            let logoAsset: any = null;
+
+                            if (account) {
+                              const nameLower = (
+                                account.name || ""
+                              ).toLowerCase();
+
+                              const matchWallet = WALLETS.find(
+                                (w) =>
+                                  (w.name &&
+                                    nameLower.includes(w.name.toLowerCase())) ||
+                                  (w.shortName &&
+                                    nameLower.includes(
+                                      w.shortName.toLowerCase(),
+                                    )) ||
+                                  nameLower.includes(w.id),
+                              );
+
+                              const matchBank = BANKS.find(
+                                (b) =>
+                                  (b.name &&
+                                    nameLower.includes(b.name.toLowerCase())) ||
+                                  (b.shortName &&
+                                    nameLower.includes(
+                                      b.shortName.toLowerCase(),
+                                    )) ||
+                                  nameLower.includes(b.id),
+                              );
+
+                              if (matchWallet) {
+                                logoAsset = matchWallet.logo;
+                              } else if (matchBank) {
+                                logoAsset = matchBank.logo;
+                              } else {
+                                const key = account.name
+                                  .toLowerCase()
+                                  .replace(/[^a-z0-9]/g, "");
+                                logoAsset = LOGO_MAP[key];
+                              }
+                            }
+
+                            if (logoAsset) {
+                              return (
+                                <Logo
+                                  logo={logoAsset}
+                                  size={36}
+                                  backgroundColor={
+                                    isSelected
+                                      ? colors.primary
+                                      : colors.secondary
+                                  }
+                                />
+                              );
+                            }
+
+                            return (
+                              <View
+                                style={[
+                                  styles.methodBadge,
+                                  {
+                                    backgroundColor: isSelected
+                                      ? colors.primary
+                                      : colors.secondary,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.methodBadgeText,
+                                    {
+                                      color: isSelected
+                                        ? "#FFFFFF"
+                                        : colors.foreground,
+                                    },
+                                  ]}
+                                >
+                                  {method.kind === "virtual-cash"
+                                    ? "C"
+                                    : method.label.charAt(0)}
+                                </Text>
+                              </View>
+                            );
+                          })()}
+
                           <View style={styles.methodTextBlock}>
                             <Text style={[styles.methodTitle, ui.valueText]}>
-                              {method.label}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.methodSubtitle,
-                                ui.placeholderText,
-                              ]}
-                            >
                               {method.sublabel ??
                                 (method.isFallback ? "Cash" : "Active account")}
                             </Text>
@@ -1503,6 +1629,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  selectFieldContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectFieldText: {
+    flex: 1,
   },
   methodDropdown: {
     marginTop: 8,

@@ -155,6 +155,7 @@ export default function AddBankCardMethodModal() {
                     styles.bankCard,
                     ui.optionCard,
                     isSelected && ui.optionCardSelected,
+                    isSelected && { borderColor: bank.primaryColor },
                     isSelected && styles.bankCardActive,
                   ]}
                   onPress={() => setSelectedBank(bank.id)}
@@ -164,6 +165,7 @@ export default function AddBankCardMethodModal() {
                     name={bank.name}
                     shortName={bank.shortName}
                     size={44}
+                    logo={bank.logo}
                     backgroundColor={bank.primaryColor}
                     style={{ marginRight: 8 }}
                   />
@@ -193,6 +195,9 @@ export default function AddBankCardMethodModal() {
                   styles.cardTypeCard,
                   ui.optionCard,
                   isSelected && ui.optionCardSelected,
+                  isSelected && {
+                    borderColor: cardType.primaryColor || "#6DB2EE",
+                  },
                   isSelected && styles.bankCardActive,
                 ]}
                 onPress={() => setSelectedCardType(cardType.id)}

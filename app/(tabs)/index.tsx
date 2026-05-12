@@ -17,6 +17,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { themeColors } from "@/constants/colors";
 import { useAccounts } from "@/hooks/useAccounts";
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
+import Logo from "@/components/logo";
+import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -97,6 +102,65 @@ export default function HomeScreen() {
   useDashboardBootstrap(currentUser?.id);
 
   const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
+
+  const resolveBrandName = (account: any) => {
+    const nameLower = (account?.name || "").toLowerCase();
+
+    const matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+
+    if (matchWallet) return matchWallet.name;
+
+    const matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+
+    if (matchBank) return matchBank.name;
+
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return key.toUpperCase();
+
+    if (account?.type === "ewallet") return "E-WALLET";
+    if (account?.type === "cash") return "CASH";
+    if (account?.type === "credit") return "Credit";
+
+    return "Bank";
+  };
+
+  const resolveLogo = (account: any) => {
+    const nameLower = (account?.name || "").toLowerCase();
+
+    const matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+    if (matchWallet?.logo) return matchWallet.logo;
+
+    const matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+    if (matchBank?.logo) return matchBank.logo;
+
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return LOGO_MAP[key];
+
+    return undefined;
+  };
+
+  const resolveBrandTheme = (account: any) =>
+    account ? getBrandTheme(account) : defaultBrandTheme;
 
   // Calculate total balance including ALL account types (bank, ewallet, cash, but NOT credit)
   // This matches the getTotalBalance query which includes bank, ewallet, and cash
@@ -428,67 +492,87 @@ export default function HomeScreen() {
               }
 
               return [
-                ...cardAccounts.map((acct) => (
-                  <Pressable
-                    key={acct.id}
-                    style={styles.cardPressable}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/payment-method-details-modal",
-                        params: { methodId: acct.id },
-                      })
-                    }
-                  >
-                    <LinearGradient
-                      colors={[
-                        acct.color ?? "#3553D8",
-                        acct.color ?? "#2A49CF",
-                        acct.color ?? "#2445C9",
-                      ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.accountCard}
-                    >
-                      <View
-                        style={[
-                          styles.cardBubbleLarge,
-                          { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.cardBubbleSmall,
-                          { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                        ]}
-                      />
-                      <View style={styles.cardTopRow}>
-                        <View>
-                          <Text style={styles.cardLabel}>{acct.name}</Text>
-                          <Text style={styles.cardName}>
-                            {acct.type === "credit" ? "Credit" : "Bank"}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.cardBadge,
-                            { backgroundColor: acct.color ?? "#F7B400" },
+                ...cardAccounts.map((acct) =>
+                  (() => {
+                    const brandTheme = resolveBrandTheme(acct);
+
+                    return (
+                      <Pressable
+                        key={acct.id}
+                        style={styles.cardPressable}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/payment-method-details-modal",
+                            params: { methodId: acct.id },
+                          })
+                        }
+                      >
+                        <LinearGradient
+                          colors={[
+                            brandTheme.gradient[0],
+                            brandTheme.gradient[1],
+                            brandTheme.primary,
                           ]}
-                        />
-                      </View>
-                      <Text style={styles.cardAmount}>
-                        {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
-                      </Text>
-                      <View style={styles.cardBottomRow}>
-                        <Text style={styles.cardDigits}>
-                          •••• {acct.accountNumberLast4 ?? ""}
-                        </Text>
-                        <Text style={styles.cardType}>
-                          {acct.type === "credit" ? "CREDIT" : "DEBIT"}
-                        </Text>
-                      </View>
-                    </LinearGradient>
-                  </Pressable>
-                )),
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.accountCard}
+                        >
+                          <View
+                            style={[
+                              styles.cardBubbleLarge,
+                              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.cardBubbleSmall,
+                              { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                            ]}
+                          />
+                          <View style={styles.cardTopRow}>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                gap: 10,
+                              }}
+                            >
+                              <Logo
+                                size={40}
+                                logo={resolveLogo(acct)}
+                                name={resolveBrandName(acct)}
+                                backgroundColor={brandTheme.primary}
+                              />
+                              <Text style={styles.cardName}>
+                                {resolveBrandName(acct)}
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.cardBadge,
+                                { backgroundColor: brandTheme.secondary },
+                              ]}
+                            />
+                          </View>
+                          <Text style={styles.cardAmount}>
+                            {formatCurrency(
+                              acct.balance ?? 0,
+                              acct.currencyCode,
+                            )}
+                          </Text>
+                          <View style={styles.cardBottomRow}>
+                            <Text style={styles.cardDigits}>
+                              •••• {acct.accountNumberLast4 ?? ""}
+                            </Text>
+                            <Text style={styles.cardType}>
+                              {acct.type === "credit" ? "CREDIT" : "DEBIT"}
+                            </Text>
+                          </View>
+                        </LinearGradient>
+                      </Pressable>
+                    );
+                  })(),
+                ),
                 <Pressable
                   key="add-account-card"
                   style={[styles.cardPressable, styles.addAccountCardPressable]}
@@ -611,66 +695,71 @@ export default function HomeScreen() {
               }
 
               return [
-                ...walletAccounts.map((acct) => (
-                  <Pressable
-                    key={acct.id}
-                    style={styles.cardPressable}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/payment-method-details-modal",
-                        params: { methodId: acct.id },
-                      })
-                    }
-                  >
-                    <LinearGradient
-                      colors={[
-                        acct.color ?? "#16B76D",
-                        acct.color ?? "#0FA785",
-                        acct.color ?? "#119E8D",
-                      ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.accountCard}
-                    >
-                      <View
-                        style={[
-                          styles.cardBubbleLarge,
-                          { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.cardBubbleSmall,
-                          { backgroundColor: withOpacity("#FFFFFF", 0.05) },
-                        ]}
-                      />
-                      <View style={styles.cardTopRow}>
-                        <View>
-                          <Text style={styles.cardLabel}>
-                            {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
-                          </Text>
-                          <Text style={styles.cardName}>{acct.name}</Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.walletBadge,
-                            { backgroundColor: acct.color ?? "#D9ECFF" },
+                ...walletAccounts.map((acct) =>
+                  (() => {
+                    const brandTheme = resolveBrandTheme(acct);
+
+                    return (
+                      <Pressable
+                        key={acct.id}
+                        style={styles.cardPressable}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/payment-method-details-modal",
+                            params: { methodId: acct.id },
+                          })
+                        }
+                      >
+                        <LinearGradient
+                          colors={[
+                            brandTheme.gradient[0],
+                            brandTheme.gradient[1],
+                            brandTheme.primary,
                           ]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.accountCard}
                         >
-                          <Text style={styles.walletBadgeText}>
-                            {acct.name.charAt(0)}
+                          <View
+                            style={[
+                              styles.cardBubbleLarge,
+                              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.cardBubbleSmall,
+                              { backgroundColor: withOpacity("#FFFFFF", 0.05) },
+                            ]}
+                          />
+                          <View style={styles.cardTopRow}>
+                            <View>
+                              <Text style={styles.cardLabel}>
+                                {resolveBrandName(acct)}
+                              </Text>
+                            </View>
+                            <Logo
+                              size={48}
+                              logo={resolveLogo(acct)}
+                              name={resolveBrandName(acct)}
+                              backgroundColor={brandTheme.primary}
+                              style={{ marginLeft: 12 }}
+                            />
+                          </View>
+                          <Text style={styles.walletAmount}>
+                            {formatCurrency(
+                              acct.balance ?? 0,
+                              acct.currencyCode,
+                            )}
                           </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.walletAmount}>
-                        {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
-                      </Text>
-                      <Text style={styles.walletType}>
-                        {acct.type === "ewallet" ? "E-WALLET" : "CASH"}
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                )),
+                          <Text style={styles.walletType}>
+                            {resolveBrandName(acct)}
+                          </Text>
+                        </LinearGradient>
+                      </Pressable>
+                    );
+                  })(),
+                ),
                 <Pressable
                   key="add-account-wallet"
                   style={[styles.cardPressable, styles.addAccountCardPressable]}
@@ -1282,6 +1371,7 @@ const styles = StyleSheet.create({
     width: 164,
   },
   addAccountCardPressable: {
+    width: 164,
     minHeight: 120,
   },
   addAccountCard: {
@@ -1337,6 +1427,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
+    gap: 12,
   },
   cardLabel: {
     fontFamily: fontFamilies.sans,

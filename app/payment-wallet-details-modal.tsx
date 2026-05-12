@@ -8,7 +8,14 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { WALLETS } from "@/constants/wallets";
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
+import Logo from "@/components/logo";
+import { CARD_NETWORKS } from "@/constants/cardNetworks";
 import { formatCurrency } from "@/hooks/use-dashboard";
+import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
+import { PremiumCardGradient } from "@/components/premium-card-gradient";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -36,6 +43,60 @@ export default function PaymentWalletDetailsModal() {
     ? params.accountId[0]
     : params.accountId;
   const account = accounts.find((a) => a.id === accountId);
+  const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
+
+  const resolveBrandName = (acct: any) => {
+    const nameLower = (acct?.name || "").toLowerCase();
+
+    let matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+    if (matchWallet) return matchWallet.name;
+
+    let matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+    if (matchBank) return matchBank.name;
+
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return key.toUpperCase();
+
+    if (acct?.type === "ewallet") return "E-WALLET";
+    if (acct?.type === "cash") return "CASH";
+
+    return acct?.type === "credit" ? "Credit" : "Bank";
+  };
+
+  const resolveLogo = (acct: any) => {
+    const nameLower = (acct?.name || "").toLowerCase();
+
+    const matchWallet = WALLETS.find(
+      (w) =>
+        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+        (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
+        nameLower.includes(w.id),
+    );
+    if (matchWallet?.logo) return matchWallet.logo;
+
+    const matchBank = BANKS.find(
+      (b) =>
+        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+        (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
+        nameLower.includes(b.id),
+    );
+    if (matchBank?.logo) return matchBank.logo;
+
+    const key = nameLower.replace(/[^a-z0-9]/g, "");
+    if (LOGO_MAP[key]) return LOGO_MAP[key];
+
+    return undefined;
+  };
 
   const ui = useMemo(
     () => ({
@@ -87,7 +148,7 @@ export default function PaymentWalletDetailsModal() {
 
         <View style={styles.headerRow}>
           <Text style={[styles.title, ui.title]}>
-            {account?.name || "Wallet"}
+            {resolveBrandName(account)}
           </Text>
           <Pressable
             style={[styles.closeButton, ui.closeButton]}
@@ -105,55 +166,48 @@ export default function PaymentWalletDetailsModal() {
           <Text style={[styles.backText, ui.backText]}>Back</Text>
         </Pressable>
 
-        <LinearGradient
-          colors={["#3C83F0", "#3373EA", "#3173EA"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <PremiumCardGradient
+          theme={brandTheme}
+          isDark={isDark}
+          variant="wallet"
           style={styles.walletHero}
         >
-          <View
-            style={[
-              styles.heroBubbleLarge,
-              { backgroundColor: withOpacity("#FFFFFF", 0.12) },
-            ]}
-          />
-          <View
-            style={[
-              styles.heroBubbleSmall,
-              { backgroundColor: withOpacity("#FFFFFF", 0.08) },
-            ]}
-          />
-
           <View style={styles.heroTopRow}>
-            <Text style={styles.heroLabel}>E-WALLET</Text>
-            <Text style={styles.heroBrand}>{account?.name || "WALLET"}</Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              <Logo
+                size={44}
+                logo={resolveLogo(account)}
+                name={resolveBrandName(account)}
+                backgroundColor={brandTheme.primary}
+              />
+              <Text style={[styles.heroLabel, { color: brandTheme.text }]}>
+                {resolveBrandName(account)}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.heroBalanceBlock}>
-            <Text style={styles.heroMetaLabel}>BALANCE</Text>
-            <Text style={styles.heroBalance}>
+            <Text
+              style={[
+                styles.heroMetaLabel,
+                { color: withOpacity(brandTheme.text, 0.72) },
+              ]}
+            >
+              BALANCE
+            </Text>
+            <Text style={[styles.heroBalance, { color: brandTheme.text }]}>
               {formatCurrency(account?.balance ?? 0, account?.currencyCode)}
             </Text>
           </View>
-        </LinearGradient>
+        </PremiumCardGradient>
 
         <View style={styles.detailList}>
-          <View style={[styles.detailCard, ui.detailCard]}>
-            <Text style={[styles.detailLabel, ui.detailLabel]}>Name</Text>
-            <Text style={[styles.detailValue, ui.detailValue]}>
-              {account?.name || "N/A"}
-            </Text>
-          </View>
           <View style={[styles.detailCard, ui.detailCard]}>
             <Text style={[styles.detailLabel, ui.detailLabel]}>Balance</Text>
             <Text style={[styles.detailValue, ui.balanceValue]}>
               {formatCurrency(account?.balance ?? 0, account?.currencyCode)}
-            </Text>
-          </View>
-          <View style={[styles.detailCard, ui.detailCard]}>
-            <Text style={[styles.detailLabel, ui.detailLabel]}>Type</Text>
-            <Text style={[styles.detailValue, ui.statusValue]}>
-              {account?.type === "ewallet" ? "E-Wallet" : "Cash"}
             </Text>
           </View>
         </View>
