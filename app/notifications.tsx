@@ -1,82 +1,40 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { useMemo } from "react";
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import Animated, {
+  FadeInDown,
+  FadeOutUp,
+  LinearTransition,
+} from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { themeColors } from '@/constants/colors';
-import { radius, shadows } from '@/constants/theme';
-import { fontFamilies, fontWeights } from '@/constants/typography';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-const notifications = [
-  {
-    title: 'Budget Warning',
-    body: "You've used 80% of your Food & Dining budget for this month.",
-    time: '2 hours ago',
-    accent: '#1495FF',
-    unread: true,
-    iconBackgroundLight: '#FFF0C7',
-    iconBackgroundDark: '#FFF0C7',
-    icon: <Ionicons name="warning-outline" size={22} color="#FF8A00" />,
-  },
-  {
-    title: 'Goal Reached!',
-    body: "Congratulations! You've saved enough for your Emergency Fund goal.",
-    time: '5 hours ago',
-    accent: '#1495FF',
-    unread: true,
-    iconBackgroundLight: '#D7F6E8',
-    iconBackgroundDark: '#D7F6E8',
-    icon: <Ionicons name="checkmark-circle-outline" size={22} color="#0CBB5A" />,
-  },
-  {
-    title: 'Weekly Spending Report',
-    body: "You spent 18% less this week compared to last week. Great job!",
-    time: '1 day ago',
-    accent: '#FFFFFF',
-    unread: false,
-    iconBackgroundLight: '#E4EEFF',
-    iconBackgroundDark: '#E4EEFF',
-    icon: <Feather name="trending-up" size={20} color="#2563EB" />,
-  },
-  {
-    title: 'Money Saving Tip',
-    body: 'Try meal prepping on weekends to reduce your dining expenses.',
-    time: '2 days ago',
-    accent: '#FFFFFF',
-    unread: false,
-    iconBackgroundLight: '#FFE1F0',
-    iconBackgroundDark: '#FFE1F0',
-    icon: <MaterialCommunityIcons name="lightbulb-on-outline" size={21} color="#F72585" />,
-  },
-  {
-    title: 'Goal Progress',
-    body: "You're 75% toward your New Laptop savings goal!",
-    time: '3 days ago',
-    accent: '#FFFFFF',
-    unread: false,
-    iconBackgroundLight: '#EFE3FF',
-    iconBackgroundDark: '#EFE3FF',
-    icon: <MaterialCommunityIcons name="target" size={20} color="#8A2BE2" />,
-  },
-  {
-    title: 'Unusual Activity',
-    body: 'Multiple transactions detected at a new location. Please verify.',
-    time: '4 days ago',
-    accent: '#FFFFFF',
-    unread: false,
-    iconBackgroundLight: '#FFF0C7',
-    iconBackgroundDark: '#FFF0C7',
-    icon: <Ionicons name="warning-outline" size={22} color="#FF8A00" />,
-  },
-] as const;
+import { themeColors } from "@/constants/colors";
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { useNotifications } from "@/hooks/useNotifications";
+import type { AppNotification } from "@/services/notifications";
 
 function withOpacity(hex: string, opacity: number) {
-  const normalized = hex.replace('#', '');
+  const normalized = hex.replace("#", "");
   const full =
-    normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized;
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const red = parseInt(full.slice(0, 2), 16);
   const green = parseInt(full.slice(2, 4), 16);
   const blue = parseInt(full.slice(4, 6), 16);
@@ -84,105 +42,400 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function formatRelativeTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Recently";
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) {
+    return "Just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  }
+
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function NotificationRow({
+  item,
+  titleColor,
+  bodyColor,
+  cardStyle,
+  unreadDotStyle,
+  categoryChipStyle,
+  categoryChipTextStyle,
+  onPress,
+  onToggleRead,
+  onDelete,
+}: {
+  item: AppNotification;
+  titleColor: string;
+  bodyColor: string;
+  cardStyle: object;
+  unreadDotStyle: object;
+  categoryChipStyle: object;
+  categoryChipTextStyle: object;
+  onPress: () => void;
+  onToggleRead: () => void;
+  onDelete: () => void;
+}) {
+  const rightAction = () => (
+    <Pressable
+      style={[styles.swipeAction, styles.swipeDelete]}
+      onPress={onDelete}
+    >
+      <Feather name="trash-2" size={18} color="#FFFFFF" />
+      <Text style={styles.swipeActionText}>Delete</Text>
+    </Pressable>
+  );
+
+  const leftAction = () => (
+    <Pressable
+      style={[styles.swipeAction, styles.swipeRead]}
+      onPress={onToggleRead}
+    >
+      <Feather
+        name={item.is_read ? "mail" : "check"}
+        size={18}
+        color="#FFFFFF"
+      />
+      <Text style={styles.swipeActionText}>
+        {item.is_read ? "Unread" : "Read"}
+      </Text>
+    </Pressable>
+  );
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(220)}
+      exiting={FadeOutUp.duration(180)}
+      layout={LinearTransition.springify()}
+    >
+      <View style={[styles.notificationShell, cardStyle, shadows.soft]}>
+        <Swipeable
+          renderLeftActions={leftAction}
+          renderRightActions={rightAction}
+          overshootLeft={false}
+          overshootRight={false}
+        >
+          <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+              styles.notificationCard,
+              pressed && styles.notificationCardPressed,
+            ]}
+          >
+            <View style={styles.notificationTopRow}>
+              <View
+                style={[
+                  styles.notificationIconWrap,
+                  {
+                    backgroundColor: withOpacity(
+                      item.color,
+                      item.is_read ? 0.12 : 0.18,
+                    ),
+                  },
+                ]}
+              >
+                <Feather name={item.icon as any} size={20} color={item.color} />
+              </View>
+
+              <View style={styles.cardBody}>
+                <View style={styles.cardHeaderRow}>
+                  <Text
+                    style={[
+                      styles.cardTitle,
+                      { color: titleColor, opacity: item.is_read ? 0.84 : 1 },
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  {!item.is_read ? (
+                    <View style={[styles.unreadDot, unreadDotStyle]} />
+                  ) : null}
+                </View>
+
+                <Text
+                  style={[
+                    styles.cardMessage,
+                    { color: bodyColor, opacity: item.is_read ? 0.78 : 1 },
+                  ]}
+                >
+                  {item.message}
+                </Text>
+
+                <View style={styles.cardFooterRow}>
+                  <Text style={[styles.cardMeta, { color: bodyColor }]}>
+                    {formatRelativeTime(item.created_at)}
+                  </Text>
+                  <View
+                    style={[
+                      styles.categoryChip,
+                      categoryChipStyle,
+                      { borderColor: withOpacity(item.color, 0.26) },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        categoryChipTextStyle,
+                        { color: item.color },
+                      ]}
+                    >
+                      {item.category.replace(/^\w/, (char) =>
+                        char.toUpperCase(),
+                      )}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Pressable>
+        </Swipeable>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    error,
+    refresh,
+    markAllAsRead,
+    toggleRead,
+    deleteNotification,
+  } = useNotifications();
+  const { preferences } = useNotificationPreferences();
 
   const pageStyles = useMemo(
     () => ({
-      background: { backgroundColor: isDark ? '#060B15' : colors.background },
-      title: { color: isDark ? '#FFFFFF' : colors.foreground },
-      subtitle: { color: isDark ? '#9EA6B5' : '#6B7485' },
+      background: { backgroundColor: isDark ? "#060B15" : colors.background },
+      title: { color: isDark ? "#FFFFFF" : colors.foreground },
+      subtitle: { color: isDark ? "#9EA6B5" : "#6B7485" },
       iconButton: {
-        backgroundColor: isDark ? '#161D29' : withOpacity(colors.secondary, 0.9),
+        backgroundColor: isDark
+          ? "#161D29"
+          : withOpacity(colors.secondary, 0.9),
       },
       infoCard: {
-        backgroundColor: isDark ? '#071B35' : '#EAF5FF',
-        borderColor: isDark ? 'rgba(20,149,255,0.2)' : 'rgba(20,149,255,0.16)',
+        backgroundColor: isDark ? "#071B35" : "#EAF5FF",
+        borderColor: isDark ? "rgba(20,149,255,0.2)" : "rgba(20,149,255,0.16)",
       },
-      infoTitle: { color: isDark ? '#FFFFFF' : '#0D1B2A' },
-      infoText: { color: isDark ? '#A5B2C2' : '#5C7694' },
-      card: {
-        backgroundColor: isDark ? '#101722' : colors.card,
-        borderColor: isDark ? 'rgba(255,255,255,0.05)' : withOpacity(colors.border, 0.92),
+      infoTitle: { color: isDark ? "#FFFFFF" : "#0D1B2A" },
+      infoText: { color: isDark ? "#A5B2C2" : "#5C7694" },
+      unreadCard: {
+        backgroundColor: isDark ? "#111C2B" : "#FFFFFF",
+        borderColor: isDark ? "rgba(20,149,255,0.34)" : "rgba(20,149,255,0.24)",
       },
-      cardTitleDefault: { color: isDark ? '#FFFFFF' : colors.foreground },
-      cardText: { color: isDark ? '#9EA6B5' : '#6B7485' },
-      dot: { backgroundColor: '#1495FF' },
+      readCard: {
+        backgroundColor: isDark ? "#101722" : colors.card,
+        borderColor: isDark
+          ? "rgba(255,255,255,0.16)"
+          : withOpacity(colors.border, 1),
+      },
+      swipeHintChip: {
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.04)"
+          : withOpacity(colors.secondary, 0.88),
+        borderColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : withOpacity(colors.border, 0.88),
+      },
+      swipeHintText: {
+        color: isDark ? "#8F9AAF" : "#6B7485",
+      },
+      categoryChip: {
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.03)"
+          : "rgba(15,23,42,0.035)",
+      },
+      categoryChipText: {
+        color: isDark ? "#D7DFEA" : "#344256",
+      },
+      titleText: isDark ? "#FFFFFF" : colors.foreground,
+      bodyText: isDark ? "#9EA6B5" : "#6B7485",
+      unreadDot: { backgroundColor: "#1495FF" },
+      emptyCard: {
+        backgroundColor: isDark ? "#101722" : colors.card,
+        borderColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : withOpacity(colors.border, 0.92),
+      },
+      actionText: { color: isDark ? "#FFFFFF" : colors.foreground },
     }),
-    [colors, isDark]
+    [colors, isDark],
   );
+
+  const handleRefresh = async () => {
+    await refresh();
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
         <View style={styles.headerBlock}>
           <View style={styles.topRow}>
-            <Pressable style={[styles.iconButton, pageStyles.iconButton]} onPress={() => router.back()}>
-              <Feather name="chevron-left" size={22} color={colors.foreground} />
+            <Pressable
+              style={[styles.iconButton, pageStyles.iconButton]}
+              onPress={() => router.back()}
+            >
+              <Feather
+                name="chevron-left"
+                size={22}
+                color={colors.foreground}
+              />
             </Pressable>
 
             <View style={styles.headerTextWrap}>
-              <Text style={[styles.title, pageStyles.title]}>Notifications</Text>
-              <Text style={[styles.subtitle, pageStyles.subtitle]}>2 unread</Text>
+              <Text style={[styles.title, pageStyles.title]}>
+                Notifications
+              </Text>
+              <Text style={[styles.subtitle, pageStyles.subtitle]}>
+                {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+              </Text>
             </View>
 
-            <Pressable style={[styles.iconButton, pageStyles.iconButton]}>
+            <Pressable
+              style={[styles.iconButton, pageStyles.iconButton]}
+              onPress={() => markAllAsRead().catch(() => undefined)}
+            >
               <Feather name="check" size={20} color={colors.foreground} />
             </Pressable>
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={() => void handleRefresh()}
+            />
+          }
+        >
           <View style={[styles.infoCard, pageStyles.infoCard]}>
             <View style={styles.infoAvatarFrame}>
               <Image
                 contentFit="cover"
-                source={require('@/assets/images/Eyrie_Mascot_1.png')}
+                source={require("@/assets/images/Eyrie_Mascot_1.png")}
                 style={styles.infoAvatar}
               />
             </View>
             <View style={styles.infoBody}>
-              <Text style={[styles.infoTitle, pageStyles.infoTitle]}>Stay Informed</Text>
+              <Text style={[styles.infoTitle, pageStyles.infoTitle]}>
+                Intelligent finance alerts
+              </Text>
               <Text style={[styles.infoText, pageStyles.infoText]}>
-                Eyrie will notify you about spending alerts, goal progress, and helpful insights to keep you on track.
+                {preferences?.push_enabled
+                  ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
+                  : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
               </Text>
             </View>
           </View>
 
+          {!!notifications.length ? (
+            <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
+              <Feather
+                name="move"
+                size={13}
+                color={pageStyles.swipeHintText.color}
+              />
+              <Text style={[styles.swipeHintText, pageStyles.swipeHintText]}>
+                Swipe each notification left or right for quick actions
+              </Text>
+            </View>
+          ) : null}
+
+          {error ? (
+            <View
+              style={[
+                styles.emptyStateCard,
+                pageStyles.emptyCard,
+                shadows.soft,
+              ]}
+            >
+              <Feather name="alert-circle" size={22} color="#F97316" />
+              <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+                Notifications need attention
+              </Text>
+              <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+                {error}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.cardsList}>
-            {notifications.map((item) => (
-              <View key={item.title} style={[styles.notificationCard, pageStyles.card, shadows.soft]}>
-                <View style={styles.cardRow}>
-                  <View
-                    style={[
-                      styles.notificationIconWrap,
-                      {
-                        backgroundColor: isDark ? item.iconBackgroundDark : item.iconBackgroundLight,
-                      },
-                    ]}>
-                    {item.icon}
-                  </View>
-
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardTitleRow}>
-                      <Text
-                        style={[
-                          styles.cardTitle,
-                          item.unread ? { color: '#1495FF' } : pageStyles.cardTitleDefault,
-                        ]}>
-                        {item.title}
-                      </Text>
-                      {item.unread ? <View style={[styles.unreadDot, pageStyles.dot]} /> : null}
-                    </View>
-
-                    <Text style={[styles.cardText, pageStyles.cardText]}>{item.body}</Text>
-                    <Text style={[styles.cardTime, pageStyles.cardText]}>{item.time}</Text>
-                  </View>
-                </View>
+            {!notifications.length && !isLoading && !error ? (
+              <View
+                style={[
+                  styles.emptyStateCard,
+                  pageStyles.emptyCard,
+                  shadows.soft,
+                ]}
+              >
+                <Feather name="bell" size={22} color={colors.mutedForeground} />
+                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+                  No notifications yet
+                </Text>
+                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+                  Budget alerts, savings goal progress, and weekly insights will
+                  show up here automatically.
+                </Text>
               </View>
+            ) : null}
+
+            {notifications.map((item) => (
+              <NotificationRow
+                key={item.id}
+                item={item}
+                titleColor={pageStyles.titleText}
+                bodyColor={pageStyles.bodyText}
+                cardStyle={
+                  item.is_read ? pageStyles.readCard : pageStyles.unreadCard
+                }
+                unreadDotStyle={pageStyles.unreadDot}
+                categoryChipStyle={pageStyles.categoryChip}
+                categoryChipTextStyle={pageStyles.categoryChipText}
+                onPress={() => {
+                  if (!item.is_read) {
+                    void toggleRead(item, true);
+                  }
+                  if (item.action_url) {
+                    router.push(item.action_url as any);
+                  }
+                }}
+                onToggleRead={() => {
+                  void toggleRead(item, !item.is_read);
+                }}
+                onDelete={() => {
+                  void deleteNotification(item);
+                }}
+              />
             ))}
           </View>
         </ScrollView>
@@ -192,32 +445,26 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  flex: { flex: 1 },
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 8,
     paddingBottom: 16,
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerTextWrap: {
-    flex: 1,
-  },
+  headerTextWrap: { flex: 1 },
   title: {
     fontFamily: fontFamilies.sans,
     fontSize: 24,
@@ -233,35 +480,33 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 14,
     paddingTop: 10,
-    paddingBottom: 24,
+    paddingBottom: 30,
   },
   infoCard: {
     borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   infoAvatarFrame: {
     width: 50,
     height: 50,
     borderRadius: radius.full,
-    backgroundColor: '#D8F7EC',
+    backgroundColor: "#D8F7EC",
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   infoAvatar: {
     width: 42,
     height: 42,
     borderRadius: radius.full,
   },
-  infoBody: {
-    flex: 1,
-  },
+  infoBody: { flex: 1 },
   infoTitle: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
@@ -272,61 +517,147 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
-    lineHeight: 28,
+    lineHeight: 20,
+  },
+  swipeHintChip: {
+    marginTop: 12,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+  },
+  swipeHintText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   cardsList: {
-    marginTop: 24,
-    gap: 14,
+    marginTop: 22,
+    gap: 16,
+  },
+  notificationShell: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
   },
   notificationCard: {
-    borderRadius: 24,
-    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
+    width: "100%",
+    alignSelf: "stretch",
+    overflow: "hidden",
   },
-  cardRow: {
-    flexDirection: 'row',
-    gap: 14,
+  notificationCardPressed: {
+    transform: [{ scale: 0.988 }],
+  },
+  notificationTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 13,
   },
   notificationIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  cardBody: {
-    flex: 1,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  cardBody: { flex: 1 },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   cardTitle: {
+    flex: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: fontWeights.bold,
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    marginTop: 8,
+  },
+  cardMessage: {
+    marginTop: 7,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  cardFooterRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  cardMeta: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
+  categoryChip: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    flexShrink: 0,
+  },
+  categoryChipText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.semibold,
+  },
+  swipeAction: {
+    width: 92,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginVertical: 4,
+  },
+  swipeRead: {
+    backgroundColor: "#1495FF",
+    marginRight: 10,
+  },
+  swipeDelete: {
+    backgroundColor: "#EF4444",
+    marginLeft: 10,
+  },
+  swipeActionText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.semibold,
+  },
+  emptyStateCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 8,
+  },
+  emptyStateTitle: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: fontWeights.bold,
-    flex: 1,
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radius.full,
-    marginTop: 2,
-  },
-  cardText: {
-    marginTop: 4,
+  emptyStateText: {
     fontFamily: fontFamilies.sans,
     fontSize: 14,
-    lineHeight: 28,
-  },
-  cardTime: {
-    marginTop: 8,
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
+    lineHeight: 20,
   },
 });

@@ -27,6 +27,7 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useNotificationStore } from "@/store/useNotificationStore";
 import {
   formatCurrency,
   useBudgetProgress,
@@ -106,6 +107,9 @@ export default function HomeScreen() {
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
   const [showTotalBalance, setShowTotalBalance] = useState(true);
   const [showCardBalances, setShowCardBalances] = useState(true);
+  const unreadNotificationCount = useNotificationStore(
+    (state) => state.unreadCount,
+  );
 
   useDashboardBootstrap(currentUser?.id);
 
@@ -294,7 +298,9 @@ export default function HomeScreen() {
                 onPress={() => router.push("/notifications")}
               >
                 <Feather name="bell" size={18} color={colors.mutedForeground} />
-                <View style={styles.notificationDot} />
+                {unreadNotificationCount > 0 ? (
+                  <View style={styles.notificationDot} />
+                ) : null}
               </Pressable>
               <Pressable
                 style={[

@@ -20,6 +20,7 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { setThemePreference } from "@/hooks/theme-preference";
 import { signOut } from "@/services/auth";
 
@@ -91,8 +92,9 @@ export default function SettingsScreen() {
   const { isSigningOut } = useAuth();
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isThemeSaving, setIsThemeSaving] = useState(false);
+  const { preferences, updatePreference, isLoading: isNotificationPrefsLoading } =
+    useNotificationPreferences();
 
   const isDark = colorScheme === "dark";
   const dynamicAccountItems = useMemo(
@@ -358,8 +360,11 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
+                value={preferences?.notifications_enabled ?? false}
+                disabled={isNotificationPrefsLoading}
+                onValueChange={(enabled) => {
+                  void updatePreference({ notifications_enabled: enabled });
+                }}
                 trackColor={{
                   false: pageStyles.switchTrackOff,
                   true: pageStyles.switchTrackOn,

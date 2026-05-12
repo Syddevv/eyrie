@@ -9,6 +9,10 @@ import {
   refreshBudgetsForTransactionChange,
   reverseTransactionEffects,
 } from "./financeOrchestrator";
+import {
+  generatePeriodicNotifications,
+  processTransactionNotificationEvent,
+} from "@/services/notifications";
 import type { NewTransaction } from "../types";
 import { createId } from "../utils/ids";
 import { nowIso } from "../utils/time";
@@ -84,6 +88,22 @@ export class TransactionsService {
     if (created.type === "expense" && created.merchantId && created.categoryId) {
       await merchantsService.learnMerchantCategory(created.merchantId, created.categoryId);
     }
+
+    processTransactionNotificationEvent({
+      userId: created.userId,
+      transactionId: created.id,
+      amount: created.amount,
+      categoryId: created.categoryId ?? null,
+      transactionDate: created.transactionDate,
+      merchantName: created.merchantName ?? null,
+      accountId: created.accountId,
+      type: created.type,
+      previousExpenseAmount: 0,
+      nextExpenseAmount: created.type === "expense" ? created.amount : 0,
+      shouldCreateTransactionAdded: true,
+    })
+      .then(() => generatePeriodicNotifications(created.userId))
+      .catch(() => undefined);
 
     emitAccountsChanged();
     emitMerchantsChanged();
@@ -167,25 +187,83 @@ export class TransactionsService {
       await merchantsService.learnMerchantCategory(updated.merchantId, updated.categoryId);
     }
 
+    const updatedExpenseAmount = updated.type === "expense" ? updated.amount : 0;
+    const existingExpenseAmount = existing.type === "expense" ? existing.amount : 0;
+
+    processTransactionNotificationEvent({
+      userId: updated.userId,
+      transactionId: updated.id,
+      amount: updated.amount,
+      categoryId: updated.categoryId ?? null,
+      transactionDate: updated.transactionDate,
+      merchantName: updated.merchantName ?? null,
+      accountId: updated.accountId,
+      type: updated.type,
+      previousExpenseAmount: existingExpenseAmount,
+      nextExpenseAmount: updatedExpenseAmount,
+      shouldCreateTransactionAdded: false,
+    })
+      .then(() => generatePeriodicNotifications(updated.userId))
+      .catch(() => undefined);
+
+    if (
+      existing.type === "expense" &&
+      (existing.categoryId !== updated.categoryId ||
+        existing.transactionDate !== updated.transactionDate)
+    ) {
+      processTransactionNotificationEvent({
+        userId: existing.userId,
+        transactionId: existing.id,
+        amount: existing.amount,
+        categoryId: existing.categoryId ?? null,
+        transactionDate: existing.transactionDate,
+        merchantName: existing.merchantName ?? null,
+        accountId: existing.accountId,
+        type: existing.type,
+        previousExpenseAmount: existingExpenseAmount,
+        nextExpenseAmount: 0,
+        shouldCreateTransactionAdded: false,
+      }).catch(() => undefined);
+    }
+
     emitAccountsChanged();
     emitMerchantsChanged();
     return updated;
   }
 
   async delete(id: string) {
-    await db.transaction(async (tx) => {
+    const deleted = await db.transaction(async (tx) => {
       const existing = await tx.query.transactions.findFirst({
         where: (table, { eq: innerEq }) => innerEq(table.id, id),
       });
 
       if (!existing) {
-        return;
+        return null;
       }
 
       await reverseTransactionEffects(tx, existing);
       await tx.delete(transactions).where(eq(transactions.id, id));
       await refreshBudgetsForTransactionChange(tx, existing, undefined);
+      return existing;
     });
+
+    if (deleted) {
+      processTransactionNotificationEvent({
+        userId: deleted.userId,
+        transactionId: deleted.id,
+        amount: deleted.amount,
+        categoryId: deleted.categoryId ?? null,
+        transactionDate: deleted.transactionDate,
+        merchantName: deleted.merchantName ?? null,
+        accountId: deleted.accountId,
+        type: deleted.type,
+        previousExpenseAmount: deleted.type === "expense" ? deleted.amount : 0,
+        nextExpenseAmount: 0,
+        shouldCreateTransactionAdded: false,
+      })
+        .then(() => generatePeriodicNotifications(deleted.userId))
+        .catch(() => undefined);
+    }
 
     emitAccountsChanged();
   }

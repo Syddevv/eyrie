@@ -7,6 +7,11 @@ import {
   adjustGoalContributionAccountBalance,
   refreshGoalCurrentAmount,
 } from "./financeOrchestrator";
+import {
+  generatePeriodicNotifications,
+  processGoalContributionNotificationEvent,
+  processGoalStateNotificationEvent,
+} from "@/services/notifications";
 import type { NewGoal, NewGoalContribution } from "../types";
 import { createId } from "../utils/ids";
 import { nowIso } from "../utils/time";
@@ -86,6 +91,15 @@ export class GoalsService {
       ...input,
       isCompleted: nextTarget > 0 ? nextCurrent >= nextTarget : false,
     });
+
+    processGoalStateNotificationEvent({
+      userId: existing.userId,
+      goalId: id,
+      previousAmount: existing.currentAmount,
+    })
+      .then(() => generatePeriodicNotifications(existing.userId))
+      .catch(() => undefined);
+
     emitGoalsChanged();
     return updated;
   }
@@ -171,14 +185,30 @@ export class GoalsService {
         },
       });
 
-      return created;
+      return {
+        contribution: created,
+        previousGoalAmount: goal.currentAmount,
+        userId: goal.userId,
+      };
     });
 
     emitGoalsChanged();
     if (payload.walletId) {
       emitAccountsChanged();
     }
-    return created;
+
+    if (created?.contribution) {
+      processGoalContributionNotificationEvent({
+        userId: created.userId,
+        goalId: payload.goalId,
+        previousAmount: created.previousGoalAmount,
+        contributionAmount: payload.amount,
+      })
+        .then(() => generatePeriodicNotifications(created.userId))
+        .catch(() => undefined);
+    }
+
+    return created?.contribution ?? null;
   }
 
   async updateContribution(id: string, input: Partial<NewGoalContribution>) {
@@ -193,6 +223,9 @@ export class GoalsService {
 
       const next = { ...existing, ...input };
       assertPositiveAmount(next.amount, "contribution amount");
+      const currentGoal = await tx.query.goals.findFirst({
+        where: (table, { eq: innerEq }) => innerEq(table.id, existing.goalId),
+      });
 
       if (existing.walletId) {
         await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
@@ -207,17 +240,34 @@ export class GoalsService {
         await refreshGoalCurrentAmount(tx, next.goalId);
       }
 
-      return tx.query.goalContributions.findFirst({
-        where: (table, { eq: innerEq }) => innerEq(table.id, id),
-        with: {
-          wallet: true,
-        },
-      });
+      return {
+        contribution: await tx.query.goalContributions.findFirst({
+          where: (table, { eq: innerEq }) => innerEq(table.id, id),
+          with: {
+            wallet: true,
+          },
+        }),
+        previousGoalAmount: currentGoal?.currentAmount ?? 0,
+        userId: currentGoal?.userId ?? null,
+        goalId: next.goalId,
+      };
     });
 
     emitGoalsChanged();
     emitAccountsChanged();
-    return updated;
+
+    if (updated?.contribution && updated.userId) {
+      processGoalContributionNotificationEvent({
+        userId: updated.userId,
+        goalId: updated.goalId,
+        previousAmount: updated.previousGoalAmount,
+        contributionAmount: updated.contribution.amount,
+      })
+        .then(() => generatePeriodicNotifications(updated.userId))
+        .catch(() => undefined);
+    }
+
+    return updated?.contribution ?? null;
   }
 
   async deleteContribution(id: string) {
