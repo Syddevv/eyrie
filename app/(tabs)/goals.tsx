@@ -502,14 +502,20 @@ export default function GoalsScreen() {
 
               <Pressable
                 style={[styles.coachButton, pageStyles.coachButton]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/add-contribution-modal",
-                    params: { goalId: highlightedGoal.id },
-                  })
-                }
+                onPress={() => {
+                  if (highlightedGoal.isCompleted) {
+                    router.push("/new-savings-goal-modal");
+                  } else {
+                    router.push({
+                      pathname: "/add-contribution-modal",
+                      params: { goalId: highlightedGoal.id },
+                    });
+                  }
+                }}
               >
-                <Text style={styles.coachButtonText}>Add Contribution</Text>
+                <Text style={styles.coachButtonText}>
+                  {highlightedGoal.isCompleted ? "Create New Goal" : "Add Contribution"}
+                </Text>
               </Pressable>
             </View>
           ) : null}

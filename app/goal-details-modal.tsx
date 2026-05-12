@@ -371,18 +371,20 @@ export default function GoalDetailsModal() {
           </View>
         </ScrollView>
 
-        <Pressable
-          style={[styles.contributeButton, ui.primaryButton]}
-          onPress={() =>
-            router.replace({
-              pathname: "/add-contribution-modal",
-              params: { goalId: goal.id },
-            })
-          }
-        >
-          <Feather name="plus" size={18} color="#FFFFFF" />
-          <Text style={styles.contributeButtonText}>Add Contribution</Text>
-        </Pressable>
+        {!goal.isCompleted && (
+          <Pressable
+            style={[styles.contributeButton, ui.primaryButton]}
+            onPress={() =>
+              router.replace({
+                pathname: "/add-contribution-modal",
+                params: { goalId: goal.id },
+              })
+            }
+          >
+            <Feather name="plus" size={18} color="#FFFFFF" />
+            <Text style={styles.contributeButtonText}>Add Contribution</Text>
+          </Pressable>
+        )}
 
         <View style={styles.footerActions}>
           <Pressable
