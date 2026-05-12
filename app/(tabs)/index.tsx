@@ -116,6 +116,8 @@ export default function HomeScreen() {
   const walletAccounts = visibleAccounts.filter(
     (account) => account.type === "ewallet" || account.type === "cash",
   );
+  const visibleBudgets = activeBudgets.slice(0, 2);
+  const visibleRecentTransactions = recentTransactions.slice(0, 3);
 
   const resolveBrandName = (account: any) => {
     const nameLower = (account?.name || "").toLowerCase();
@@ -938,8 +940,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.budgetList}>
-            {activeBudgets.length ? (
-              activeBudgets.map((item) => (
+            {visibleBudgets.length ? (
+              visibleBudgets.map((item) => (
                 <View
                   key={item.id}
                   style={[
@@ -1061,8 +1063,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.transactionList}>
-            {recentTransactions.length ? (
-              recentTransactions.map((item) => (
+            {visibleRecentTransactions.length ? (
+              visibleRecentTransactions.map((item) => (
                 <View key={item.id} style={styles.transactionRow}>
                   <View
                     style={[
