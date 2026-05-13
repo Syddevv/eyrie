@@ -1,7 +1,14 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { themeColors } from "@/constants/colors";
@@ -36,7 +43,12 @@ const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
-    normalized.length === 3 ? normalized.split("").map((char) => char + char).join("") : normalized;
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const red = Number.parseInt(full.slice(0, 2), 16);
   const green = Number.parseInt(full.slice(2, 4), 16);
   const blue = Number.parseInt(full.slice(4, 6), 16);
@@ -48,7 +60,11 @@ function renderTransactionIcon(transaction: TransactionListItem) {
   if (transaction.iconLibrary === "material") {
     return (
       <MaterialCommunityIcons
-        name={transaction.iconName as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+        name={
+          transaction.iconName as React.ComponentProps<
+            typeof MaterialCommunityIcons
+          >["name"]
+        }
         size={22}
         color={transaction.iconColor}
       />
@@ -57,7 +73,9 @@ function renderTransactionIcon(transaction: TransactionListItem) {
 
   return (
     <Feather
-      name={transaction.iconName as React.ComponentProps<typeof Feather>["name"]}
+      name={
+        transaction.iconName as React.ComponentProps<typeof Feather>["name"]
+      }
       size={20}
       color={transaction.iconColor}
     />
@@ -74,13 +92,21 @@ function isSameDay(a: Date, b: Date) {
 
 function buildCalendarDays(monthDate: Date) {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const lastDay = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth() + 1,
+    0,
+  );
   const leadingDays = firstDay.getDay();
   const daysInMonth = lastDay.getDate();
   const cells: { key: string; date: Date; inMonth: boolean }[] = [];
 
   for (let index = 0; index < leadingDays; index += 1) {
-    const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), index - leadingDays + 1);
+    const date = new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      index - leadingDays + 1,
+    );
     cells.push({ key: `prev-${index}`, date, inMonth: false });
   }
 
@@ -95,7 +121,11 @@ function buildCalendarDays(monthDate: Date) {
     const trailing = 7 - remainder;
 
     for (let index = 1; index <= trailing; index += 1) {
-      const date = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, index);
+      const date = new Date(
+        monthDate.getFullYear(),
+        monthDate.getMonth() + 1,
+        index,
+      );
       cells.push({ key: `next-${index}`, date, inMonth: false });
     }
   }
@@ -111,10 +141,14 @@ export default function TransactionsScreen() {
   const { transactions, summary, isLoading } = useTransactions();
   const [searchQuery, setSearchQuery] = useState("");
   const [showTypeFilters, setShowTypeFilters] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
+    "all",
+  );
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(selectedDate ?? new Date());
+  const [calendarMonth, setCalendarMonth] = useState(
+    selectedDate ?? new Date(),
+  );
 
   const pageStyles = useMemo(
     () => ({
@@ -122,10 +156,14 @@ export default function TransactionsScreen() {
       title: { color: isDark ? "#FFFFFF" : colors.foreground },
       subtitle: { color: isDark ? "#9EA6B5" : "#6B7485" },
       iconButton: {
-        backgroundColor: isDark ? "#161D29" : withOpacity(colors.secondary, 0.9),
+        backgroundColor: isDark
+          ? "#161D29"
+          : withOpacity(colors.secondary, 0.9),
       },
       searchBar: {
-        backgroundColor: isDark ? "#161D29" : withOpacity(colors.secondary, 0.9),
+        backgroundColor: isDark
+          ? "#161D29"
+          : withOpacity(colors.secondary, 0.9),
       },
       searchText: { color: isDark ? "#8D97A7" : "#758094" },
       incomeCard: {
@@ -137,16 +175,22 @@ export default function TransactionsScreen() {
       sectionLabel: { color: isDark ? "#A1ABBA" : "#6B7485" },
       groupCard: {
         backgroundColor: isDark ? "#101722" : colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.05)" : withOpacity(colors.border, 0.92),
+        borderColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : withOpacity(colors.border, 0.92),
       },
       divider: {
-        backgroundColor: isDark ? "rgba(255,255,255,0.05)" : withOpacity(colors.border, 0.84),
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : withOpacity(colors.border, 0.84),
       },
       incomeAmount: { color: "#00C665" },
       defaultAmount: { color: isDark ? "#FFFFFF" : colors.foreground },
       chevron: { color: isDark ? "#7F8897" : "#8C94A3" },
       filterChip: {
-        backgroundColor: isDark ? "#161D29" : withOpacity(colors.secondary, 0.9),
+        backgroundColor: isDark
+          ? "#161D29"
+          : withOpacity(colors.secondary, 0.9),
       },
       filterChipActive: {
         backgroundColor: colors.primary,
@@ -155,7 +199,9 @@ export default function TransactionsScreen() {
       filterChipTextActive: { color: "#FFFFFF" },
       calendarCard: {
         backgroundColor: colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(15, 23, 42, 0.08)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(15, 23, 42, 0.08)",
       },
       calendarText: { color: colors.foreground },
       mutedCalendarText: { color: colors.mutedForeground },
@@ -164,7 +210,10 @@ export default function TransactionsScreen() {
     }),
     [colors, isDark],
   );
-  const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
+  const calendarDays = useMemo(
+    () => buildCalendarDays(calendarMonth),
+    [calendarMonth],
+  );
 
   const filteredSections = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -189,33 +238,54 @@ export default function TransactionsScreen() {
     return groupTransactionsBySection(filteredTransactions);
   }, [searchQuery, selectedDate, transactions, typeFilter]);
 
-  const visibleCount = filteredSections.reduce((count, section) => count + section.items.length, 0);
+  const visibleCount = filteredSections.reduce(
+    (count, section) => count + section.items.length,
+    0,
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
         <View style={styles.headerBlock}>
           <View style={styles.topRow}>
-            <Pressable style={[styles.backButton, pageStyles.iconButton]} onPress={() => router.back()}>
-              <Feather name="chevron-left" size={22} color={colors.foreground} />
+            <Pressable
+              style={[styles.backButton, pageStyles.iconButton]}
+              onPress={() => router.back()}
+            >
+              <Feather
+                name="chevron-left"
+                size={22}
+                color={colors.foreground}
+              />
             </Pressable>
 
             <View style={styles.headerTextWrap}>
-              <Text style={[styles.title, pageStyles.title]}>All Transactions</Text>
-              <Text style={[styles.countText, pageStyles.subtitle]}>{visibleCount} transactions</Text>
+              <Text style={[styles.title, pageStyles.title]}>
+                All Transactions
+              </Text>
+              <Text style={[styles.countText, pageStyles.subtitle]}>
+                {visibleCount} transactions
+              </Text>
             </View>
           </View>
 
           <View style={styles.searchRow}>
             <View style={[styles.searchBar, pageStyles.searchBar]}>
-              <Feather name="search" size={18} color={pageStyles.searchText.color} />
+              <Feather
+                name="search"
+                size={18}
+                color={pageStyles.searchText.color}
+              />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder="Search transactions..."
                 placeholderTextColor={pageStyles.searchText.color}
                 selectionColor={colors.primary}
-                style={[styles.searchInput, { color: pageStyles.searchText.color }]}
+                style={[
+                  styles.searchInput,
+                  { color: pageStyles.searchText.color },
+                ]}
               />
             </View>
 
@@ -225,8 +295,13 @@ export default function TransactionsScreen() {
                 pageStyles.iconButton,
                 showTypeFilters && { backgroundColor: colors.primary },
               ]}
-              onPress={() => setShowTypeFilters((current) => !current)}>
-              <Feather name="filter" size={18} color={showTypeFilters ? "#FFFFFF" : colors.foreground} />
+              onPress={() => setShowTypeFilters((current) => !current)}
+            >
+              <Feather
+                name="filter"
+                size={18}
+                color={showTypeFilters ? "#FFFFFF" : colors.foreground}
+              />
             </Pressable>
             <Pressable
               style={[
@@ -234,8 +309,13 @@ export default function TransactionsScreen() {
                 pageStyles.iconButton,
                 selectedDate && { backgroundColor: colors.primary },
               ]}
-              onPress={() => setShowCalendar(true)}>
-              <Feather name="calendar" size={18} color={selectedDate ? "#FFFFFF" : colors.foreground} />
+              onPress={() => setShowCalendar(true)}
+            >
+              <Feather
+                name="calendar"
+                size={18}
+                color={selectedDate ? "#FFFFFF" : colors.foreground}
+              />
             </Pressable>
           </View>
 
@@ -243,7 +323,12 @@ export default function TransactionsScreen() {
             <View style={styles.filterRow}>
               {(["all", "income", "expense"] as const).map((option) => {
                 const isActive = typeFilter === option;
-                const label = option === "all" ? "All" : option === "income" ? "Income" : "Expense";
+                const label =
+                  option === "all"
+                    ? "All"
+                    : option === "income"
+                      ? "Income"
+                      : "Expense";
 
                 return (
                   <Pressable
@@ -253,13 +338,15 @@ export default function TransactionsScreen() {
                       pageStyles.filterChip,
                       isActive && pageStyles.filterChipActive,
                     ]}
-                    onPress={() => setTypeFilter(option)}>
+                    onPress={() => setTypeFilter(option)}
+                  >
                     <Text
                       style={[
                         styles.filterChipText,
                         pageStyles.filterChipText,
                         isActive && pageStyles.filterChipTextActive,
-                      ]}>
+                      ]}
+                    >
                       {label}
                     </Text>
                   </Pressable>
@@ -271,29 +358,51 @@ export default function TransactionsScreen() {
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, pageStyles.incomeCard]}>
               <Text style={styles.summaryLabelIncome}>Total Income</Text>
-              <Text style={styles.summaryAmountIncome}>{formatCurrency(summary.income)}</Text>
+              <Text style={styles.summaryAmountIncome}>
+                {formatCurrency(summary.income)}
+              </Text>
             </View>
             <View style={[styles.summaryCard, pageStyles.expenseCard]}>
               <Text style={styles.summaryLabelExpense}>Total Expenses</Text>
-              <Text style={styles.summaryAmountExpense}>{formatCurrency(summary.expenses)}</Text>
+              <Text style={styles.summaryAmountExpense}>
+                {formatCurrency(summary.expenses)}
+              </Text>
             </View>
           </View>
         </View>
 
-        <ScrollView style={styles.recordsScroll} contentContainerStyle={styles.recordsContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.recordsScroll}
+          contentContainerStyle={styles.recordsContent}
+          showsVerticalScrollIndicator={false}
+        >
           {isLoading ? (
-            <View style={[styles.emptyCard, pageStyles.groupCard, shadows.soft]}>
-              <Text style={[styles.emptyTitle, pageStyles.title]}>Loading transactions</Text>
-              <Text style={[styles.emptyText, pageStyles.subtitle]}>Fetching your latest transaction history.</Text>
+            <View
+              style={[styles.emptyCard, pageStyles.groupCard, shadows.soft]}
+            >
+              <Text style={[styles.emptyTitle, pageStyles.title]}>
+                Loading transactions
+              </Text>
+              <Text style={[styles.emptyText, pageStyles.subtitle]}>
+                Fetching your latest transaction history.
+              </Text>
             </View>
           ) : null}
 
           {!isLoading
             ? filteredSections.map((section) => (
                 <View key={section.title} style={styles.sectionBlock}>
-                  <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>{section.title}</Text>
+                  <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>
+                    {section.title}
+                  </Text>
 
-                  <View style={[styles.groupCard, pageStyles.groupCard, shadows.soft]}>
+                  <View
+                    style={[
+                      styles.groupCard,
+                      pageStyles.groupCard,
+                      shadows.soft,
+                    ]}
+                  >
                     {section.items.map((item, index) => (
                       <View key={item.id}>
                         <Pressable
@@ -303,21 +412,36 @@ export default function TransactionsScreen() {
                               pathname: "/transaction-details-modal",
                               params: { transactionId: item.id },
                             })
-                          }>
+                          }
+                        >
                           <View style={styles.recordLeft}>
                             <View
                               style={[
                                 styles.recordIconWrap,
                                 {
-                                  backgroundColor: isDark ? item.iconBackgroundDark : item.iconBackgroundLight,
+                                  backgroundColor: isDark
+                                    ? item.iconBackgroundDark
+                                    : item.iconBackgroundLight,
                                 },
-                              ]}>
+                              ]}
+                            >
                               {renderTransactionIcon(item)}
                             </View>
 
                             <View>
-                              <Text style={[styles.recordTitle, pageStyles.title]}>{item.title}</Text>
-                              <Text style={[styles.recordCategory, pageStyles.subtitle]}>{item.category}</Text>
+                              <Text
+                                style={[styles.recordTitle, pageStyles.title]}
+                              >
+                                {item.title}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.recordCategory,
+                                  pageStyles.subtitle,
+                                ]}
+                              >
+                                {item.category}
+                              </Text>
                             </View>
                           </View>
 
@@ -325,15 +449,26 @@ export default function TransactionsScreen() {
                             <Text
                               style={[
                                 styles.recordAmount,
-                                item.amountColor === "income" ? pageStyles.incomeAmount : pageStyles.defaultAmount,
-                              ]}>
+                                item.amountColor === "income"
+                                  ? pageStyles.incomeAmount
+                                  : pageStyles.defaultAmount,
+                              ]}
+                            >
                               {item.signedAmountLabel}
                             </Text>
-                            <Feather name="chevron-right" size={18} color={pageStyles.chevron.color} />
+                            <Feather
+                              name="chevron-right"
+                              size={18}
+                              color={pageStyles.chevron.color}
+                            />
                           </View>
                         </Pressable>
 
-                        {index < section.items.length - 1 ? <View style={[styles.rowDivider, pageStyles.divider]} /> : null}
+                        {index < section.items.length - 1 ? (
+                          <View
+                            style={[styles.rowDivider, pageStyles.divider]}
+                          />
+                        ) : null}
                       </View>
                     ))}
                   </View>
@@ -342,42 +477,85 @@ export default function TransactionsScreen() {
             : null}
 
           {!isLoading && !filteredSections.length ? (
-            <View style={[styles.emptyCard, pageStyles.groupCard, shadows.soft]}>
-              <Text style={[styles.emptyTitle, pageStyles.title]}>No transactions found</Text>
-              <Text style={[styles.emptyText, pageStyles.subtitle]}>Try a different search, filter, or date.</Text>
+            <View
+              style={[styles.emptyCard, pageStyles.groupCard, shadows.soft]}
+            >
+              <Text style={[styles.emptyTitle, pageStyles.title]}>
+                No transactions found
+              </Text>
+              <Text style={[styles.emptyText, pageStyles.subtitle]}>
+                Try a different search, filter, or date.
+              </Text>
             </View>
           ) : null}
         </ScrollView>
 
         {showCalendar ? (
           <View style={styles.calendarOverlay}>
-            <Pressable style={styles.calendarBackdrop} onPress={() => setShowCalendar(false)} />
-            <View style={[styles.calendarCard, pageStyles.calendarCard, shadows.card]}>
+            <Pressable
+              style={styles.calendarBackdrop}
+              onPress={() => setShowCalendar(false)}
+            />
+            <View
+              style={[
+                styles.calendarCard,
+                pageStyles.calendarCard,
+                shadows.card,
+              ]}
+            >
               <View style={styles.calendarHeader}>
                 <Pressable
                   style={[styles.calendarArrow, pageStyles.searchBar]}
                   onPress={() =>
-                    setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
-                  }>
-                  <Feather name="chevron-left" size={16} color={pageStyles.calendarText.color} />
+                    setCalendarMonth(
+                      (current) =>
+                        new Date(
+                          current.getFullYear(),
+                          current.getMonth() - 1,
+                          1,
+                        ),
+                    )
+                  }
+                >
+                  <Feather
+                    name="chevron-left"
+                    size={16}
+                    color={pageStyles.calendarText.color}
+                  />
                 </Pressable>
 
                 <Text style={[styles.calendarTitle, pageStyles.calendarText]}>
-                  {monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+                  {monthNames[calendarMonth.getMonth()]}{" "}
+                  {calendarMonth.getFullYear()}
                 </Text>
 
                 <Pressable
                   style={[styles.calendarArrow, pageStyles.searchBar]}
                   onPress={() =>
-                    setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
-                  }>
-                  <Feather name="chevron-right" size={16} color={pageStyles.calendarText.color} />
+                    setCalendarMonth(
+                      (current) =>
+                        new Date(
+                          current.getFullYear(),
+                          current.getMonth() + 1,
+                          1,
+                        ),
+                    )
+                  }
+                >
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={pageStyles.calendarText.color}
+                  />
                 </Pressable>
               </View>
 
               <View style={styles.weekdayRow}>
                 {weekdayLabels.map((label) => (
-                  <Text key={label} style={[styles.weekdayLabel, pageStyles.mutedCalendarText]}>
+                  <Text
+                    key={label}
+                    style={[styles.weekdayLabel, pageStyles.mutedCalendarText]}
+                  >
                     {label}
                   </Text>
                 ))}
@@ -385,7 +563,9 @@ export default function TransactionsScreen() {
 
               <View style={styles.calendarGrid}>
                 {calendarDays.map((day) => {
-                  const isSelected = selectedDate ? isSameDay(day.date, selectedDate) : false;
+                  const isSelected = selectedDate
+                    ? isSameDay(day.date, selectedDate)
+                    : false;
                   const isToday = isSameDay(day.date, new Date());
 
                   return (
@@ -399,16 +579,24 @@ export default function TransactionsScreen() {
                       ]}
                       onPress={() => {
                         setSelectedDate(day.date);
-                        setCalendarMonth(new Date(day.date.getFullYear(), day.date.getMonth(), 1));
+                        setCalendarMonth(
+                          new Date(
+                            day.date.getFullYear(),
+                            day.date.getMonth(),
+                            1,
+                          ),
+                        );
                         setShowCalendar(false);
-                      }}>
+                      }}
+                    >
                       <Text
                         style={[
                           styles.dayLabel,
                           pageStyles.calendarText,
                           !day.inMonth && pageStyles.dayOutsideText,
                           isSelected && styles.selectedDayText,
-                        ]}>
+                        ]}
+                      >
                         {day.date.getDate()}
                       </Text>
                     </Pressable>
@@ -421,8 +609,11 @@ export default function TransactionsScreen() {
                 onPress={() => {
                   setSelectedDate(null);
                   setShowCalendar(false);
-                }}>
-                <Text style={[styles.clearDateText, pageStyles.filterChipText]}>Clear Date Filter</Text>
+                }}
+              >
+                <Text style={[styles.clearDateText, pageStyles.filterChipText]}>
+                  Clear Date Filter
+                </Text>
               </Pressable>
             </View>
           </View>

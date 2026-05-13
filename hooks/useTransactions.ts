@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { formatCurrency } from "@/hooks/use-dashboard";
+import { resolveBrandLabel } from "@/hooks/usePaymentMethods";
 import { transactionsService } from "@/src/db/services";
 import { onAccountsChanged } from "@/src/lib/dbSync";
 import { getMerchantPresetByName } from "@/constants/expense-merchants";
@@ -22,6 +23,7 @@ export type TransactionListItem = {
   category: string;
   categoryId: string | null;
   accountId: string;
+  accountLabel: string;
   transactionDate: string;
   dateKey: string;
   dateLabel: string;
@@ -328,6 +330,9 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
   });
   const isIncome = source.type === "income";
   const isTransfer = source.type === "transfer";
+  const accountLabel = source.account
+    ? resolveBrandLabel(source.account.type as any, source.account.name)
+    : "Unknown account";
 
   return {
     id: source.id,
@@ -337,6 +342,7 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
     category: categoryName,
     categoryId: source.categoryId ?? null,
     accountId: source.accountId,
+    accountLabel,
     transactionDate: source.transactionDate,
     dateKey: source.transactionDate.slice(0, 10),
     dateLabel: formatTransactionDate(source.transactionDate),

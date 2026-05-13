@@ -24,7 +24,7 @@ function formatLast4(value?: string | null) {
   return value?.trim() ? `•••• ${value.trim()}` : "";
 }
 
-function resolveBrandLabel(
+export function resolveBrandLabel(
   kind: PaymentMethodOption["kind"],
   name: string,
 ) {
