@@ -74,7 +74,7 @@ export default function AddBankAccountModal() {
   const [balance, setBalance] = useState("");
   const [cardholderName, setCardholderName] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const isAddEnabled = cardholderName.trim().length > 0;
+  const isAddEnabled = Boolean(selectedBank);
   const { user } = useCurrentUser();
 
   useEffect(() => {
@@ -295,9 +295,7 @@ export default function AddBankAccountModal() {
               try {
                 await accountsService.create({
                   userId: user?.id ?? "",
-                  name: selectedBank
-                    ? `${selectedBank.name} - ${cardholderName.trim()}`
-                    : cardholderName.trim(),
+                  name: selectedBank?.name ?? cardholderName.trim(),
                   type: "bank",
                   balance: Number(balance) || 0,
                   currencyCode: undefined as any,
@@ -307,7 +305,7 @@ export default function AddBankAccountModal() {
                 });
 
                 emitAccountsChanged();
-              } catch (e) {
+              } catch {
                 // ignore - global feedback handled elsewhere
               }
 

@@ -141,7 +141,7 @@ export default function AddEWalletAccountModal() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [balance, setBalance] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const isConnectEnabled = accountName.trim().length > 0;
+  const isConnectEnabled = Boolean(selectedWallet.name);
   const { user } = useCurrentUser();
 
   useEffect(() => {
@@ -356,9 +356,7 @@ export default function AddEWalletAccountModal() {
               try {
                 await accountsService.create({
                   userId: user?.id ?? "",
-                  name: accountName.trim()
-                    ? `${selectedWallet.name} - ${accountName.trim()}`
-                    : selectedWallet.name,
+                  name: selectedWallet.name,
                   type: "ewallet",
                   balance: Number(balance) || 0,
                   currencyCode: undefined as any,
@@ -367,7 +365,7 @@ export default function AddEWalletAccountModal() {
                 });
 
                 emitAccountsChanged();
-              } catch (e) {
+              } catch {
                 // ignore
               }
 

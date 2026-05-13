@@ -11,6 +11,7 @@ import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useSavingsGoal } from "@/hooks/useSavingsGoals";
 import { goalsService } from "@/src/db/services";
 import {
@@ -27,12 +28,17 @@ export default function GoalDetailsModal() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
   const { goal, isLoading } = useSavingsGoal(goalId);
+  const { methods } = usePaymentMethods();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [pendingDeleteContributionId, setPendingDeleteContributionId] =
     useState<string | null>(null);
   const [isDeletingContribution, setIsDeletingContribution] = useState(false);
   const contributionPlan = goal ? getGoalContributionPlan(goal) : null;
+  const linkedWalletLabel = goal?.linkedWalletId
+    ? methods.find((method) => method.id === goal.linkedWalletId)?.label ??
+      goal.linkedWallet?.name
+    : "Not linked";
 
   const ui = useMemo(
     () => ({
@@ -275,9 +281,7 @@ export default function GoalDetailsModal() {
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, ui.statCard]}>
               <Text style={[styles.summaryLabel, ui.muted]}>Linked wallet</Text>
-              <Text style={[styles.summaryValue, ui.title]}>
-                {goal.linkedWallet?.name ?? "Not linked"}
-              </Text>
+              <Text style={[styles.summaryValue, ui.title]}>{linkedWalletLabel}</Text>
             </View>
             <View style={[styles.summaryCard, ui.statCard]}>
               <Text style={[styles.summaryLabel, ui.muted]}>

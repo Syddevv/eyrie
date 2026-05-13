@@ -81,14 +81,6 @@ function resolveBrandName(account: any) {
   return "Bank";
 }
 
-function extractUserName(accountName: string) {
-  // Extract the user name part from "BrandName - UserName" format
-  // If there's a " - " separator, return the part after it
-  // Otherwise, return the full name as is
-  const parts = accountName.split(" - ");
-  return parts.length > 1 ? parts.slice(1).join(" - ") : accountName;
-}
-
 function resolveLogo(account: any) {
   const nameLower = (account?.name || "").toLowerCase();
 
@@ -127,9 +119,6 @@ export default function EditPaymentCardModal() {
   const account = accounts.find((a) => a.id === accountId);
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
-  const [accountName, setAccountName] = useState(
-    account ? extractUserName(account.name ?? "") : "",
-  );
   const [balance, setBalance] = useState((account?.balance ?? 0).toString());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -156,7 +145,6 @@ export default function EditPaymentCardModal() {
 
   useEffect(() => {
     if (account) {
-      setAccountName(extractUserName(account.name ?? ""));
       setBalance((account.balance ?? 0).toString());
     }
   }, [account]);
@@ -209,13 +197,9 @@ export default function EditPaymentCardModal() {
     setIsSaving(true);
     try {
       const brandName = resolveBrandName(account);
-      const userNameInput = accountName.trim();
-      const fullName = userNameInput
-        ? `${brandName} - ${userNameInput}`
-        : brandName;
 
       await accountsService.update(account.id, {
-        name: fullName,
+        name: brandName,
         balance: parseFloat(balance) || 0,
       });
 
@@ -225,7 +209,7 @@ export default function EditPaymentCardModal() {
         pathname: "/payment-card-details-modal",
         params: { accountId: account.id },
       });
-    } catch (error) {
+    } catch {
       showSnackbar("Failed to update card");
     } finally {
       setIsSaving(false);
@@ -330,22 +314,6 @@ export default function EditPaymentCardModal() {
               </View>
             </View>
           </PremiumCardGradient>
-
-          <View style={styles.formSection}>
-            <Text style={[styles.label, ui.label]}>Account Name</Text>
-            <View style={[styles.fieldSurface, ui.fieldSurface]}>
-              <TextInput
-                value={accountName}
-                onChangeText={setAccountName}
-                placeholder={
-                  account ? extractUserName(account.name ?? "") : "Enter name"
-                }
-                placeholderTextColor={ui.placeholder.color}
-                selectionColor="#1681DD"
-                style={[styles.fieldInput, ui.fieldText]}
-              />
-            </View>
-          </View>
 
           <View style={styles.formSection}>
             <Text style={[styles.label, ui.label]}>Current Balance</Text>

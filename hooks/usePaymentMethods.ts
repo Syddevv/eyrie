@@ -1,5 +1,8 @@
 import { useMemo } from "react";
 
+import { BANKS } from "@/constants/banks";
+import LOGO_MAP from "@/constants/logoMap";
+import { WALLETS } from "@/constants/wallets";
 import { useAccounts } from "@/hooks/useAccounts";
 import { formatCurrency } from "@/hooks/use-dashboard";
 
@@ -21,26 +24,70 @@ function formatLast4(value?: string | null) {
   return value?.trim() ? `•••• ${value.trim()}` : "";
 }
 
-function formatMethodLabel(
+function resolveBrandLabel(
   kind: PaymentMethodOption["kind"],
   name: string,
-  last4?: string | null,
 ) {
-  if (kind === "bank" || kind === "credit") {
-    const suffix = formatLast4(last4);
-    return suffix ? `${name} ${suffix}` : name;
+  const nameLower = (name || "").toLowerCase();
+
+  const matchWallet = WALLETS.find(
+    (wallet) =>
+      (wallet.name && nameLower.includes(wallet.name.toLowerCase())) ||
+      (wallet.shortName && nameLower.includes(wallet.shortName.toLowerCase())) ||
+      nameLower.includes(wallet.id),
+  );
+  if (matchWallet) {
+    return matchWallet.name;
+  }
+
+  const matchBank = BANKS.find(
+    (bank) =>
+      (bank.name && nameLower.includes(bank.name.toLowerCase())) ||
+      (bank.shortName && nameLower.includes(bank.shortName.toLowerCase())) ||
+      nameLower.includes(bank.id),
+  );
+  if (matchBank) {
+    return matchBank.name;
+  }
+
+  const key = nameLower.replace(/[^a-z0-9]/g, "");
+  if (LOGO_MAP[key]) {
+    return key.toUpperCase();
   }
 
   if (kind === "cash") {
     return name || "Cash";
   }
 
-  return name;
+  if (kind === "ewallet") {
+    return "E-Wallet";
+  }
+
+  if (kind === "credit") {
+    return "Credit account";
+  }
+
+  return "Bank account";
 }
 
-import { WALLETS } from "@/constants/wallets";
-import { BANKS } from "@/constants/banks";
-import LOGO_MAP from "@/constants/logoMap";
+function formatMethodLabel(
+  kind: PaymentMethodOption["kind"],
+  name: string,
+  last4?: string | null,
+) {
+  const brandLabel = resolveBrandLabel(kind, name);
+
+  if (kind === "bank" || kind === "credit") {
+    const suffix = formatLast4(last4);
+    return suffix ? `${brandLabel} ${suffix}` : brandLabel;
+  }
+
+  if (kind === "cash") {
+    return brandLabel;
+  }
+
+  return brandLabel;
+}
 
 export function usePaymentMethods() {
   const { accounts, isLoading, refresh } = useAccounts();
@@ -86,37 +133,15 @@ export function usePaymentMethods() {
     }
 
     return visibleAccounts.map((account) => {
+      const brandLabel = resolveBrandLabel(
+        account.type as PaymentMethodOption["kind"],
+        account.name,
+      );
       const label = formatMethodLabel(
         account.type as PaymentMethodOption["kind"],
         account.name,
         account.accountNumberLast4,
       );
-
-      // resolve brand name for display (prefer canonical names from constants)
-      const nameLower = (account.name || "").toLowerCase();
-
-      const matchWallet = WALLETS.find(
-        (w) =>
-          (w.name && nameLower.includes(w.name.toLowerCase())) ||
-          (w.shortName && nameLower.includes(w.shortName.toLowerCase())) ||
-          nameLower.includes(w.id),
-      );
-
-      const matchBank = BANKS.find(
-        (b) =>
-          (b.name && nameLower.includes(b.name.toLowerCase())) ||
-          (b.shortName && nameLower.includes(b.shortName.toLowerCase())) ||
-          nameLower.includes(b.id),
-      );
-
-      let brandLabel: string | null = null;
-
-      if (matchWallet) brandLabel = matchWallet.name;
-      else if (matchBank) brandLabel = matchBank.name;
-      else {
-        const key = nameLower.replace(/[^a-z0-9]/g, "");
-        if (LOGO_MAP[key]) brandLabel = key.toUpperCase();
-      }
 
       const fallbackLabel =
         account.type === "cash"
