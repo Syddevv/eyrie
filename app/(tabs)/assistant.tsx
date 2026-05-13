@@ -7,18 +7,28 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 import { AppBottomNav } from '@/components/app-bottom-nav';
 import { themeColors } from '@/constants/colors';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  formatCurrency,
+  type AnalyticsDonutSlice,
+  type AnalyticsFilterKey,
+  type AnalyticsPoint,
+  type IncomeExpensePoint,
+} from '@/src/lib/analytics';
 
 type InsightTab = 'analytics' | 'assistant';
-
-const breakdown = [
-  { label: 'Food & Dining', value: '34%', color: '#4F8CFF' },
-  { label: 'Transportation', value: '13%', color: '#3AD0A0' },
-  { label: 'Shopping', value: '27%', color: '#FF9640' },
-  { label: 'Bills', value: '18%', color: '#9B63F8' },
-  { label: 'Entertainment', value: '8%', color: '#D9D233' },
+const analyticsFilters: readonly {
+  key: AnalyticsFilterKey;
+  label: string;
+}[] = [
+  { key: 'thisWeek', label: 'This Week' },
+  { key: 'thisMonth', label: 'This Month' },
+  { key: 'lastMonth', label: 'Last Month' },
+  { key: 'last3Months', label: 'Last 3 Months' },
+  { key: 'thisYear', label: 'This Year' },
 ] as const;
 
 const quickPrompts = [
@@ -26,6 +36,10 @@ const quickPrompts = [
   { icon: 'shield', text: 'Savings tips' },
   { icon: 'dollar-sign', text: 'Recent expenses' },
 ] as const;
+
+function categoryCountLabel(count: number) {
+  return `${count} categor${count === 1 ? 'y' : 'ies'}`;
+}
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace('#', '');
@@ -38,57 +52,93 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-function AnalyticsChart({ strokeColor, fillColor }: { strokeColor: string; fillColor: string }) {
+function buildLinePath(points: number[], width: number, height: number) {
+  const safePoints = points.length ? points : [0];
+  const maxValue = Math.max(...safePoints, 1);
+  const stepX = safePoints.length > 1 ? (width - 12) / (safePoints.length - 1) : 0;
+  const coords = safePoints.map((value, index) => {
+    const x = 6 + index * stepX;
+    const y = 8 + (1 - value / maxValue) * (height - 31);
+    return { x, y };
+  });
+
+  const line = coords.reduce((path, point, index, arr) => {
+    if (index === 0) {
+      return `M${point.x} ${point.y}`;
+    }
+
+    const previous = arr[index - 1];
+    const controlX = (previous.x + point.x) / 2;
+    return `${path} C${controlX} ${previous.y} ${controlX} ${point.y} ${point.x} ${point.y}`;
+  }, '');
+
+  const area = `${line} L${coords[coords.length - 1]?.x ?? 6} ${height} L${coords[0]?.x ?? 6} ${height} Z`;
+
+  return { line, area };
+}
+
+function AnalyticsChart({
+  points,
+  strokeColor,
+  fillColor,
+}: {
+  points: AnalyticsPoint[];
+  strokeColor: string;
+  fillColor: string;
+}) {
+  const path = buildLinePath(
+    points.map((point) => point.amount),
+    320,
+    126,
+  );
+
   return (
     <Svg width="100%" height={126} viewBox="0 0 320 126">
-      <Path
-        d="M6 84C26 88 46 92 64 92C82 92 92 54 111 54C130 54 139 103 159 103C180 103 200 73 217 54C240 30 262 7 281 7C297 7 309 26 320 41V126H6Z"
-        fill={fillColor}
-      />
-      <Path
-        d="M6 84C26 88 46 92 64 92C82 92 92 54 111 54C130 54 139 103 159 103C180 103 200 73 217 54C240 30 262 7 281 7C297 7 309 26 320 41"
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+      <Path d={path.area} fill={fillColor} />
+      <Path d={path.line} fill="none" stroke={strokeColor} strokeWidth="3" strokeLinecap="round" />
     </Svg>
   );
 }
 
-function IncomeExpenseChart() {
-  const income = ['#43D39E', '#43D39E', '#43D39E', '#43D39E', '#43D39E'] as const;
-  const expense = ['#FF9844', '#FF9844', '#FF9844', '#FF9844', '#FF9844'] as const;
-  const incomeHeights = [102, 98, 108, 103, 103];
-  const expenseHeights = [53, 47, 57, 44, 40];
+function IncomeExpenseChart({ points }: { points: IncomeExpensePoint[] }) {
+  const maxValue = Math.max(
+    1,
+    ...points.flatMap((point) => [point.income, point.expenses]),
+  );
+  const chartWidth = 320;
+  const pairWidth = chartWidth / Math.max(points.length, 1);
+  const barWidth = Math.min(24, Math.max(12, pairWidth * 0.3));
+  const groupOffset = Math.max(8, (pairWidth - barWidth * 2 - 3) / 2);
 
   return (
     <Svg width="100%" height={150} viewBox="0 0 320 150">
-      {incomeHeights.map((height, index) => {
-        const x = 12 + index * 63;
+      {points.map((point, index) => {
+        const incomeHeight = Math.max(4, (point.income / maxValue) * 108);
+        const x = index * pairWidth + groupOffset;
         return (
           <Rect
             key={`income-${x}`}
             x={x}
-            y={132 - height}
-            width="24"
-            height={height}
+            y={132 - incomeHeight}
+            width={barWidth}
+            height={incomeHeight}
             rx="4"
-            fill={income[index]}
+            fill="#43D39E"
           />
         );
       })}
-      {expenseHeights.map((height, index) => {
-        const x = 39 + index * 63;
+      {points.map((point, index) => {
+        const expenseHeight = Math.max(4, (point.expenses / maxValue) * 108);
+        const x = index * pairWidth + groupOffset + barWidth + 3;
         return (
           <Rect
             key={`expense-${x}`}
             x={x}
-            y={132 - height}
-            width="24"
-            height={height}
+            y={132 - expenseHeight}
+            width={barWidth}
+            height={expenseHeight}
             rx="4"
-            fill={expense[index]}
+            fill="#FF9844"
           />
         );
       })}
@@ -96,77 +146,60 @@ function IncomeExpenseChart() {
   );
 }
 
-function BreakdownChart({ trackColor }: { trackColor: string }) {
+function BreakdownChart({
+  trackColor,
+  innerColor,
+  slices,
+}: {
+  trackColor: string;
+  innerColor: string;
+  slices: AnalyticsDonutSlice[];
+}) {
+  const circumference = 2 * Math.PI * 40;
+  let offset = 0;
+
   return (
     <Svg width={112} height={112} viewBox="0 0 112 112">
       <Circle cx="56" cy="56" r="40" stroke={trackColor} strokeWidth="20" fill="none" />
-      <Circle
-        cx="56"
-        cy="56"
-        r="40"
-        stroke="#4F8CFF"
-        strokeWidth="20"
-        fill="none"
-        strokeDasharray="85 251"
-        strokeDashoffset="0"
-        strokeLinecap="butt"
-        rotation="-90"
-        origin="56,56"
-      />
-      <Circle
-        cx="56"
-        cy="56"
-        r="40"
-        stroke="#3AD0A0"
-        strokeWidth="20"
-        fill="none"
-        strokeDasharray="33 303"
-        strokeDashoffset="-87"
-        rotation="-90"
-        origin="56,56"
-      />
-      <Circle
-        cx="56"
-        cy="56"
-        r="40"
-        stroke="#FF9640"
-        strokeWidth="20"
-        fill="none"
-        strokeDasharray="68 268"
-        strokeDashoffset="-122"
-        rotation="-90"
-        origin="56,56"
-      />
-      <Circle
-        cx="56"
-        cy="56"
-        r="40"
-        stroke="#9B63F8"
-        strokeWidth="20"
-        fill="none"
-        strokeDasharray="45 291"
-        strokeDashoffset="-192"
-        rotation="-90"
-        origin="56,56"
-      />
-      <Circle
-        cx="56"
-        cy="56"
-        r="40"
-        stroke="#D9D233"
-        strokeWidth="20"
-        fill="none"
-        strokeDasharray="20 316"
-        strokeDashoffset="-239"
-        rotation="-90"
-        origin="56,56"
-      />
-      <Circle cx="56" cy="56" r="27" fill="#111722" />
+      {slices.map((slice) => {
+        const length = Math.max((slice.percentage / 100) * circumference, 0);
+        const dashOffset = -offset;
+        offset += length;
+
+        return (
+          <Circle
+            key={slice.label}
+            cx="56"
+            cy="56"
+            r="40"
+            stroke={slice.color}
+            strokeWidth="20"
+            fill="none"
+            strokeDasharray={`${length} ${circumference - length}`}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="butt"
+            rotation="-90"
+            origin="56,56"
+          />
+        );
+      })}
+      <Circle cx="56" cy="56" r="27" fill={innerColor} />
     </Svg>
   );
 }
 
-function BudgetHealthRing({ trackColor }: { trackColor: string }) {
+function BudgetHealthRing({
+  trackColor,
+  score,
+  progressColor,
+}: {
+  trackColor: string;
+  score: number;
+  progressColor: string;
+}) {
+  const circumference = 2 * Math.PI * 30;
+  const progress = circumference * (score / 100);
+
   return (
     <Svg width={88} height={88} viewBox="0 0 88 88">
       <Circle cx="44" cy="44" r="30" stroke={trackColor} strokeWidth="10" fill="none" />
@@ -174,10 +207,10 @@ function BudgetHealthRing({ trackColor }: { trackColor: string }) {
         cx="44"
         cy="44"
         r="30"
-        stroke="#0DBB59"
+        stroke={progressColor}
         strokeWidth="10"
         fill="none"
-        strokeDasharray="142 188"
+        strokeDasharray={`${progress} ${circumference - progress}`}
         strokeLinecap="round"
         rotation="-140"
         origin="44,44"
@@ -190,8 +223,35 @@ export default function AssistantScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = themeColors[colorScheme];
   const [activeTab, setActiveTab] = useState<InsightTab>('analytics');
+  const [selectedFilter, setSelectedFilter] = useState<AnalyticsFilterKey>('thisMonth');
+  const { analytics } = useAnalytics(selectedFilter);
 
   const isDark = colorScheme === 'dark';
+  const budgetRingColor =
+    analytics.budgetHealth.tone === 'Excellent'
+      ? '#0DBB59'
+      : analytics.budgetHealth.tone === 'Good'
+        ? '#17C964'
+        : analytics.budgetHealth.tone === 'Warning'
+          ? '#FF9F2F'
+          : '#FF314A';
+  const weeklyDeltaColor =
+    analytics.weeklySpending.changePercentage > 0
+      ? '#FF314A'
+      : analytics.weeklySpending.changePercentage < 0
+        ? '#17C964'
+        : isDark
+          ? '#A2ABBA'
+          : '#6A7384';
+  const breakdownItems = analytics.spendingBreakdown.slices.length
+    ? analytics.spendingBreakdown.slices
+    : [{ label: 'No spending yet', percentage: 0, color: '#4F8CFF', amount: 0 }];
+  const weeklyDeltaLabel =
+    analytics.weeklySpending.changePercentage === 0
+      ? '0%'
+      : `${analytics.weeklySpending.changePercentage > 0 ? '↗ +' : '↘ '}${Math.abs(
+          analytics.weeklySpending.changePercentage,
+        )}%`;
 
   const pageStyles = useMemo(
     () => ({
@@ -305,18 +365,58 @@ export default function AssistantScreen() {
           <ScrollView
             contentContainerStyle={styles.analyticsContent}
             showsVerticalScrollIndicator={false}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}>
+              {analyticsFilters.map((filter) => {
+                const isActive = filter.key === selectedFilter;
+
+                return (
+                  <Pressable
+                    key={filter.key}
+                    style={[
+                      styles.filterChip,
+                      pageStyles.chip,
+                      isActive && pageStyles.segmentActive,
+                    ]}
+                    onPress={() => setSelectedFilter(filter.key)}>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        isActive ? pageStyles.title : pageStyles.segmentInactiveText,
+                      ]}>
+                      {filter.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
             <View style={[styles.card, pageStyles.card, shadows.soft]}>
               <View style={styles.cardHeadRow}>
                 <Text style={[styles.cardTitle, pageStyles.title]}>Budget Health</Text>
-                <View style={styles.excellentPill}>
-                  <Text style={styles.excellentText}>Excellent</Text>
+                <View
+                  style={[
+                    styles.excellentPill,
+                    { backgroundColor: withOpacity(budgetRingColor, 0.14) },
+                  ]}>
+                  <Text style={[styles.excellentText, { color: budgetRingColor }]}>
+                    {analytics.budgetHealth.tone}
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.healthRow}>
                 <View style={styles.healthMeterWrap}>
-                  <BudgetHealthRing trackColor={pageStyles.progressTrack.backgroundColor} />
-                  <Text style={[styles.healthScore, pageStyles.title]}>85</Text>
+                  <BudgetHealthRing
+                    trackColor={pageStyles.progressTrack.backgroundColor as string}
+                    score={analytics.budgetHealth.score}
+                    progressColor={budgetRingColor}
+                  />
+                  <Text style={[styles.healthScore, pageStyles.title]}>
+                    {analytics.budgetHealth.score}
+                  </Text>
                 </View>
 
                 <View style={styles.healthLabels}>
@@ -326,9 +426,15 @@ export default function AssistantScreen() {
                 </View>
 
                 <View style={styles.healthStats}>
-                  <Text style={[styles.healthStat, pageStyles.statusGreen]}>4 categories</Text>
-                  <Text style={[styles.healthStat, pageStyles.statusOrange]}>1 category</Text>
-                  <Text style={[styles.healthStat, pageStyles.statusRed]}>0 categories</Text>
+                  <Text style={[styles.healthStat, pageStyles.statusGreen]}>
+                    {categoryCountLabel(analytics.budgetHealth.onTrackCount)}
+                  </Text>
+                  <Text style={[styles.healthStat, pageStyles.statusOrange]}>
+                    {categoryCountLabel(analytics.budgetHealth.warningCount)}
+                  </Text>
+                  <Text style={[styles.healthStat, pageStyles.statusRed]}>
+                    {categoryCountLabel(analytics.budgetHealth.overBudgetCount)}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -337,15 +443,21 @@ export default function AssistantScreen() {
               <Text style={[styles.cardTitle, pageStyles.title]}>Spending Breakdown</Text>
 
               <View style={styles.breakdownRow}>
-                <BreakdownChart trackColor={pageStyles.progressTrack.backgroundColor} />
+                <BreakdownChart
+                  trackColor={pageStyles.progressTrack.backgroundColor as string}
+                  innerColor={pageStyles.donutInner}
+                  slices={analytics.spendingBreakdown.slices}
+                />
                 <View style={styles.breakdownLegend}>
-                  {breakdown.map((item) => (
+                  {breakdownItems.map((item) => (
                     <View key={item.label} style={styles.legendRow}>
                       <View style={styles.legendLeft}>
                         <View style={[styles.legendDot, { backgroundColor: item.color }]} />
                         <Text style={[styles.legendLabel, pageStyles.subtitle]}>{item.label}</Text>
                       </View>
-                      <Text style={[styles.legendValue, pageStyles.title]}>{item.value}</Text>
+                      <Text style={[styles.legendValue, pageStyles.title]}>
+                        {item.percentage}%
+                      </Text>
                     </View>
                   ))}
                 </View>
@@ -355,22 +467,30 @@ export default function AssistantScreen() {
 
               <View style={styles.totalSpentRow}>
                 <Text style={[styles.totalSpentLabel, pageStyles.subtitle]}>Total Spent</Text>
-                <Text style={[styles.totalSpentValue, pageStyles.title]}>₱25,100</Text>
+                <Text style={[styles.totalSpentValue, pageStyles.title]}>
+                  {formatCurrency(analytics.spendingBreakdown.totalSpent, analytics.currencyCode)}
+                </Text>
               </View>
             </View>
 
             <View style={[styles.card, pageStyles.card, shadows.soft]}>
               <View style={styles.cardHeadRow}>
                 <Text style={[styles.cardTitle, pageStyles.title]}>Weekly Spending</Text>
-                <Text style={styles.positiveDelta}>↗ +12%</Text>
+                <Text style={[styles.positiveDelta, { color: weeklyDeltaColor }]}>
+                  {weeklyDeltaLabel}
+                </Text>
               </View>
 
-              <AnalyticsChart strokeColor="#4C87FF" fillColor={pageStyles.graphFill} />
+              <AnalyticsChart
+                points={analytics.weeklySpending.points}
+                strokeColor="#4C87FF"
+                fillColor={pageStyles.graphFill}
+              />
 
               <View style={styles.weekLabels}>
-                {['Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                  <Text key={day} style={[styles.weekLabel, pageStyles.lineLabel]}>
-                    {day}
+                {analytics.weeklySpending.points.map((point) => (
+                  <Text key={point.label} style={[styles.weekLabel, pageStyles.lineLabel]}>
+                    {point.shortLabel}
                   </Text>
                 ))}
               </View>
@@ -379,12 +499,12 @@ export default function AssistantScreen() {
             <View style={[styles.card, pageStyles.card, shadows.soft]}>
               <Text style={[styles.cardTitle, pageStyles.title]}>Income vs Expenses</Text>
 
-              <IncomeExpenseChart />
+              <IncomeExpenseChart points={analytics.incomeVsExpenses.points} />
 
               <View style={styles.monthLabels}>
-                {['Jan', 'Feb', 'Mar', 'Apr', 'May'].map((month) => (
-                  <Text key={month} style={[styles.monthLabel, pageStyles.barMonth]}>
-                    {month}
+                {analytics.incomeVsExpenses.points.map((point) => (
+                  <Text key={point.label} style={[styles.monthLabel, pageStyles.barMonth]}>
+                    {point.label}
                   </Text>
                 ))}
               </View>
@@ -410,12 +530,15 @@ export default function AssistantScreen() {
                     style={styles.coachAvatar}
                   />
                 </View>
-                <Text style={styles.coachHeaderTitle}>Financial Insight</Text>
+              <Text style={styles.coachHeaderTitle}>Financial Insight</Text>
               </View>
               <Text style={[styles.coachBody, pageStyles.subtitle]}>
-                Your savings rate this month is 62% - that&apos;s 8% higher than last month! You&apos;re on track to reach your emergency fund goal by August.
+                {analytics.insights[0]?.message ??
+                  'Add more activity to generate personalized financial insights.'}
               </Text>
-              <Pressable style={styles.askRow}>
+              <Pressable
+                style={styles.askRow}
+                onPress={() => setActiveTab('assistant')}>
                 <Text style={[styles.askText, pageStyles.askLink]}>Ask Eyrie for advice</Text>
                 <Feather name="message-circle" size={16} color={pageStyles.askLink.color} />
               </Pressable>
@@ -567,6 +690,24 @@ const styles = StyleSheet.create({
     paddingBottom: 144,
     gap: 18,
   },
+  filterRow: {
+    gap: 10,
+    paddingRight: 14,
+  },
+  filterChip: {
+    height: 34,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterChipText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
   card: {
     borderRadius: 26,
     borderWidth: 1,
@@ -708,14 +849,16 @@ const styles = StyleSheet.create({
   },
   weekLabels: {
     marginTop: 4,
-    paddingHorizontal: 26,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   weekLabel: {
+    flex: 1,
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center',
   },
   monthLabels: {
     marginTop: -2,
