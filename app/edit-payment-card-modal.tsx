@@ -24,6 +24,7 @@ import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
 import Logo from "@/components/logo";
 import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
+import { CARD_NETWORKS } from "@/constants/cardNetworks";
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 
 function withOpacity(hex: string, opacity: number) {
@@ -44,6 +45,11 @@ function withOpacity(hex: string, opacity: number) {
 
 function formatDigits(value: string, maxLength: number) {
   return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function formatCardNumber(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 16);
+  return digits.replace(/(.{4})/g, "$1 ").trim();
 }
 
 function formatBalance(value: string) {
@@ -106,6 +112,13 @@ function resolveLogo(account: any) {
   return undefined;
 }
 
+function resolveCardNetworkLabel(account: any) {
+  const id = account?.icon;
+  if (!id) return account?.type === "credit" ? "Credit" : "Debit";
+  const match = CARD_NETWORKS.find((card) => card.id === id);
+  return match ? match.name : account?.type === "credit" ? "Credit" : "Debit";
+}
+
 export default function EditPaymentCardModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{ accountId?: string | string[] }>();
@@ -119,6 +132,12 @@ export default function EditPaymentCardModal() {
   const account = accounts.find((a) => a.id === accountId);
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
+  const [accountName, setAccountName] = useState(
+    account?.accountHolderName ?? "",
+  );
+  const [accountNumber, setAccountNumber] = useState(
+    account?.accountNumberLast4 ?? "",
+  );
   const [balance, setBalance] = useState((account?.balance ?? 0).toString());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -145,6 +164,8 @@ export default function EditPaymentCardModal() {
 
   useEffect(() => {
     if (account) {
+      setAccountName(account.accountHolderName ?? "");
+      setAccountNumber(account.accountNumberLast4 ?? "");
       setBalance((account.balance ?? 0).toString());
     }
   }, [account]);
@@ -200,6 +221,9 @@ export default function EditPaymentCardModal() {
 
       await accountsService.update(account.id, {
         name: brandName,
+        accountHolderName: accountName.trim() || null,
+        accountNumberLast4:
+          formatDigits(accountNumber, 16).slice(-4) || null,
         balance: parseFloat(balance) || 0,
       });
 
@@ -286,13 +310,14 @@ export default function EditPaymentCardModal() {
                   { color: withOpacity("#FFFFFF", 0.68) },
                 ]}
               >
-                {account?.type === "credit" ? "Credit" : "Debit"}
+                {resolveCardNetworkLabel(account)}
               </Text>
             </View>
 
             <Text style={styles.heroNumber}>
-              {account?.accountNumberLast4
-                ? "* * * * * * * * * * * * " + account.accountNumberLast4
+              {formatDigits(accountNumber, 16).slice(-4)
+                ? "* * * * * * * * * * * * " +
+                  formatDigits(accountNumber, 16).slice(-4)
                 : "N/A"}
             </Text>
 
@@ -309,11 +334,40 @@ export default function EditPaymentCardModal() {
               <View style={styles.heroExpiryBlock}>
                 <Text style={styles.heroMetaLabel}>TYPE</Text>
                 <Text style={styles.heroExpiry}>
-                  {account?.type === "credit" ? "Credit" : "Debit"}
+                  {resolveCardNetworkLabel(account)}
                 </Text>
               </View>
             </View>
           </PremiumCardGradient>
+
+          <View style={styles.formSection}>
+            <Text style={[styles.label, ui.label]}>Name</Text>
+            <View style={[styles.fieldSurface, ui.fieldSurface]}>
+              <TextInput
+                value={accountName}
+                onChangeText={setAccountName}
+                placeholder="JUAN DELA CRUZ"
+                placeholderTextColor={ui.placeholder.color}
+                selectionColor="#1681DD"
+                style={[styles.fieldInput, ui.fieldText]}
+              />
+            </View>
+          </View>
+
+          <View style={styles.formSection}>
+            <Text style={[styles.label, ui.label]}>Account Number</Text>
+            <View style={[styles.fieldSurface, ui.fieldSurface]}>
+              <TextInput
+                value={accountNumber}
+                onChangeText={(value) => setAccountNumber(formatCardNumber(value))}
+                placeholder="1234 5678 9012 3456"
+                placeholderTextColor={ui.placeholder.color}
+                keyboardType="number-pad"
+                selectionColor="#1681DD"
+                style={[styles.fieldInput, ui.fieldText]}
+              />
+            </View>
+          </View>
 
           <View style={styles.formSection}>
             <Text style={[styles.label, ui.label]}>Current Balance</Text>

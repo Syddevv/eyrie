@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +15,7 @@ import {
 
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
@@ -143,6 +145,17 @@ export default function AddEWalletAccountModal() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isConnectEnabled = Boolean(selectedWallet.name);
   const { user } = useCurrentUser();
+  const { accounts } = useAccounts();
+  const hasExistingWallet = useMemo(
+    () =>
+      accounts.some(
+        (account) =>
+          !account.isHidden &&
+          account.type === "ewallet" &&
+          account.name.toLowerCase().includes(selectedWallet.name.toLowerCase()),
+      ),
+    [accounts, selectedWallet.name],
+  );
 
   useEffect(() => {
     const showEvent =
@@ -350,6 +363,14 @@ export default function AddEWalletAccountModal() {
             onPress={async () => {
               if (!isConnectEnabled) {
                 showIncompleteFormAlert();
+                return;
+              }
+
+              if (hasExistingWallet) {
+                Alert.alert(
+                  "Wallet already added",
+                  `${selectedWallet.name} is already in your active wallets.`,
+                );
                 return;
               }
 

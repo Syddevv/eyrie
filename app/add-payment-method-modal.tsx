@@ -3,9 +3,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BANKS } from '@/constants/banks';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
+import { useAccounts } from '@/hooks/useAccounts';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { WALLETS } from '@/constants/wallets';
 
 type PaymentOption = {
   id: string;
@@ -37,7 +40,36 @@ export default function AddPaymentMethodModal() {
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
+  const { accounts } = useAccounts();
   const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo || '/payment-methods-modal';
+  const activeAccounts = useMemo(
+    () => accounts.filter((account) => !account.isHidden),
+    [accounts],
+  );
+  const hasAvailableCardBank = useMemo(
+    () =>
+      BANKS.some(
+        (bank) =>
+          !activeAccounts.some(
+            (account) =>
+              (account.type === 'bank' || account.type === 'credit') &&
+              account.name.toLowerCase().includes(bank.name.toLowerCase()),
+          ),
+      ),
+    [activeAccounts],
+  );
+  const hasAvailableWallet = useMemo(
+    () =>
+      WALLETS.some(
+        (wallet) =>
+          !activeAccounts.some(
+            (account) =>
+              account.type === 'ewallet' &&
+              account.name.toLowerCase().includes(wallet.name.toLowerCase()),
+          ),
+      ),
+    [activeAccounts],
+  );
 
   const ui = useMemo(
     () => ({
@@ -88,11 +120,16 @@ export default function AddPaymentMethodModal() {
         <Text style={[styles.subtitle, ui.subtitle]}>What would you like to add?</Text>
 
         <View style={styles.optionsRow}>
-          {paymentOptions.map((option) => (
+          {paymentOptions.map((option) => {
+            const isDisabled =
+              option.id === 'card' ? !hasAvailableCardBank : !hasAvailableWallet;
+
+            return (
             <Pressable
               key={option.id}
-              style={[styles.optionCard, ui.optionCard]}
+              style={[styles.optionCard, ui.optionCard, isDisabled && styles.optionCardDisabled]}
               onPress={() =>
+                !isDisabled &&
                 router.replace({
                   pathname: option.id === 'card' ? '/add-bank-card-method-modal' : '/add-e-wallet-method-modal',
                   params: {
@@ -100,14 +137,15 @@ export default function AddPaymentMethodModal() {
                     parentTo: returnTo,
                   },
                 })
-              }>
+              }
+              disabled={isDisabled}>
               <View style={[styles.optionIconWrap, { backgroundColor: option.iconColor }]}>
                 <MaterialCommunityIcons name={option.icon} size={22} color="#FFFFFF" />
               </View>
               <Text style={[styles.optionTitle, ui.optionTitle]}>{option.title}</Text>
               <Text style={[styles.optionSubtitle, ui.optionSubtitle]}>{option.subtitle}</Text>
             </Pressable>
-          ))}
+          )})}
         </View>
 
         <Pressable style={[styles.cancelButton, ui.cancelButton]} onPress={() => router.replace(returnTo)}>
@@ -180,6 +218,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 18,
+  },
+  optionCardDisabled: {
+    opacity: 0.42,
   },
   optionIconWrap: {
     width: 50,

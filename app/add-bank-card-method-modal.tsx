@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 
@@ -22,6 +23,7 @@ export default function AddBankCardMethodModal() {
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
+  const { accounts } = useAccounts();
   const returnTo =
     (Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo) ||
     "/payment-methods-modal";
@@ -53,6 +55,24 @@ export default function AddBankCardMethodModal() {
     );
     setVisibleBanks(filtered);
   }, [debouncedQuery]);
+
+  const addedBankIds = useMemo(
+    () =>
+      new Set(
+        accounts
+          .filter(
+            (account) =>
+              !account.isHidden &&
+              (account.type === "bank" || account.type === "credit"),
+          )
+          .flatMap((account) =>
+            BANKS.filter((bank) =>
+              account.name.toLowerCase().includes(bank.name.toLowerCase()),
+            ).map((bank) => bank.id),
+          ),
+      ),
+    [accounts],
+  );
 
   const ui = useMemo(
     () => ({
@@ -147,6 +167,7 @@ export default function AddBankCardMethodModal() {
           >
             {visibleBanks.map((bank) => {
               const isSelected = bank.id === selectedBank;
+              const isDisabled = addedBankIds.has(bank.id);
 
               return (
                 <Pressable
@@ -157,8 +178,14 @@ export default function AddBankCardMethodModal() {
                     isSelected && ui.optionCardSelected,
                     isSelected && { borderColor: bank.primaryColor },
                     isSelected && styles.bankCardActive,
+                    isDisabled && styles.optionCardDisabled,
                   ]}
-                  onPress={() => setSelectedBank(bank.id)}
+                  onPress={() => {
+                    if (!isDisabled) {
+                      setSelectedBank(bank.id);
+                    }
+                  }}
+                  disabled={isDisabled}
                 >
                   <Logo
                     id={bank.id}
@@ -340,6 +367,9 @@ const styles = StyleSheet.create({
   },
   bankCardActive: {
     borderColor: "#60A5FA",
+  },
+  optionCardDisabled: {
+    opacity: 0.42,
   },
   bankCard: {
     width: "48%",

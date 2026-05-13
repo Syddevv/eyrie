@@ -14,6 +14,7 @@ import Logo from "../components/logo";
 import { WALLETS } from "@/constants/wallets";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 
@@ -26,6 +27,7 @@ export default function AddEWalletMethodModal() {
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
+  const { accounts } = useAccounts();
 
   const returnTo =
     (Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo) ||
@@ -42,6 +44,19 @@ export default function AddEWalletMethodModal() {
   );
   // No search field: show curated wallets list
   const visibleWallets = WALLETS;
+  const addedWalletIds = useMemo(
+    () =>
+      new Set(
+        accounts
+          .filter((account) => !account.isHidden && account.type === "ewallet")
+          .flatMap((account) =>
+            WALLETS.filter((wallet) =>
+              account.name.toLowerCase().includes(wallet.name.toLowerCase()),
+            ).map((wallet) => wallet.id),
+          ),
+      ),
+    [accounts],
+  );
 
   const isContinueEnabled = Boolean(selectedWallet);
 
@@ -133,6 +148,7 @@ export default function AddEWalletMethodModal() {
         >
           {visibleWallets.map((wallet) => {
             const isSelected = wallet.id === selectedWallet;
+            const isDisabled = addedWalletIds.has(wallet.id);
 
             return (
               <Pressable
@@ -143,8 +159,14 @@ export default function AddEWalletMethodModal() {
                   isSelected && ui.walletCardSelected,
                   isSelected && { borderColor: wallet.primaryColor },
                   isSelected && styles.walletCardActive,
+                  isDisabled && styles.walletCardDisabled,
                 ]}
-                onPress={() => setSelectedWallet(wallet.id)}
+                onPress={() => {
+                  if (!isDisabled) {
+                    setSelectedWallet(wallet.id);
+                  }
+                }}
+                disabled={isDisabled}
               >
                 <Logo
                   id={wallet.id}
@@ -283,6 +305,9 @@ const styles = StyleSheet.create({
   },
   walletCardActive: {
     borderColor: "#60A5FA",
+  },
+  walletCardDisabled: {
+    opacity: 0.42,
   },
   walletText: {
     flex: 1,

@@ -63,6 +63,7 @@ export default function PaymentCardDetailsModal() {
     : params.hideActions === "1";
   const account = accounts.find((a) => a.id === accountId);
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
+  const accountHolderLabel = account?.accountHolderName?.trim() || "Not set";
 
   const resolveBrandName = (acct: any) => {
     const nameLower = (acct?.name || "").toLowerCase();
@@ -261,6 +262,12 @@ export default function PaymentCardDetailsModal() {
         </PremiumCardGradient>
 
         <View style={styles.detailList}>
+          <View style={[styles.detailCard, ui.detailCard]}>
+            <Text style={[styles.detailLabel, ui.detailLabel]}>Name</Text>
+            <Text style={[styles.detailValue, ui.detailValue]}>
+              {accountHolderLabel}
+            </Text>
+          </View>
           <View style={[styles.detailCard, ui.detailCard]}>
             <Text style={[styles.detailLabel, ui.detailLabel]}>Balance</Text>
             <Text style={[styles.detailValue, ui.balanceValue]}>

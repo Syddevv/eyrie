@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +18,7 @@ import { BANKS } from "@/constants/banks";
 import { CARD_NETWORKS } from "@/constants/cardNetworks";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAccounts } from "@/hooks/useAccounts";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -76,6 +78,19 @@ export default function AddBankAccountModal() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isAddEnabled = Boolean(selectedBank);
   const { user } = useCurrentUser();
+  const { accounts } = useAccounts();
+  const hasExistingBank = useMemo(
+    () =>
+      selectedBank
+        ? accounts.some(
+            (account) =>
+              !account.isHidden &&
+              (account.type === "bank" || account.type === "credit") &&
+              account.name.toLowerCase().includes(selectedBank.name.toLowerCase()),
+          )
+        : false,
+    [accounts, selectedBank],
+  );
 
   useEffect(() => {
     const showEvent =
@@ -292,13 +307,25 @@ export default function AddBankAccountModal() {
                 return;
               }
 
+              if (hasExistingBank) {
+                Alert.alert(
+                  "Card already added",
+                  `${selectedBank?.name ?? "This bank"} is already in your active cards.`,
+                );
+                return;
+              }
+
+              const last4 = cardNumber.replace(/\D/g, "").slice(-4) || null;
+
               try {
                 await accountsService.create({
                   userId: user?.id ?? "",
                   name: selectedBank?.name ?? cardholderName.trim(),
+                  accountHolderName: cardholderName.trim() || null,
                   type: "bank",
                   balance: Number(balance) || 0,
                   currencyCode: undefined as any,
+                  accountNumberLast4: last4,
                   color: selectedBank?.primaryColor || "#6DB2EE",
                   // store selected card network id so we can show Visa/Mastercard later
                   icon: selectedCardType?.id ?? null,

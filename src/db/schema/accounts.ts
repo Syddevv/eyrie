@@ -13,6 +13,7 @@ export const accounts = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     name: text("name").notNull(),
+    accountHolderName: text("account_holder_name"),
     balance: real("balance").notNull().default(0),
     currencyCode: text("currency_code")
       .notNull()
