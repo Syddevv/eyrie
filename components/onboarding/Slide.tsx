@@ -79,6 +79,19 @@ const sparkles = [
   { key: "sparkle-4", x: 0.76, y: 0.72, size: 7, duration: 4300, shift: 6 },
 ] as const;
 
+const accentLoopProfiles = [
+  { duration: 3900, floatY: -4, floatX: 1, scale: 1.008, rotate: 0.45 },
+  { duration: 4400, floatY: 5, floatX: -1, scale: 1.01, rotate: -0.55 },
+  { duration: 4700, floatY: -6, floatX: 0.5, scale: 1.006, rotate: 0.35 },
+  { duration: 4100, floatY: 4, floatX: -0.5, scale: 1.009, rotate: -0.4 },
+] as const;
+
+const mascotLoopProfiles = [
+  { duration: 4300, floatY: -8, floatX: 0.6, scale: 1.015, rotate: 0.7 },
+  { duration: 4700, floatY: -7, floatX: -0.4, scale: 1.014, rotate: -0.55 },
+  { duration: 5000, floatY: -8, floatX: 0.3, scale: 1.016, rotate: 0.45 },
+] as const;
+
 function createAccentAnchorStyle(
   anchor: AccentAnchor,
   frameWidth: number,
@@ -149,6 +162,7 @@ function FloatingAccentCard({
         ? 60
         : 52;
   const Icon = accent.icon;
+  const floatProfile = accentLoopProfiles[index % accentLoopProfiles.length];
   const anchorStyle = createAccentAnchorStyle(
     accent.anchor,
     frameWidth,
@@ -172,12 +186,14 @@ function FloatingAccentCard({
     >
       <MotiView
         animate={{
-          translateY: [0, -5, 0],
-          rotate: ["0deg", `${index % 2 === 0 ? 1 : -1}deg`, "0deg"],
+          translateY: [0, floatProfile.floatY, 0],
+          translateX: [0, floatProfile.floatX, 0],
+          scale: [1, floatProfile.scale, 1],
+          rotate: ["0deg", `${floatProfile.rotate}deg`, "0deg"],
         }}
         transition={{
           type: "timing",
-          duration: 4600 + index * 260,
+          duration: floatProfile.duration + index * 140,
           loop: true,
         }}
       >
@@ -257,8 +273,17 @@ function FloatingAccentCard({
   );
 }
 
-function Slide({ slide }: { slide: OnboardingSlideData }) {
+function Slide({
+  slide,
+  introSeed = 0,
+}: {
+  slide: OnboardingSlideData;
+  introSeed?: number;
+}) {
   const { height, width } = useWindowDimensions();
+  const introKey = `${slide.id}-${introSeed}`;
+  const mascotProfile =
+    mascotLoopProfiles[slide.id % mascotLoopProfiles.length];
 
   const frameHeight = useMemo(
     () => Math.min(Math.max(height * 0.43, 330), 455),
@@ -281,7 +306,7 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
         >
           {sparkles.map((sparkle) => (
             <MotiView
-              key={`${slide.id}-${sparkle.key}`}
+              key={`${introKey}-${sparkle.key}`}
               from={{ opacity: 0, translateY: 6 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{
@@ -367,6 +392,7 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
           ))}
 
           <MotiView
+            key={`${introKey}-mascot`}
             from={{ opacity: 0, scale: 0.975, translateY: 14 }}
             animate={{
               opacity: 1,
@@ -390,11 +416,14 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
           >
             <MotiView
               animate={{
-                translateY: [0, -5, 0],
+                translateY: [0, mascotProfile.floatY, 0],
+                translateX: [0, mascotProfile.floatX, 0],
+                scale: [1, mascotProfile.scale, 1],
+                rotate: ["0deg", `${mascotProfile.rotate}deg`, "0deg"],
               }}
               transition={{
                 type: "timing",
-                duration: 4800,
+                duration: mascotProfile.duration,
                 loop: true,
               }}
             >
@@ -411,12 +440,13 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
 
       <View style={styles.contentSection}>
         <MotiView
+          key={`${introKey}-badge`}
           from={{ opacity: 0, translateY: 10 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 260,
-            delay: 80,
+            duration: 210,
+            delay: 12,
             easing: Easing.out(Easing.cubic),
           }}
         >
@@ -426,12 +456,13 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
         </MotiView>
 
         <MotiView
+          key={`${introKey}-title`}
           from={{ opacity: 0, translateY: 12 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 300,
-            delay: 115,
+            duration: 230,
+            delay: 34,
             easing: Easing.out(Easing.cubic),
           }}
         >
@@ -441,12 +472,13 @@ function Slide({ slide }: { slide: OnboardingSlideData }) {
         </MotiView>
 
         <MotiView
+          key={`${introKey}-description`}
           from={{ opacity: 0, translateY: 10 }}
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 300,
-            delay: 145,
+            duration: 230,
+            delay: 54,
             easing: Easing.out(Easing.cubic),
           }}
         >

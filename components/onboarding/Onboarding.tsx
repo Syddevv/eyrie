@@ -256,6 +256,7 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  const [introSeed, setIntroSeed] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
   const activeSlide = slides[index];
@@ -283,6 +284,7 @@ export default function Onboarding() {
       }
 
       setIndex(nextIndex);
+      setIntroSeed((current) => current + 1);
     },
     [index],
   );
@@ -379,7 +381,10 @@ export default function Onboarding() {
                       },
                     ]}
                   >
-                    <Slide slide={slide} />
+                    <Slide
+                      slide={slide}
+                      introSeed={isActive ? introSeed : slideIndex}
+                    />
                   </MotiView>
                 );
               })}
@@ -397,10 +402,12 @@ export default function Onboarding() {
             ]}
           >
             <MotiView
+              key={`pagination-${activeSlide.id}-${introSeed}`}
+              from={{ opacity: 0, translateY: 8, scale: 0.99 }}
               animate={{ opacity: 1, translateY: 0 }}
               transition={{
                 type: "timing",
-                duration: 280,
+                duration: 180,
                 easing: Easing.out(Easing.cubic),
               }}
             >
@@ -412,10 +419,12 @@ export default function Onboarding() {
             </MotiView>
 
             <MotiView
+              key={`cta-${activeSlide.id}-${introSeed}`}
+              from={{ opacity: 0, translateY: 12, scale: 0.985 }}
               animate={{ opacity: 1, translateY: 0, scale: 1 }}
               transition={{
                 type: "timing",
-                duration: 320,
+                duration: 200,
                 easing: Easing.out(Easing.cubic),
               }}
             >
