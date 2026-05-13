@@ -1,9 +1,9 @@
-import type { Session, User } from '@supabase/supabase-js';
-import { create } from 'zustand';
+import type { Session, User } from "@supabase/supabase-js";
+import { create } from "zustand";
 
-export type AuthMode = 'sign-in' | 'sign-up';
-export type SnackbarTone = 'success' | 'error' | 'info';
-export type OtpStatus = 'idle' | 'error' | 'success';
+export type AuthMode = "sign-in" | "sign-up";
+export type SnackbarTone = "success" | "error" | "info";
+export type OtpStatus = "idle" | "error" | "success";
 
 export type OtpModalState = {
   visible: boolean;
@@ -24,6 +24,8 @@ type AuthStoreState = {
   session: Session | null;
   user: User | null;
   isReady: boolean;
+  hasCompletedOnboarding: boolean;
+  setHasCompletedOnboarding: (hasCompletedOnboarding: boolean) => void;
   isSigningIn: boolean;
   isSigningUp: boolean;
   isSendingOtp: boolean;
@@ -40,7 +42,7 @@ type AuthStoreState = {
   setVerifyingOtp: (value: boolean) => void;
   setGoogleLoading: (value: boolean) => void;
   setSigningOut: (value: boolean) => void;
-  openOtpModal: (payload: Omit<OtpModalState, 'visible' | 'status'>) => void;
+  openOtpModal: (payload: Omit<OtpModalState, "visible" | "status">) => void;
   closeOtpModal: () => void;
   setOtpModalStatus: (status: OtpStatus) => void;
   setOtpResendAvailableAt: (timestamp: number) => void;
@@ -50,16 +52,17 @@ type AuthStoreState = {
 
 const initialOtpModal: OtpModalState = {
   visible: false,
-  email: '',
-  mode: 'sign-in',
+  email: "",
+  mode: "sign-in",
   resendAvailableAt: 0,
-  status: 'idle',
+  status: "idle",
 };
 
 export const useAuthStore = create<AuthStoreState>((set) => ({
   session: null,
   user: null,
   isReady: false,
+  hasCompletedOnboarding: false,
   isSigningIn: false,
   isSigningUp: false,
   isSendingOtp: false,
@@ -74,6 +77,8 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       user: session?.user ?? null,
     }),
   setReady: (isReady) => set({ isReady }),
+  setHasCompletedOnboarding: (hasCompletedOnboarding) =>
+    set({ hasCompletedOnboarding }),
   setSigningIn: (value) => set({ isSigningIn: value }),
   setSigningUp: (value) => set({ isSigningUp: value }),
   setSendingOtp: (value) => set({ isSendingOtp: value }),
@@ -84,7 +89,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({
       otpModal: {
         visible: true,
-        status: 'idle',
+        status: "idle",
         ...payload,
       },
     }),
@@ -108,7 +113,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
         resendAvailableAt: timestamp,
       },
     })),
-  showSnackbar: (message, tone = 'info') =>
+  showSnackbar: (message, tone = "info") =>
     set({
       snackbar: {
         visible: true,

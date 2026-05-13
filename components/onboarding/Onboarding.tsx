@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Asset } from "expo-asset";
 import { MotiView } from "moti";
@@ -31,11 +30,12 @@ import {
 import Pagination from "./Pagination";
 import Slide, { type OnboardingSlideData } from "./Slide";
 
+import { setHasCompletedOnboarding as persistOnboardingCompletion } from "@/lib/onboarding-storage";
+import { useAuthStore } from "@/store/useAuthStore";
+
 import Mascot1 from "@/assets/images/Eyrie_Mascot_1.png";
 import Mascot2 from "@/assets/images/Eyrie_Mascot_2.png";
 import Mascot3 from "@/assets/images/Eyrie_Mascot_3.png";
-
-const ONBOARDING_STORAGE_KEY = "onboardingCompleted";
 
 const slides: readonly OnboardingSlideData[] = [
   {
@@ -196,15 +196,6 @@ const pageTransition = {
   easing: Easing.out(Easing.cubic),
 };
 
-async function setCompletedOnboarding() {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-    return;
-  }
-
-  await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-}
-
 const PersistentBackground = memo(function PersistentBackground() {
   return (
     <View style={styles.backgroundLayer} pointerEvents="none">
@@ -258,6 +249,9 @@ export default function Onboarding() {
   const [index, setIndex] = useState(0);
   const [introSeed, setIntroSeed] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const setOnboardingCompleted = useAuthStore(
+    (state) => state.setHasCompletedOnboarding,
+  );
 
   const activeSlide = slides[index];
   const isCompact = height < 760;
@@ -269,9 +263,10 @@ export default function Onboarding() {
   }, []);
 
   const complete = useCallback(async () => {
-    await setCompletedOnboarding();
-    router.replace("/sign-in");
-  }, [router]);
+    await persistOnboardingCompletion();
+    setOnboardingCompleted(true);
+    router.replace("/sign-up");
+  }, [router, setOnboardingCompleted]);
 
   const skip = useCallback(() => {
     void complete();
