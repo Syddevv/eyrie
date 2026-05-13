@@ -8,7 +8,7 @@ type ThemePreference = ThemeMode | "system";
 
 const STORAGE_KEY = "eyrie:theme-preference";
 const listeners = new Set<() => void>();
-let preference: ThemePreference = "system";
+let preference: ThemePreference = "light";
 let hasLoadedPreference = false;
 
 function notifyThemePreferenceChanged() {
@@ -72,4 +72,3 @@ export function useColorScheme(): ThemeMode {
 
   return systemColorScheme === "dark" ? "dark" : "light";
 }
-
