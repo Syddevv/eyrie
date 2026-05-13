@@ -24,10 +24,7 @@ function AppShell() {
       <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       <Stack.Screen name="sign-up" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="transactions"
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="transactions" options={{ headerShown: false }} />
       <Stack.Screen
         name="transaction-details-modal"
         options={{
@@ -46,10 +43,7 @@ function AppShell() {
           contentStyle: { backgroundColor: "transparent" },
         }}
       />
-      <Stack.Screen
-        name="notifications"
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
       <Stack.Screen
         name="categories-settings"
         options={{ headerShown: false }}

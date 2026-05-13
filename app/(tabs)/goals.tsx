@@ -75,13 +75,15 @@ export default function GoalsScreen() {
       headerAction: {
         backgroundColor: colorScheme === "light" ? colors.primary : "#1495FF",
       },
-      summaryGradient: colorScheme === "light"
-        ? (["#31DC95", "#1CCB7F", "#14915E"] as const)
-        : (["#1AB877", "#119B63", "#096A44"] as const),
+      summaryGradient:
+        colorScheme === "light"
+          ? (["#31DC95", "#1CCB7F", "#14915E"] as const)
+          : (["#1AB877", "#119B63", "#096A44"] as const),
       summaryCard: {
-        borderColor: colorScheme === "light"
-          ? "rgba(255, 255, 255, 0.12)"
-          : "rgba(255, 255, 255, 0.06)",
+        borderColor:
+          colorScheme === "light"
+            ? "rgba(255, 255, 255, 0.12)"
+            : "rgba(255, 255, 255, 0.06)",
         shadowOpacity: colorScheme === "light" ? 0.12 : 0.14,
         shadowRadius: 20,
         shadowOffset: { width: 0, height: 12 },
@@ -128,6 +130,7 @@ export default function GoalsScreen() {
             : "rgba(20,149,255,0.16)",
       },
       coachTitle: { color: colorScheme === "light" ? "#0D1B2A" : "#FFFFFF" },
+      coachGoalName: { color: colorScheme === "light" ? "#0E67F7" : "#5B9CF7" },
       coachText: { color: colorScheme === "light" ? "#58718E" : "#99A8BB" },
       coachButton: {
         backgroundColor: colorScheme === "light" ? "#1495FF" : "#1697FF",
@@ -267,7 +270,10 @@ export default function GoalsScreen() {
                   ]}
                 >
                   <LinearGradient
-                    colors={["rgba(255,255,255,0.98)", "rgba(223,255,241,0.92)"]}
+                    colors={[
+                      "rgba(255,255,255,0.98)",
+                      "rgba(223,255,241,0.92)",
+                    ]}
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
                     style={styles.summaryFill}
@@ -454,10 +460,14 @@ export default function GoalsScreen() {
                         <GoalAvatar goal={goal} size={18} />
                       </View>
                       <View style={styles.archiveTextBlock}>
-                        <Text style={[styles.archiveGoalTitle, pageStyles.title]}>
+                        <Text
+                          style={[styles.archiveGoalTitle, pageStyles.title]}
+                        >
                           {goal.title}
                         </Text>
-                        <Text style={[styles.archiveGoalMeta, pageStyles.mutedText]}>
+                        <Text
+                          style={[styles.archiveGoalMeta, pageStyles.mutedText]}
+                        >
                           {`${formatCurrency(goal.currentAmount)} of ${formatCurrency(goal.targetAmount)}`}
                         </Text>
                       </View>
@@ -493,6 +503,11 @@ export default function GoalsScreen() {
                   <Text style={[styles.coachTitle, pageStyles.coachTitle]}>
                     Savings Insight
                   </Text>
+                  <Text
+                    style={[styles.coachGoalName, pageStyles.coachGoalName]}
+                  >
+                    {highlightedGoal.title}
+                  </Text>
                   <Text style={[styles.coachText, pageStyles.coachText]}>
                     {highlightedGoal.insights[0]?.message ??
                       `You need about ${formatCurrency(highlightedGoal.metrics.monthlyTarget)} each month to stay on track.`}
@@ -514,7 +529,9 @@ export default function GoalsScreen() {
                 }}
               >
                 <Text style={styles.coachButtonText}>
-                  {highlightedGoal.isCompleted ? "Create New Goal" : "Add Contribution"}
+                  {highlightedGoal.isCompleted
+                    ? "Create New Goal"
+                    : "Add Contribution"}
                 </Text>
               </Pressable>
             </View>
@@ -687,7 +704,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     overflow: "hidden",
   },
-  summaryFillWrap: { height: "100%", borderRadius: radius.full, overflow: "hidden" },
+  summaryFillWrap: {
+    height: "100%",
+    borderRadius: radius.full,
+    overflow: "hidden",
+  },
   summaryFill: { width: "100%", height: "100%", borderRadius: radius.full },
   goalsList: { gap: 16, marginTop: 18 },
   goalCard: {
@@ -810,6 +831,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 22,
     fontWeight: fontWeights.bold,
+  },
+  coachGoalName: {
+    marginTop: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
   },
   coachText: {
     marginTop: 4,
