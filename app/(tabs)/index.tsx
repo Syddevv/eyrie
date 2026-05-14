@@ -2,7 +2,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useMemo, useState, type ComponentProps } from "react";
+import { memo, useMemo, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
@@ -89,6 +90,315 @@ const HOME_CONTENT_WIDTH = Dimensions.get("window").width - 32;
 const HOME_CARD_GAP = 12;
 const HOME_CARD_WIDTH = (HOME_CONTENT_WIDTH - HOME_CARD_GAP) / 2;
 const HOME_CARD_HEIGHT = 138;
+
+type EmptyStateVariant = "cards" | "budgets" | "transactions";
+type ThemePalette = typeof themeColors.light;
+
+interface PremiumEmptyStateProps {
+  variant: EmptyStateVariant;
+  title: string;
+  body: string;
+  eyebrow: string;
+  ctaLabel?: string;
+  onPress?: () => void;
+  width?: number;
+  delay?: number;
+  colors: ThemePalette;
+  colorScheme: "light" | "dark";
+  mutedTextColor: string;
+}
+
+const EmptyStateIllustration = memo(function EmptyStateIllustration({
+  variant,
+  colors,
+  colorScheme,
+}: Pick<PremiumEmptyStateProps, "variant" | "colors" | "colorScheme">) {
+  const isLight = colorScheme === "light";
+  const accent =
+    variant === "budgets"
+      ? "#2DBBBA"
+      : variant === "transactions"
+        ? "#7A8AA0"
+        : colors.primary;
+
+  if (variant === "cards") {
+    return (
+      <View style={styles.emptyVisualCards}>
+        <LinearGradient
+          colors={[
+            withOpacity(colors.primary, isLight ? 0.14 : 0.22),
+            withOpacity("#6EA8FF", isLight ? 0.28 : 0.2),
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.emptyVisualCardLayer, styles.emptyVisualCardBack]}
+        />
+        <LinearGradient
+          colors={
+            isLight
+              ? (["#61A3FF", "#3E7EFF"] as const)
+              : ([withOpacity("#7EB0FF", 0.9), colors.primary] as const)
+          }
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.emptyVisualCardLayer}
+        >
+          <View style={styles.emptyVisualCardChip} />
+          <View style={styles.emptyVisualCardDots}>
+            <View style={styles.emptyVisualCardDot} />
+            <View style={styles.emptyVisualCardDot} />
+            <View style={styles.emptyVisualCardDot} />
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  if (variant === "budgets") {
+    return (
+      <View style={styles.emptyVisualBudget}>
+        <View
+          style={[
+            styles.emptyVisualBudgetRing,
+            { borderColor: withOpacity(accent, isLight ? 0.24 : 0.34) },
+          ]}
+        >
+          <View
+            style={[
+              styles.emptyVisualBudgetRingFill,
+              { backgroundColor: withOpacity(accent, isLight ? 0.16 : 0.22) },
+            ]}
+          />
+          <MaterialCommunityIcons
+            name="chart-donut"
+            size={20}
+            color={accent}
+          />
+        </View>
+        <View style={styles.emptyVisualBudgetBars}>
+          {[0.84, 0.58, 0.72].map((width, index) => (
+            <View
+              key={`${variant}-bar-${index}`}
+              style={[
+                styles.emptyVisualBudgetBarTrack,
+                {
+                  backgroundColor: withOpacity(
+                    colors.foreground,
+                    isLight ? 0.07 : 0.12,
+                  ),
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.emptyVisualBudgetBarFill,
+                  {
+                    width: `${width * 100}%`,
+                    backgroundColor:
+                      index === 1
+                        ? withOpacity(colors.primary, isLight ? 0.26 : 0.42)
+                        : withOpacity(accent, isLight ? 0.24 : 0.36),
+                  },
+                ]}
+              />
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.emptyVisualTransactions}>
+      {[0.88, 0.72, 0.64].map((width, index) => (
+        <View key={`${variant}-row-${index}`} style={styles.emptyVisualTxnRow}>
+          <View
+            style={[
+              styles.emptyVisualTxnDot,
+              { backgroundColor: withOpacity(colors.primary, 0.18) },
+            ]}
+          />
+          <View style={styles.emptyVisualTxnCopy}>
+            <View
+              style={[
+                styles.emptyVisualTxnLine,
+                {
+                  width: `${width * 100}%`,
+                  backgroundColor: withOpacity(
+                    colors.foreground,
+                    isLight ? 0.11 : 0.16,
+                  ),
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.emptyVisualTxnLineSmall,
+                {
+                  backgroundColor: withOpacity(
+                    colors.foreground,
+                    isLight ? 0.07 : 0.12,
+                  ),
+                },
+              ]}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+});
+
+const PremiumEmptyState = memo(function PremiumEmptyState({
+  variant,
+  title,
+  body,
+  eyebrow,
+  ctaLabel,
+  onPress,
+  width,
+  delay = 0,
+  colors,
+  colorScheme,
+  mutedTextColor,
+}: PremiumEmptyStateProps) {
+  const isLight = colorScheme === "light";
+  const accent =
+    variant === "budgets"
+      ? "#2DBBBA"
+      : variant === "transactions"
+        ? "#7A8AA0"
+        : colors.primary;
+  const iconName =
+    variant === "budgets"
+      ? "chart-box-outline"
+      : variant === "transactions"
+        ? "history"
+        : "credit-card-outline";
+  const gradientColors =
+    variant === "budgets"
+      ? ([withOpacity("#2DBBBA", isLight ? 0.08 : 0.12), "transparent"] as const)
+      : variant === "transactions"
+        ? ([withOpacity(colors.primary, isLight ? 0.06 : 0.1), "transparent"] as const)
+        : ([withOpacity(colors.primary, isLight ? 0.08 : 0.12), "transparent"] as const);
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(360).delay(delay)}
+      style={[
+        styles.premiumEmptyCardWrap,
+        styles.premiumEmptyCardShadow,
+        width ? { width } : styles.premiumEmptyStretch,
+      ]}
+    >
+      <View
+        style={[
+          styles.premiumEmptyCard,
+          width ? { width: "100%" } : null,
+          {
+            backgroundColor: colors.card,
+            borderColor: withOpacity(colors.border, isLight ? 0.88 : 0.96),
+          },
+        ]}
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={gradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.premiumEmptyGradient}
+        />
+        <View
+          pointerEvents="none"
+          style={[
+            styles.premiumEmptyGlow,
+            {
+              backgroundColor: withOpacity(accent, isLight ? 0.07 : 0.1),
+            },
+          ]}
+        />
+        <View
+          pointerEvents="none"
+          style={[
+            styles.premiumEmptyBlob,
+            {
+              backgroundColor: withOpacity(colors.primary, isLight ? 0.05 : 0.08),
+            },
+          ]}
+        />
+
+        <View style={styles.premiumEmptyVisualBlock}>
+          <View
+            style={[
+              styles.premiumEmptyIconShell,
+              {
+                backgroundColor: withOpacity(accent, isLight ? 0.12 : 0.18),
+                borderColor: withOpacity(accent, isLight ? 0.1 : 0.16),
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.premiumEmptyIconInner,
+                {
+                  backgroundColor: withOpacity(accent, isLight ? 0.16 : 0.24),
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={iconName}
+                size={16}
+                color={accent}
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.premiumEmptyTextBlock}>
+          <Text style={[styles.premiumEmptyEyebrow, { color: mutedTextColor }]}>
+            {eyebrow}
+          </Text>
+          <Text style={[styles.premiumEmptyTitle, { color: colors.foreground }]}>
+            {title}
+          </Text>
+          <Text style={[styles.premiumEmptyBody, { color: mutedTextColor }]}>
+            {body}
+          </Text>
+        </View>
+
+        <EmptyStateIllustration
+          variant={variant}
+          colors={colors}
+          colorScheme={colorScheme}
+        />
+
+        {ctaLabel && onPress ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.premiumEmptyButtonWrap,
+              pressed && styles.premiumEmptyButtonWrapPressed,
+            ]}
+            onPress={onPress}
+          >
+            <LinearGradient
+              colors={
+                isLight
+                  ? (["#62A5FF", "#2F7CF7"] as const)
+                  : ([withOpacity("#74AEFF", 0.94), colors.primary] as const)
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.premiumEmptyButton}
+            >
+              <Feather name="plus" size={14} color="#FFFFFF" />
+              <Text style={styles.premiumEmptyButtonText}>{ctaLabel}</Text>
+            </LinearGradient>
+          </Pressable>
+        ) : null}
+      </View>
+    </Animated.View>
+  );
+});
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -502,69 +812,24 @@ export default function HomeScreen() {
             {(() => {
               if (!accountsLoading && cardAccounts.length === 0) {
                 return (
-                  <View
-                    style={[
-                      styles.emptyCard,
-                      {
-                        backgroundColor: pageStyles.whiteCard.backgroundColor,
-                        borderColor: withOpacity(colors.border, 0.9),
-                      },
-                      shadows.soft,
-                    ]}
-                  >
-                    <View style={styles.emptyCardHero}>
-                      <View
-                        style={[
-                          styles.emptyCardIconWrap,
-                          {
-                            backgroundColor:
-                              colorScheme === "light"
-                                ? "#E8F3FF"
-                                : withOpacity(colors.primary, 0.18),
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="credit-card-outline"
-                          size={24}
-                          color={colors.primary}
-                        />
-                      </View>
-                      <Text
-                        style={[styles.emptyCardEyebrow, pageStyles.mutedText]}
-                      >
-                        Card Setup
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.emptyCardTitle,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      No cards yet
-                    </Text>
-                    <Text style={[styles.emptyCardBody, pageStyles.mutedText]}>
-                      Connect your first bank or credit card to view it here.
-                    </Text>
-                    <Pressable
-                      style={[
-                        styles.emptyCardButton,
-                        { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() =>
-                        router.push("/add-bank-card-method-modal", {
-                          returnTo: "/(tabs)",
-                          parentTo: "/(tabs)",
-                        })
-                      }
-                    >
-                      <View style={styles.emptyCardButtonContent}>
-                        <Feather name="plus" size={15} color="#FFFFFF" />
-                        <Text style={styles.emptyCardButtonText}>Add card</Text>
-                      </View>
-                    </Pressable>
-                  </View>
+                  <PremiumEmptyState
+                    variant="cards"
+                    eyebrow="Card setup"
+                    title="No cards yet"
+                    body="Link your first card to track balances here."
+                    ctaLabel="Add card"
+                    width={HOME_CONTENT_WIDTH}
+                    delay={70}
+                    colors={colors}
+                    colorScheme={colorScheme}
+                    mutedTextColor={pageStyles.mutedText.color}
+                    onPress={() =>
+                      router.push("/add-bank-card-method-modal", {
+                        returnTo: "/(tabs)",
+                        parentTo: "/(tabs)",
+                      })
+                    }
+                  />
                 );
               }
 
@@ -1025,27 +1290,23 @@ export default function HomeScreen() {
                 </Text>
               </View>
             ) : (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.whiteCard,
-                  shadows.soft,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="chart-box-outline"
-                  size={24}
-                  color={colors.mutedForeground}
-                />
-                <Text
-                  style={[styles.emptyStateTitle, { color: colors.foreground }]}
-                >
-                  No active budgets yet
-                </Text>
-                <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
-                  Create a budget and it will appear here with live progress.
-                </Text>
-              </View>
+              <PremiumEmptyState
+                variant="budgets"
+                eyebrow="Budget progress"
+                title="No active budgets yet"
+                body="Create a budget to see live category progress."
+                ctaLabel="Create budget"
+                delay={120}
+                colors={colors}
+                colorScheme={colorScheme}
+                mutedTextColor={pageStyles.mutedText.color}
+                onPress={() =>
+                  router.push({
+                    pathname: "/add-category-modal",
+                    params: { cycle: "monthly" },
+                  })
+                }
+              />
             )}
           </View>
 
@@ -1149,27 +1410,18 @@ export default function HomeScreen() {
                 </Text>
               </View>
             ) : (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.whiteCard,
-                  shadows.soft,
-                ]}
-              >
-                <Feather
-                  name="clock"
-                  size={24}
-                  color={colors.mutedForeground}
-                />
-                <Text
-                  style={[styles.emptyStateTitle, { color: colors.foreground }]}
-                >
-                  No recent transactions
-                </Text>
-                <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
-                  New expenses and income will show up here automatically.
-                </Text>
-              </View>
+              <PremiumEmptyState
+                variant="transactions"
+                eyebrow="Activity feed"
+                title="No recent transactions"
+                body="Add a transaction to start building your history."
+                ctaLabel="Add transaction"
+                delay={170}
+                colors={colors}
+                colorScheme={colorScheme}
+                mutedTextColor={pageStyles.mutedText.color}
+                onPress={() => router.push("/modal")}
+              />
             )}
           </View>
         </ScrollView>
@@ -1198,7 +1450,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 140,
+    paddingBottom: 184,
   },
   headerRow: {
     flexDirection: "row",
@@ -1512,7 +1764,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cardsRow: {
-    marginTop: 12,
+    marginTop: 10,
+    paddingVertical: 4,
     flexGrow: 1,
     justifyContent: "center",
     gap: HOME_CARD_GAP,
@@ -1769,6 +2022,221 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+  },
+  premiumEmptyCardWrap: {
+    borderRadius: 24,
+  },
+  premiumEmptyCard: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    alignItems: "center",
+    gap: 6,
+    minHeight: 136,
+  },
+  premiumEmptyCardShadow: {
+    shadowColor: "#0C1425",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  premiumEmptyStretch: {
+    alignSelf: "stretch",
+  },
+  premiumEmptyGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  premiumEmptyGlow: {
+    position: "absolute",
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    top: -28,
+    right: -18,
+  },
+  premiumEmptyBlob: {
+    position: "absolute",
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    bottom: -20,
+    left: -12,
+  },
+  premiumEmptyVisualBlock: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
+  },
+  premiumEmptyIconShell: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 0,
+  },
+  premiumEmptyIconInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  premiumEmptyTextBlock: {
+    alignItems: "center",
+    gap: 3,
+    maxWidth: 284,
+  },
+  premiumEmptyEyebrow: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.medium,
+    letterSpacing: 0.22,
+    textTransform: "uppercase",
+  },
+  premiumEmptyTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 19,
+    fontWeight: fontWeights.bold,
+    textAlign: "center",
+    letterSpacing: -0.15,
+  },
+  premiumEmptyBody: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  premiumEmptyButtonWrap: {
+    borderRadius: 16,
+    shadowColor: "#137CFF",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  premiumEmptyButtonWrapPressed: {
+    transform: [{ scale: 0.97 }],
+  },
+  premiumEmptyButton: {
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  premiumEmptyButtonText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    color: "#FFFFFF",
+  },
+  emptyVisualCards: {
+    width: 58,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyVisualCardLayer: {
+    position: "absolute",
+    width: 34,
+    height: 20,
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+  },
+  emptyVisualCardBack: {
+    transform: [{ rotate: "-10deg" }, { translateX: -10 }, { translateY: 1 }],
+  },
+  emptyVisualCardChip: {
+    width: 8,
+    height: 5,
+    borderRadius: 2,
+    backgroundColor: withOpacity("#FFFFFF", 0.78),
+    marginBottom: 4,
+  },
+  emptyVisualCardDots: {
+    flexDirection: "row",
+    gap: 2,
+  },
+  emptyVisualCardDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: withOpacity("#FFFFFF", 0.82),
+  },
+  emptyVisualBudget: {
+    width: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  emptyVisualBudgetRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyVisualBudgetRingFill: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+  },
+  emptyVisualBudgetBars: {
+    width: 38,
+    gap: 3,
+  },
+  emptyVisualBudgetBarTrack: {
+    height: 4,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  emptyVisualBudgetBarFill: {
+    height: "100%",
+    borderRadius: 999,
+  },
+  emptyVisualTransactions: {
+    width: 78,
+    gap: 4,
+    paddingLeft: 0,
+  },
+  emptyVisualTxnRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  emptyVisualTxnDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+  },
+  emptyVisualTxnCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  emptyVisualTxnLine: {
+    height: 4,
+    borderRadius: 999,
+  },
+  emptyVisualTxnLineSmall: {
+    width: "52%",
+    height: 3,
+    borderRadius: 999,
   },
   emptyCard: {
     width: HOME_CONTENT_WIDTH,
