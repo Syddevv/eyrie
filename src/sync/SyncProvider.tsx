@@ -1,9 +1,17 @@
-import { ActivityIndicator, AppState, StyleSheet, Text, View, type AppStateStatus } from "react-native";
+import {
+  ActivityIndicator,
+  AppState,
+  StyleSheet,
+  Text,
+  View,
+  type AppStateStatus,
+} from "react-native";
 import { type PropsWithChildren, useEffect, useRef } from "react";
 
 import { themeColors } from "@/constants/colors";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/store/useAuthStore";
+import { emitAllChanges, emitAccountsChanged } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
 
@@ -29,6 +37,14 @@ function useSyncTriggers() {
         reason: previousUserId.current ? "launch" : "login",
       });
       useSyncStore.getState().setRestoring(false);
+
+      // Refresh all UI after restore/sync completes
+      // This ensures all screens display the latest data without manual navigation
+      if (shouldRestore) {
+        setTimeout(() => {
+          emitAllChanges();
+        }, 100);
+      }
     })();
 
     previousUserId.current = userId;

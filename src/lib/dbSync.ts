@@ -4,6 +4,7 @@ const accountListeners = new Set<Callback>();
 const categoryListeners = new Set<Callback>();
 const goalListeners = new Set<Callback>();
 const merchantListeners = new Set<Callback>();
+const transactionListeners = new Set<Callback>();
 
 export function onAccountsChanged(cb: Callback) {
   accountListeners.add(cb);
@@ -63,6 +64,23 @@ export function emitMerchantsChanged() {
   }
 }
 
+export function onTransactionsChanged(cb: Callback) {
+  transactionListeners.add(cb);
+  return () => {
+    transactionListeners.delete(cb);
+  };
+}
+
+export function emitTransactionsChanged() {
+  for (const cb of Array.from(transactionListeners)) {
+    try {
+      cb();
+    } catch {
+      // swallow
+    }
+  }
+}
+
 export function emitGoalsChanged() {
   for (const cb of Array.from(goalListeners)) {
     try {
@@ -71,6 +89,18 @@ export function emitGoalsChanged() {
       // swallow
     }
   }
+}
+
+/**
+ * Emit all data changes to refresh the entire UI
+ * Called after sync restore completes to update all screens
+ */
+export function emitAllChanges() {
+  emitAccountsChanged();
+  emitCategoriesChanged();
+  emitGoalsChanged();
+  emitMerchantsChanged();
+  emitTransactionsChanged();
 }
 
 export default {
@@ -82,4 +112,7 @@ export default {
   emitGoalsChanged,
   onMerchantsChanged,
   emitMerchantsChanged,
+  onTransactionsChanged,
+  emitTransactionsChanged,
+  emitAllChanges,
 };

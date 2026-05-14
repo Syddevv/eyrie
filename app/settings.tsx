@@ -23,6 +23,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { setThemePreference } from "@/hooks/theme-preference";
 import { signOut } from "@/services/auth";
+import { SyncDiagnosticsPanel } from "@/src/sync";
 
 type AccountItem = {
   title: string;
@@ -93,8 +94,11 @@ export default function SettingsScreen() {
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
   const [isThemeSaving, setIsThemeSaving] = useState(false);
-  const { preferences, updatePreference, isLoading: isNotificationPrefsLoading } =
-    useNotificationPreferences();
+  const {
+    preferences,
+    updatePreference,
+    isLoading: isNotificationPrefsLoading,
+  } = useNotificationPreferences();
 
   const isDark = colorScheme === "dark";
   const dynamicAccountItems = useMemo(
@@ -397,7 +401,6 @@ export default function SettingsScreen() {
                 />
               </View>
             </Pressable>
-
           </View>
 
           <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>
@@ -462,6 +465,8 @@ export default function SettingsScreen() {
               </View>
             ))}
           </View>
+
+          {__DEV__ && <SyncDiagnosticsPanel embedded />}
 
           <Pressable
             disabled={isSigningOut}

@@ -124,4 +124,4 @@ CREATE TABLE `sync_locks` (
 	`expires_at` text NOT NULL,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL
-);
+);  

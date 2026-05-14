@@ -10,7 +10,7 @@ import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { DatabaseProvider } from "@/src/db/DatabaseProvider";
-import { SyncDiagnosticsPanel, SyncProvider, SyncStatusBanner } from "@/src/sync";
+import { SyncProvider, SyncStatusBanner } from "@/src/sync";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -263,7 +263,6 @@ export default function RootLayout() {
             <SyncProvider>
               <AppShell />
               <SyncStatusBanner />
-              {__DEV__ ? <SyncDiagnosticsPanel /> : null}
             </SyncProvider>
           </AuthProvider>
         </DatabaseProvider>
