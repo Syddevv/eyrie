@@ -10,12 +10,5 @@ export const expoDb = openDatabaseSync(DATABASE_NAME, {
 
 expoDb.execSync("PRAGMA journal_mode = WAL;");
 expoDb.execSync("PRAGMA foreign_keys = ON;");
-try {
-  expoDb.execSync(
-    "ALTER TABLE accounts ADD COLUMN account_holder_name TEXT;",
-  );
-} catch {
-  // Column already exists on existing installs.
-}
 
 export const db = drizzle(expoDb, { schema });

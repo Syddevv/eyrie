@@ -25,6 +25,10 @@ export const goals = sqliteTable(
     isArchived: integer("is_archived", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+    syncStatus: text("sync_status").notNull().default("synced"),
+    lastSyncedAt: text("last_synced_at"),
+    syncError: text("sync_error"),
   },
   (table) => ({
     userIdx: index("goals_user_idx").on(table.userId),
@@ -37,6 +41,9 @@ export const goalContributions = sqliteTable(
   "goal_contributions",
   {
     id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     goalId: text("goal_id")
       .notNull()
       .references(() => goals.id, { onDelete: "cascade" }),
@@ -44,8 +51,14 @@ export const goalContributions = sqliteTable(
     amount: real("amount").notNull(),
     note: text("note"),
     createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+    syncStatus: text("sync_status").notNull().default("synced"),
+    lastSyncedAt: text("last_synced_at"),
+    syncError: text("sync_error"),
   },
   (table) => ({
+    userIdx: index("goal_contributions_user_idx").on(table.userId),
     goalIdx: index("goal_contributions_goal_idx").on(table.goalId),
     walletIdx: index("goal_contributions_wallet_idx").on(table.walletId),
     dateIdx: index("goal_contributions_date_idx").on(table.createdAt),

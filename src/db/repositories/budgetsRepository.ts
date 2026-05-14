@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { budgets } from "../schema";
@@ -29,21 +29,25 @@ export class BudgetsRepository {
 
   async findAllByUser(userId: string) {
     return db.query.budgets.findMany({
-      where: eq(budgets.userId, userId),
+      where: and(eq(budgets.userId, userId), isNull(budgets.deletedAt)),
       orderBy: [desc(budgets.startDate), desc(budgets.createdAt)],
     });
   }
 
   async findByUserAndCategory(userId: string, categoryId: string) {
     return db.query.budgets.findMany({
-      where: and(eq(budgets.userId, userId), eq(budgets.categoryId, categoryId)),
+      where: and(
+        eq(budgets.userId, userId),
+        eq(budgets.categoryId, categoryId),
+        isNull(budgets.deletedAt),
+      ),
       orderBy: [desc(budgets.startDate)],
     });
   }
 
   async findById(id: string) {
     return db.query.budgets.findFirst({
-      where: eq(budgets.id, id),
+      where: and(eq(budgets.id, id), isNull(budgets.deletedAt)),
     });
   }
 }

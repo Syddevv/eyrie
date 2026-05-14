@@ -1,4 +1,4 @@
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { merchantCategoryHistory, merchants, transactions } from "../schema";
@@ -21,7 +21,7 @@ export class MerchantsRepository {
 
   async findById(id: string) {
     return db.query.merchants.findFirst({
-      where: eq(merchants.id, id),
+      where: and(eq(merchants.id, id), isNull(merchants.deletedAt)),
       with: {
         defaultCategory: true,
       },
@@ -33,6 +33,7 @@ export class MerchantsRepository {
     return db.query.merchants.findFirst({
       where: and(
         eq(merchants.userId, userId),
+        isNull(merchants.deletedAt),
         sql`lower(trim(${merchants.name})) = ${normalized}`,
       ),
       with: {
@@ -46,6 +47,7 @@ export class MerchantsRepository {
     return db.query.merchants.findMany({
       where: and(
         eq(merchants.userId, userId),
+        isNull(merchants.deletedAt),
         normalizedQuery
           ? like(sql`lower(${merchants.name})`, `%${escapeLike(normalizedQuery)}%`)
           : undefined,
@@ -64,7 +66,7 @@ export class MerchantsRepository {
         lastUsedAt: sql<string>`max(${transactions.transactionDate})`,
       })
       .from(transactions)
-      .where(and(eq(transactions.userId, userId), sql`${transactions.merchantId} is not null`))
+      .where(and(eq(transactions.userId, userId), isNull(transactions.deletedAt), sql`${transactions.merchantId} is not null`))
       .groupBy(transactions.merchantId);
 
     const map = new Map<string, string>();

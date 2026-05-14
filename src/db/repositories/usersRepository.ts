@@ -1,15 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { users } from "../schema";
 
 export class UsersRepository {
   async findById(id: string) {
-    return db.query.users.findFirst({ where: eq(users.id, id) });
+    return db.query.users.findFirst({ where: and(eq(users.id, id), isNull(users.deletedAt)) });
   }
 
   async findByEmail(email: string) {
-    return db.query.users.findFirst({ where: eq(users.email, email) });
+    return db.query.users.findFirst({ where: and(eq(users.email, email), isNull(users.deletedAt)) });
   }
 
   async create(input: {

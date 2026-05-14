@@ -22,13 +22,35 @@ import {
   assertRequiredText,
 } from "../utils/validation";
 import { emitAccountsChanged, emitGoalsChanged } from "@/src/lib/dbSync";
+import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
-export type CreateGoalInput = Omit<NewGoal, "id" | "createdAt" | "updatedAt" | "currentAmount"> & {
+export type CreateGoalInput = Omit<
+  NewGoal,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "currentAmount"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
+> & {
   id?: string;
   currentAmount?: number;
 };
 
-export type CreateGoalContributionInput = Omit<NewGoalContribution, "id" | "createdAt"> & {
+export type CreateGoalContributionInput = Omit<
+  NewGoalContribution,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "userId"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
+> & {
   id?: string;
   allowOverdraft?: boolean;
 };
@@ -40,20 +62,25 @@ export class GoalsService {
     assertPositiveAmount(input.targetAmount, "target amount");
     assertNonNegativeAmount(input.currentAmount ?? 0, "current amount");
     assertRequiredText(input.targetDate ?? "", "target date");
-    assertCategoryIconType(input.iconType);
+    assertCategoryIconType(input.iconType ?? "vector");
 
     const timestamp = nowIso();
 
     const created = await goalsRepository.create({
-      ...input,
-      id: input.id ?? createId("goal"),
-      currentAmount: input.currentAmount ?? 0,
-      isCompleted: (input.currentAmount ?? 0) >= input.targetAmount,
-      isArchived: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      ...prepareCreateForSync({
+        ...input,
+        id: input.id ?? createId("goal"),
+        currentAmount: input.currentAmount ?? 0,
+        isCompleted: (input.currentAmount ?? 0) >= input.targetAmount,
+        isArchived: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
     });
 
+    if (created) {
+      await enqueueSync("saving_goals", created.id, "upsert", created.userId);
+    }
     emitGoalsChanged();
     return created;
   }
@@ -87,10 +114,16 @@ export class GoalsService {
     const nextTarget = typeof input.targetAmount === "number" ? input.targetAmount : existing.targetAmount;
     const nextCurrent = typeof input.currentAmount === "number" ? input.currentAmount : existing.currentAmount;
 
-    const updated = await goalsRepository.update(id, {
-      ...input,
-      isCompleted: nextTarget > 0 ? nextCurrent >= nextTarget : false,
-    });
+    const updated = await goalsRepository.update(
+      id,
+      prepareUpdateForSync({
+        ...input,
+        isCompleted: nextTarget > 0 ? nextCurrent >= nextTarget : false,
+      }),
+    );
+    if (updated) {
+      await enqueueSync("saving_goals", updated.id, "upsert", updated.userId);
+    }
 
     processGoalStateNotificationEvent({
       userId: existing.userId,
@@ -105,24 +138,44 @@ export class GoalsService {
   }
 
   async delete(id: string) {
-    await goalsRepository.delete(id);
+    const goal = await goalsRepository.findById(id);
+    if (!goal) {
+      return;
+    }
+
+    const deleted = await goalsRepository.update(id, prepareDeleteForSync());
+    if (deleted) {
+      await enqueueSync("saving_goals", deleted.id, "delete", deleted.userId);
+    }
     emitGoalsChanged();
   }
 
   async archive(id: string) {
-    const archived = await goalsRepository.update(id, {
-      isArchived: true,
-      updatedAt: nowIso(),
-    });
+    const archived = await goalsRepository.update(
+      id,
+      prepareUpdateForSync({
+        isArchived: true,
+        updatedAt: nowIso(),
+      }),
+    );
+    if (archived) {
+      await enqueueSync("saving_goals", archived.id, "upsert", archived.userId);
+    }
     emitGoalsChanged();
     return archived;
   }
 
   async restore(id: string) {
-    const restored = await goalsRepository.update(id, {
-      isArchived: false,
-      updatedAt: nowIso(),
-    });
+    const restored = await goalsRepository.update(
+      id,
+      prepareUpdateForSync({
+        isArchived: false,
+        updatedAt: nowIso(),
+      }),
+    );
+    if (restored) {
+      await enqueueSync("saving_goals", restored.id, "upsert", restored.userId);
+    }
     emitGoalsChanged();
     return restored;
   }
@@ -168,9 +221,13 @@ export class GoalsService {
       const contributionId = input.id ?? createId("gcon");
 
       await tx.insert(goalContributions).values({
-        ...payload,
-        id: contributionId,
-        createdAt: timestamp,
+        ...prepareCreateForSync({
+          ...payload,
+          id: contributionId,
+          userId: goal.userId,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }),
       });
 
       if (payload.walletId) {
@@ -195,6 +252,14 @@ export class GoalsService {
     emitGoalsChanged();
     if (payload.walletId) {
       emitAccountsChanged();
+    }
+
+    if (created?.contribution) {
+      await enqueueSync("goal_contributions", created.contribution.id, "upsert", created.userId);
+      await enqueueSync("saving_goals", payload.goalId, "upsert", created.userId);
+      if (payload.walletId) {
+        await enqueueSync("accounts", payload.walletId, "upsert", created.userId);
+      }
     }
 
     if (created?.contribution) {
@@ -230,7 +295,15 @@ export class GoalsService {
       if (existing.walletId) {
         await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
       }
-      await tx.update(goalContributions).set(input).where(eq(goalContributions.id, id));
+      await tx
+        .update(goalContributions)
+        .set(
+          prepareUpdateForSync({
+            ...input,
+            updatedAt: nowIso(),
+          }),
+        )
+        .where(eq(goalContributions.id, id));
       if (next.walletId) {
         await adjustGoalContributionAccountBalance(tx, next.walletId, -next.amount);
       }
@@ -257,13 +330,22 @@ export class GoalsService {
     emitAccountsChanged();
 
     if (updated?.contribution && updated.userId) {
+      await enqueueSync("goal_contributions", updated.contribution.id, "upsert", updated.userId);
+      await enqueueSync("saving_goals", updated.goalId, "upsert", updated.userId);
+      if (updated.contribution.walletId) {
+        await enqueueSync("accounts", updated.contribution.walletId, "upsert", updated.userId);
+      }
+    }
+
+    if (updated?.contribution && updated.userId) {
+      const syncUserId = updated.userId;
       processGoalContributionNotificationEvent({
-        userId: updated.userId,
+        userId: syncUserId,
         goalId: updated.goalId,
         previousAmount: updated.previousGoalAmount,
         contributionAmount: updated.contribution.amount,
       })
-        .then(() => generatePeriodicNotifications(updated.userId))
+        .then(() => generatePeriodicNotifications(syncUserId))
         .catch(() => undefined);
     }
 
@@ -271,24 +353,36 @@ export class GoalsService {
   }
 
   async deleteContribution(id: string) {
-    await db.transaction(async (tx) => {
+    const deleted = await db.transaction(async (tx) => {
       const existing = await tx.query.goalContributions.findFirst({
         where: (table, { eq }) => eq(table.id, id),
       });
 
       if (!existing) {
-        return;
+        return null;
       }
 
-      await tx.delete(goalContributions).where(eq(goalContributions.id, id));
+      await tx
+        .update(goalContributions)
+        .set(prepareDeleteForSync())
+        .where(eq(goalContributions.id, id));
       if (existing.walletId) {
         await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
       }
       await refreshGoalCurrentAmount(tx, existing.goalId);
+      return existing;
     });
 
     emitGoalsChanged();
     emitAccountsChanged();
+
+    if (deleted) {
+      await enqueueSync("goal_contributions", deleted.id, "delete", deleted.userId);
+      await enqueueSync("saving_goals", deleted.goalId, "upsert", deleted.userId);
+      if (deleted.walletId) {
+        await enqueueSync("accounts", deleted.walletId, "upsert", deleted.userId);
+      }
+    }
   }
 
   async fetchContributionById(id: string) {

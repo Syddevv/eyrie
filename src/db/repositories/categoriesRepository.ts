@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { budgets, categories, transactions } from "../schema";
@@ -26,10 +26,12 @@ export class CategoriesRepository {
         ? and(
             or(eq(categories.userId, userId), eq(categories.userId, SYSTEM_CATEGORY_USER_ID)),
             eq(categories.type, type),
+            isNull(categories.deletedAt),
             includeArchived ? undefined : eq(categories.isArchived, false),
           )
         : and(
             or(eq(categories.userId, userId), eq(categories.userId, SYSTEM_CATEGORY_USER_ID)),
+            isNull(categories.deletedAt),
             includeArchived ? undefined : eq(categories.isArchived, false),
           ),
       orderBy: [asc(categories.type), asc(categories.name)],
@@ -40,6 +42,7 @@ export class CategoriesRepository {
     return db.query.categories.findMany({
       where: and(
         or(eq(categories.userId, userId), eq(categories.userId, SYSTEM_CATEGORY_USER_ID)),
+        isNull(categories.deletedAt),
         includeArchived ? undefined : eq(categories.isArchived, false),
       ),
       orderBy: [asc(categories.isArchived), asc(categories.type), asc(categories.name)],
@@ -52,6 +55,7 @@ export class CategoriesRepository {
         eq(categories.type, type),
         eq(categories.name, name),
         eq(categories.isArchived, false),
+        isNull(categories.deletedAt),
         or(eq(categories.userId, userId), eq(categories.userId, SYSTEM_CATEGORY_USER_ID)),
       ),
     });
@@ -59,7 +63,7 @@ export class CategoriesRepository {
 
   async findById(id: string) {
     return db.query.categories.findFirst({
-      where: eq(categories.id, id),
+      where: and(eq(categories.id, id), isNull(categories.deletedAt)),
     });
   }
 
@@ -75,7 +79,7 @@ export class CategoriesRepository {
           count: sql<number>`count(*)`,
         })
         .from(transactions)
-        .where(inArray(transactions.categoryId, categoryIds))
+        .where(and(inArray(transactions.categoryId, categoryIds), isNull(transactions.deletedAt)))
         .groupBy(transactions.categoryId),
       db
         .select({
@@ -83,7 +87,7 @@ export class CategoriesRepository {
           count: sql<number>`count(*)`,
         })
         .from(budgets)
-        .where(inArray(budgets.categoryId, categoryIds))
+        .where(and(inArray(budgets.categoryId, categoryIds), isNull(budgets.deletedAt)))
         .groupBy(budgets.categoryId),
     ]);
 

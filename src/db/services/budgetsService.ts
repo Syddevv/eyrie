@@ -5,8 +5,20 @@ import type { NewBudget } from "../types";
 import { createId } from "../utils/ids";
 import { nowIso } from "../utils/time";
 import { assertBudgetPeriod, assertNonNegativeAmount, assertPositiveAmount, assertRequiredText } from "../utils/validation";
+import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
-export type CreateBudgetInput = Omit<NewBudget, "id" | "createdAt" | "updatedAt" | "spent"> & {
+export type CreateBudgetInput = Omit<
+  NewBudget,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "spent"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
+> & {
   id?: string;
   spent?: number;
 };
@@ -48,11 +60,13 @@ export class BudgetsService {
 
     const timestamp = nowIso();
     const budget = await budgetsRepository.create({
-      ...input,
-      id: input.id ?? createId("budget"),
-      spent: input.spent ?? 0,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      ...prepareCreateForSync({
+        ...input,
+        id: input.id ?? createId("budget"),
+        spent: input.spent ?? 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
     });
 
     if (budget) {
@@ -61,7 +75,11 @@ export class BudgetsService {
       });
     }
 
-    return budgetsRepository.findById(budget!.id);
+    const created = await budgetsRepository.findById(budget!.id);
+    if (created) {
+      await enqueueSync("budgets", created.id, "upsert", created.userId);
+    }
+    return created;
   }
 
   async update(id: string, input: Partial<NewBudget>) {
@@ -77,7 +95,7 @@ export class BudgetsService {
       assertNonNegativeAmount(input.spent, "spent amount");
     }
 
-    const budget = await budgetsRepository.update(id, input);
+    const budget = await budgetsRepository.update(id, prepareUpdateForSync(input));
 
     if (budget) {
       await db.transaction(async (tx) => {
@@ -85,11 +103,23 @@ export class BudgetsService {
       });
     }
 
+    if (budget) {
+      await enqueueSync("budgets", budget.id, "upsert", budget.userId);
+    }
+
     return budget;
   }
 
   async delete(id: string) {
-    await budgetsRepository.delete(id);
+    const existing = await budgetsRepository.findById(id);
+    if (!existing) {
+      return;
+    }
+
+    const deleted = await budgetsRepository.update(id, prepareDeleteForSync());
+    if (deleted) {
+      await enqueueSync("budgets", deleted.id, "delete", deleted.userId);
+    }
   }
 
   async fetch(userId: string) {

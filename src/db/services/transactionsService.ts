@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gte, isNull, lte } from "drizzle-orm";
 
 import { db } from "../client";
-import { transactions } from "../schema";
+import { budgets, transactions } from "../schema";
 import { transactionsRepository } from "../repositories/transactionsRepository";
 import { merchantsService } from "./merchantsService";
 import {
@@ -23,16 +23,69 @@ import {
   assertTransferAccounts,
 } from "../utils/validation";
 import { emitAccountsChanged, emitMerchantsChanged } from "@/src/lib/dbSync";
+import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
-  "id" | "createdAt" | "updatedAt"
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
 > & {
   id?: string;
   merchantDefaultCategoryId?: string | null;
 };
 
 export class TransactionsService {
+  private async enqueueTransactionDependencies(entries: Array<Pick<NewTransaction, "userId" | "accountId" | "transferAccountId" | "type" | "categoryId" | "transactionDate"> | null | undefined>) {
+    const accountIds = new Set<string>();
+    const budgetIds = new Set<string>();
+    let userId: string | null = null;
+
+    for (const entry of entries) {
+      if (!entry?.userId) {
+        continue;
+      }
+
+      userId = entry.userId;
+      accountIds.add(entry.accountId);
+      if (entry.transferAccountId) {
+        accountIds.add(entry.transferAccountId);
+      }
+
+      if (entry.type === "expense" && entry.categoryId) {
+        const relatedBudgets = await db.query.budgets.findMany({
+          where: and(
+            eq(budgets.userId, entry.userId),
+            eq(budgets.categoryId, entry.categoryId),
+            isNull(budgets.deletedAt),
+            lte(budgets.startDate, entry.transactionDate),
+            gte(budgets.endDate, entry.transactionDate),
+          ),
+        });
+        for (const budget of relatedBudgets) {
+          budgetIds.add(budget.id);
+        }
+      }
+    }
+
+    if (!userId) {
+      return;
+    }
+
+    for (const accountId of accountIds) {
+      await enqueueSync("accounts", accountId, "upsert", userId);
+    }
+
+    for (const budgetId of budgetIds) {
+      await enqueueSync("budgets", budgetId, "upsert", userId);
+    }
+  }
+
   async create(input: CreateTransactionInput) {
     assertRequiredText(input.userId ?? "", "userId");
     assertRequiredText(input.accountId ?? "", "accountId");
@@ -59,15 +112,17 @@ export class TransactionsService {
 
     const created = await db.transaction(async (tx) => {
       const entry = {
-        ...input,
-        merchantId: merchantPayload?.merchantId ?? input.merchantId ?? null,
-        merchantName:
-          input.type === "expense"
-            ? merchantPayload?.merchantName ?? null
-            : input.merchantName ?? null,
-        id: transactionId,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        ...prepareCreateForSync({
+          ...input,
+          merchantId: merchantPayload?.merchantId ?? input.merchantId ?? null,
+          merchantName:
+            input.type === "expense"
+              ? merchantPayload?.merchantName ?? null
+              : input.merchantName ?? null,
+          id: transactionId,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }),
       };
 
       await tx.insert(transactions).values(entry);
@@ -107,6 +162,8 @@ export class TransactionsService {
 
     emitAccountsChanged();
     emitMerchantsChanged();
+    await enqueueSync("transactions", created.id, "upsert", created.userId);
+    await this.enqueueTransactionDependencies([created]);
     return created;
   }
 
@@ -146,7 +203,9 @@ export class TransactionsService {
       const next = {
         ...current,
         ...input,
-        updatedAt: nowIso(),
+        ...prepareUpdateForSync({
+          updatedAt: nowIso(),
+        }),
       };
 
       if (next.type === "expense") {
@@ -228,6 +287,8 @@ export class TransactionsService {
 
     emitAccountsChanged();
     emitMerchantsChanged();
+    await enqueueSync("transactions", updated.id, "upsert", updated.userId);
+    await this.enqueueTransactionDependencies([existing, updated]);
     return updated;
   }
 
@@ -242,7 +303,7 @@ export class TransactionsService {
       }
 
       await reverseTransactionEffects(tx, existing);
-      await tx.delete(transactions).where(eq(transactions.id, id));
+      await tx.update(transactions).set(prepareDeleteForSync()).where(eq(transactions.id, id));
       await refreshBudgetsForTransactionChange(tx, existing, undefined);
       return existing;
     });
@@ -266,6 +327,10 @@ export class TransactionsService {
     }
 
     emitAccountsChanged();
+    if (deleted) {
+      await enqueueSync("transactions", deleted.id, "delete", deleted.userId);
+      await this.enqueueTransactionDependencies([deleted]);
+    }
   }
 
   async fetch(userId: string) {

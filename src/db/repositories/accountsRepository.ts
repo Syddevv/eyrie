@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { accounts } from "../schema";
@@ -29,14 +29,14 @@ export class AccountsRepository {
 
   async findAllByUser(userId: string) {
     return db.query.accounts.findMany({
-      where: eq(accounts.userId, userId),
+      where: and(eq(accounts.userId, userId), isNull(accounts.deletedAt)),
       orderBy: [desc(accounts.updatedAt), desc(accounts.createdAt)],
     });
   }
 
   async findById(id: string) {
     return db.query.accounts.findFirst({
-      where: eq(accounts.id, id),
+      where: and(eq(accounts.id, id), isNull(accounts.deletedAt)),
     });
   }
 }

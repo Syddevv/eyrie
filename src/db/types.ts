@@ -12,6 +12,9 @@ import {
   merchantCategoryHistory,
   merchants,
   notifications,
+  syncLocks,
+  syncQueue,
+  syncState,
   transactions,
   users,
 } from "./schema";
@@ -42,3 +45,9 @@ export type Currency = InferSelectModel<typeof currencies>;
 export type NewCurrency = InferInsertModel<typeof currencies>;
 export type ExchangeRate = InferSelectModel<typeof exchangeRates>;
 export type NewExchangeRate = InferInsertModel<typeof exchangeRates>;
+export type SyncQueueItem = InferSelectModel<typeof syncQueue>;
+export type NewSyncQueueItem = InferInsertModel<typeof syncQueue>;
+export type SyncStateRow = InferSelectModel<typeof syncState>;
+export type NewSyncStateRow = InferInsertModel<typeof syncState>;
+export type SyncLockRow = InferSelectModel<typeof syncLocks>;
+export type NewSyncLockRow = InferInsertModel<typeof syncLocks>;

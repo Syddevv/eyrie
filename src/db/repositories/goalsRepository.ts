@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { goalContributions, goals } from "../schema";
@@ -29,7 +29,7 @@ export class GoalsRepository {
 
   async findAllByUser(userId: string) {
     return db.query.goals.findMany({
-      where: eq(goals.userId, userId),
+      where: and(eq(goals.userId, userId), isNull(goals.deletedAt)),
       orderBy: [asc(goals.isArchived), asc(goals.isCompleted), asc(goals.targetDate), desc(goals.createdAt)],
       with: {
         linkedWallet: true,
@@ -45,7 +45,7 @@ export class GoalsRepository {
 
   async findById(id: string) {
     return db.query.goals.findFirst({
-      where: eq(goals.id, id),
+      where: and(eq(goals.id, id), isNull(goals.deletedAt)),
       with: {
         linkedWallet: true,
         contributions: {
@@ -74,13 +74,13 @@ export class GoalsRepository {
 
   async findContributionById(id: string) {
     return db.query.goalContributions.findFirst({
-      where: eq(goalContributions.id, id),
+      where: and(eq(goalContributions.id, id), isNull(goalContributions.deletedAt)),
     });
   }
 
   async findContributionsByGoal(goalId: string) {
     return db.query.goalContributions.findMany({
-      where: eq(goalContributions.goalId, goalId),
+      where: and(eq(goalContributions.goalId, goalId), isNull(goalContributions.deletedAt)),
       orderBy: [desc(goalContributions.createdAt)],
       with: {
         wallet: true,

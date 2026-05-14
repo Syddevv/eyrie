@@ -9,12 +9,21 @@ import {
   assertRequiredText,
 } from "../utils/validation";
 import { emitAccountsChanged } from "@/src/lib/dbSync";
+import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
-const defaultCashAccountRequests = new Map<string, Promise<Account>>();
+const defaultCashAccountRequests = new Map<string, Promise<Account | undefined>>();
 
 export type CreateAccountInput = Omit<
   NewAccount,
-  "id" | "createdAt" | "updatedAt" | "isHidden"
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "isHidden"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
 > & {
   id?: string;
   isHidden?: boolean;
@@ -30,14 +39,19 @@ export class AccountsService {
     const timestamp = nowIso();
 
     const created = await accountsRepository.create({
-      ...input,
-      balance: input.balance ?? 0,
-      isHidden: input.isHidden ?? false,
-      id: input.id ?? createId("acct"),
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      ...prepareCreateForSync({
+        ...input,
+        balance: input.balance ?? 0,
+        isHidden: input.isHidden ?? false,
+        id: input.id ?? createId("acct"),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
     });
 
+    if (created) {
+      await enqueueSync("accounts", created.id, "upsert", created.userId);
+    }
     emitAccountsChanged();
     return created;
   }
@@ -89,13 +103,24 @@ export class AccountsService {
       assertRequiredText(input.name, "account name");
     }
 
-    const updated = await accountsRepository.update(id, input);
+    const updated = await accountsRepository.update(id, prepareUpdateForSync(input));
+    if (updated) {
+      await enqueueSync("accounts", updated.id, "upsert", updated.userId);
+    }
     emitAccountsChanged();
     return updated;
   }
 
   async delete(id: string) {
-    await accountsRepository.delete(id);
+    const existing = await accountsRepository.findById(id);
+    if (!existing) {
+      return;
+    }
+
+    const deleted = await accountsRepository.update(id, prepareDeleteForSync());
+    if (deleted) {
+      await enqueueSync("accounts", deleted.id, "delete", deleted.userId);
+    }
     emitAccountsChanged();
   }
 

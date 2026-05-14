@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "../client";
 import { transactions } from "../schema";
@@ -21,7 +21,7 @@ export class TransactionsRepository {
 
   async findAllByUser(userId: string) {
     return db.query.transactions.findMany({
-      where: eq(transactions.userId, userId),
+      where: and(eq(transactions.userId, userId), isNull(transactions.deletedAt)),
       orderBy: [desc(transactions.transactionDate), desc(transactions.createdAt)],
       with: {
         category: true,
@@ -38,7 +38,7 @@ export class TransactionsRepository {
 
   async findById(id: string) {
     return db.query.transactions.findFirst({
-      where: eq(transactions.id, id),
+      where: and(eq(transactions.id, id), isNull(transactions.deletedAt)),
       with: {
         category: true,
         merchant: {

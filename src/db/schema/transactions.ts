@@ -33,6 +33,10 @@ export const transactions = sqliteTable(
     transactionDate: text("transaction_date").notNull(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+    syncStatus: text("sync_status").notNull().default("synced"),
+    lastSyncedAt: text("last_synced_at"),
+    syncError: text("sync_error"),
   },
   (table) => ({
     userIdx: index("transactions_user_idx").on(table.userId),

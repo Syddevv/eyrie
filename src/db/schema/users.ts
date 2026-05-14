@@ -14,4 +14,8 @@ export const users = sqliteTable("users", {
     .references(() => currencies.code),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
+  syncStatus: text("sync_status").notNull().default("synced"),
+  lastSyncedAt: text("last_synced_at"),
+  syncError: text("sync_error"),
 });

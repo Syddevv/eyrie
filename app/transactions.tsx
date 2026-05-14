@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +23,7 @@ import {
   useTransactions,
   type TransactionListItem,
 } from "@/hooks/useTransactions";
+import { useManualSync, useSyncStatus } from "@/src/sync";
 
 const monthNames = [
   "January",
@@ -138,7 +140,10 @@ export default function TransactionsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
-  const { transactions, summary, isLoading } = useTransactions();
+  const { transactions, summary, isLoading, refresh } = useTransactions();
+  const { syncNow, isSyncing } = useManualSync();
+  const { isOnline, lastSyncedAt, pendingCount, uiState, isRestoring } =
+    useSyncStatus();
   const [searchQuery, setSearchQuery] = useState("");
   const [showTypeFilters, setShowTypeFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
@@ -242,6 +247,23 @@ export default function TransactionsScreen() {
     (count, section) => count + section.items.length,
     0,
   );
+
+  const syncLabel = isRestoring
+    ? "Restoring your data..."
+    : uiState === "offline"
+      ? "Offline mode"
+      : uiState === "retrying"
+        ? "Retrying sync..."
+        : isSyncing
+          ? "Syncing..."
+          : lastSyncedAt
+            ? `Last synced ${new Intl.DateTimeFormat("en-PH", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(new Date(lastSyncedAt))}`
+            : "Not synced yet";
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -369,12 +391,52 @@ export default function TransactionsScreen() {
               </Text>
             </View>
           </View>
+
+          <View
+            style={[
+              styles.syncRow,
+              {
+                backgroundColor: isDark ? "#101722" : colors.card,
+                borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(15, 23, 42, 0.08)",
+              },
+            ]}
+          >
+            <View style={styles.syncTextWrap}>
+              <Text style={[styles.syncTitle, pageStyles.title]}>
+                {syncLabel}
+              </Text>
+              <Text style={[styles.syncSubtitle, pageStyles.subtitle]}>
+                {uiState === "offline"
+                  ? "Changes will sync automatically when your connection returns."
+                  : pendingCount
+                    ? `${pendingCount} changes waiting to upload`
+                    : "Your local data stays available offline."}
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.syncButton, { backgroundColor: colors.primary }]}
+              onPress={async () => {
+                await Promise.all([refresh(), syncNow()]);
+              }}
+            >
+              <Text style={styles.syncButtonText}>{isSyncing ? "..." : "Sync"}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView
           style={styles.recordsScroll}
           contentContainerStyle={styles.recordsContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading || isSyncing}
+              onRefresh={() =>
+                Promise.all([refresh(), syncNow()]).catch(() => undefined)
+              }
+              tintColor={colors.primary}
+            />
+          }
         >
           {isLoading ? (
             <View
@@ -715,6 +777,46 @@ const styles = StyleSheet.create({
     marginTop: 18,
     flexDirection: "row",
     gap: 12,
+  },
+  syncRow: {
+    marginTop: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  syncTextWrap: {
+    flex: 1,
+  },
+  syncTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.bold,
+  },
+  syncSubtitle: {
+    marginTop: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  syncButton: {
+    minWidth: 64,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  syncButtonText: {
+    color: "#FFFFFF",
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: fontWeights.bold,
   },
   summaryCard: {
     flex: 1,

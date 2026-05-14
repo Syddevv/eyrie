@@ -6,6 +6,8 @@ import m0001 from './0001_next_bloodstrike.sql';
 import m0002 from './0002_fancy_category_control.sql';
 import m0003 from './0003_goals_rebuild.sql';
 import m0004 from './0004_merchants_refactor.sql';
+import m0005 from './0005_sync_foundation.sql';
+import m0006 from './0006_accounts_holder_name.sql';
 
   export default {
     journal,
@@ -14,7 +16,9 @@ import m0004 from './0004_merchants_refactor.sql';
 m0001,
 m0002,
 m0003,
-m0004
+m0004,
+m0005,
+m0006
     }
   }
   

@@ -9,10 +9,18 @@ import {
   assertRequiredText,
 } from "../utils/validation";
 import { SYSTEM_CATEGORY_USER_ID } from "../utils/constants";
+import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
 export type CreateCategoryInput = Omit<
   NewCategory,
-  "id" | "createdAt" | "updatedAt"
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "deletedAt"
+  | "syncStatus"
+  | "lastSyncedAt"
+  | "syncError"
 > & {
   id?: string;
 };
@@ -33,7 +41,7 @@ export class CategoriesService {
   async create(input: CreateCategoryInput) {
     assertRequiredText(input.name, "category name");
     assertCategoryType(input.type);
-    assertCategoryIconType(input.iconType);
+    assertCategoryIconType(input.iconType ?? "vector");
     await this.ensureUniqueName(
       input.userId ?? SYSTEM_CATEGORY_USER_ID,
       input.name,
@@ -41,12 +49,17 @@ export class CategoriesService {
     );
 
     const created = await categoriesRepository.create({
-      ...input,
-      id: input.id ?? createId("cat"),
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+      ...prepareCreateForSync({
+        ...input,
+        id: input.id ?? createId("cat"),
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      }),
     });
 
+    if (created && created.userId && created.userId !== SYSTEM_CATEGORY_USER_ID) {
+      await enqueueSync("categories", created.id, "upsert", created.userId);
+    }
     emitCategoriesChanged();
     return created;
   }
@@ -83,16 +96,30 @@ export class CategoriesService {
       );
     }
 
-    const updated = await categoriesRepository.update(id, {
-      ...input,
-      updatedAt: nowIso(),
-    });
+    const updated = await categoriesRepository.update(
+      id,
+      prepareUpdateForSync({
+        ...input,
+        updatedAt: nowIso(),
+      }),
+    );
+    if (updated && updated.userId && updated.userId !== SYSTEM_CATEGORY_USER_ID) {
+      await enqueueSync("categories", updated.id, "upsert", updated.userId);
+    }
     emitCategoriesChanged();
     return updated;
   }
 
   async delete(id: string) {
-    await categoriesRepository.delete(id);
+    const category = await categoriesRepository.findById(id);
+    if (!category) {
+      return;
+    }
+
+    const deleted = await categoriesRepository.update(id, prepareDeleteForSync());
+    if (deleted && deleted.userId && deleted.userId !== SYSTEM_CATEGORY_USER_ID) {
+      await enqueueSync("categories", deleted.id, "delete", deleted.userId);
+    }
     emitCategoriesChanged();
   }
 
@@ -103,19 +130,31 @@ export class CategoriesService {
       throw new Error("Category not found.");
     }
 
-    const archived = await categoriesRepository.update(id, {
-      isArchived: true,
-      updatedAt: nowIso(),
-    });
+    const archived = await categoriesRepository.update(
+      id,
+      prepareUpdateForSync({
+        isArchived: true,
+        updatedAt: nowIso(),
+      }),
+    );
+    if (archived && archived.userId && archived.userId !== SYSTEM_CATEGORY_USER_ID) {
+      await enqueueSync("categories", archived.id, "upsert", archived.userId);
+    }
     emitCategoriesChanged();
     return archived;
   }
 
   async restore(id: string) {
-    const restored = await categoriesRepository.update(id, {
-      isArchived: false,
-      updatedAt: nowIso(),
-    });
+    const restored = await categoriesRepository.update(
+      id,
+      prepareUpdateForSync({
+        isArchived: false,
+        updatedAt: nowIso(),
+      }),
+    );
+    if (restored && restored.userId && restored.userId !== SYSTEM_CATEGORY_USER_ID) {
+      await enqueueSync("categories", restored.id, "upsert", restored.userId);
+    }
     emitCategoriesChanged();
     return restored;
   }

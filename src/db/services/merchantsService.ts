@@ -3,6 +3,8 @@ import { nowIso } from "../utils/time";
 import { merchantsRepository } from "../repositories/merchantsRepository";
 import { emitMerchantsChanged } from "@/src/lib/dbSync";
 import { getMerchantPresetByName, searchMerchantPresets, type MerchantPresetOption } from "@/constants/expense-merchants";
+import { prepareCreateForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
 export type MerchantPickerOption = MerchantPresetOption & {
   merchantId: string | null;
@@ -31,10 +33,17 @@ export class MerchantsService {
 
     if (existing) {
       if (!existing.defaultCategoryId && input.defaultCategoryId) {
-        return merchantsRepository.update(existing.id, {
-          defaultCategoryId: input.defaultCategoryId,
-          updatedAt: timestamp,
-        });
+        const updated = await merchantsRepository.update(
+          existing.id,
+          prepareUpdateForSync({
+            defaultCategoryId: input.defaultCategoryId,
+            updatedAt: timestamp,
+          }),
+        );
+        if (updated) {
+          await enqueueSync("merchants", updated.id, "upsert", updated.userId);
+        }
+        return updated;
       }
 
       return existing;
@@ -42,13 +51,15 @@ export class MerchantsService {
 
     const preset = getMerchantPresetByName(normalizedName);
     const created = await merchantsRepository.create({
-      id: createId("mer"),
-      userId: input.userId,
-      name: normalizedName,
-      logoUri: input.logoUri ?? null,
-      defaultCategoryId: input.defaultCategoryId ?? null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+      ...prepareCreateForSync({
+        id: createId("mer"),
+        userId: input.userId,
+        name: normalizedName,
+        logoUri: input.logoUri ?? null,
+        defaultCategoryId: input.defaultCategoryId ?? null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
     });
 
     if (!created) {
@@ -56,13 +67,20 @@ export class MerchantsService {
     }
 
     if (!created.defaultCategoryId && preset?.defaultCategoryId) {
-      await merchantsRepository.update(created.id, {
-        defaultCategoryId: preset.defaultCategoryId,
-        updatedAt: timestamp,
-      });
+      const updated = await merchantsRepository.update(
+        created.id,
+        prepareUpdateForSync({
+          defaultCategoryId: preset.defaultCategoryId,
+          updatedAt: timestamp,
+        }),
+      );
+      if (updated) {
+        await enqueueSync("merchants", updated.id, "upsert", updated.userId);
+      }
       return merchantsRepository.findById(created.id);
     }
 
+    await enqueueSync("merchants", created.id, "upsert", created.userId);
     emitMerchantsChanged();
     return created;
   }
@@ -78,10 +96,16 @@ export class MerchantsService {
 
     const topCategory = await merchantsRepository.getTopCategoryForMerchant(merchantId);
     if (topCategory?.categoryId) {
-      await merchantsRepository.update(merchantId, {
-        defaultCategoryId: topCategory.categoryId,
-        updatedAt: timestamp,
-      });
+      const updated = await merchantsRepository.update(
+        merchantId,
+        prepareUpdateForSync({
+          defaultCategoryId: topCategory.categoryId,
+          updatedAt: timestamp,
+        }),
+      );
+      if (updated) {
+        await enqueueSync("merchants", updated.id, "upsert", updated.userId);
+      }
     }
 
     emitMerchantsChanged();

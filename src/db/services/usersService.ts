@@ -3,6 +3,8 @@ import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { usersRepository } from "../repositories/usersRepository";
 import { nowIso } from "../utils/time";
 import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
+import { prepareCreateForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import { enqueueSync } from "@/src/sync/queue";
 
 type LocalUser = {
   id: string;
@@ -38,13 +40,15 @@ export class UsersService {
 
     if (!existing) {
       return usersRepository.create({
-        id,
-        fullName,
-        email,
-        avatarUrl,
-        currencyCode: undefined as any,
-        createdAt: now,
-        updatedAt: now,
+        ...prepareCreateForSync({
+          id,
+          fullName,
+          email,
+          avatarUrl,
+          currencyCode: undefined as any,
+          createdAt: now,
+          updatedAt: now,
+        }),
       }) as Promise<LocalUser>;
     }
 
@@ -91,17 +95,27 @@ export class UsersService {
       updates.avatarUrl = input.avatarUrl || null;
     }
 
-    return usersRepository.update(id, updates) as Promise<LocalUser>;
+    const updated = (await usersRepository.update(
+      id,
+      prepareUpdateForSync(updates),
+    )) as LocalUser;
+    await enqueueSync("users", updated.id, "upsert", updated.id);
+    return updated;
   }
 
   async updateCurrency(id: string, currencyCode: string) {
     const normalizedCurrencyCode =
       currencyCode.trim().toUpperCase() || DEFAULT_CURRENCY_CODE;
 
-    return usersRepository.update(id, {
-      currencyCode: normalizedCurrencyCode,
-      updatedAt: nowIso(),
-    }) as Promise<LocalUser>;
+    const updated = (await usersRepository.update(
+      id,
+      prepareUpdateForSync({
+        currencyCode: normalizedCurrencyCode,
+        updatedAt: nowIso(),
+      }),
+    )) as LocalUser;
+    await enqueueSync("users", updated.id, "upsert", updated.id);
+    return updated;
   }
 }
 

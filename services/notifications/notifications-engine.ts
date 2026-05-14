@@ -10,7 +10,12 @@ import { roundMoney } from "@/src/db/utils/money";
 import { addDaysIso, nowIso } from "@/src/db/utils/time";
 
 import { ensureNotificationPreferences, upsertNotifications } from "./notifications-api";
-import { buildNotificationCandidate, shouldNotifyViaPush } from "./notifications-metadata";
+import {
+  buildNotificationCandidate,
+  defaultNotificationPreferences,
+  shouldNotifyViaPush,
+  toCreateNotificationInput,
+} from "./notifications-metadata";
 import { presentLocalNotification } from "./notifications-push";
 import type { AppNotification, NotificationCandidate } from "./types";
 
@@ -51,12 +56,28 @@ async function persistCandidates(userId: string, candidates: NotificationCandida
     return [] as AppNotification[];
   }
 
-  const inserted = await upsertNotifications(userId, candidates);
-  if (!inserted.length) {
-    return [];
+  const preferences = await ensureNotificationPreferences(userId).catch(() =>
+    defaultNotificationPreferences(userId),
+  );
+
+  let inserted: AppNotification[] = [];
+
+  try {
+    inserted = await upsertNotifications(userId, candidates);
+  } catch {
+    inserted = candidates.map((candidate, index) => {
+      const payload = toCreateNotificationInput(userId, candidate);
+      return {
+        id: `local-${payload.dedupe_key}-${index}`,
+        ...payload,
+        is_read: false,
+        created_at: nowIso(),
+        read_at: null,
+        deleted_at: null,
+      };
+    });
   }
 
-  const preferences = await ensureNotificationPreferences(userId);
   for (const notification of inserted) {
     if (shouldNotifyViaPush(notification, preferences)) {
       await presentLocalNotification(notification);

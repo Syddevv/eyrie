@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte, gte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import { accounts, budgets, goalContributions, goals, transactions } from "../schema";
 import type { Transaction } from "../types";
@@ -63,6 +63,7 @@ export async function refreshBudgetsForExpense(tx: Executor, userId: string, cat
     where: and(
       eq(budgets.userId, userId),
       eq(budgets.categoryId, categoryId),
+      isNull(budgets.deletedAt),
       lte(budgets.startDate, transactionDate),
       gte(budgets.endDate, transactionDate)
     ),
@@ -83,6 +84,7 @@ export async function refreshBudgetsForExpense(tx: Executor, userId: string, cat
           eq(transactions.userId, budget.userId),
           eq(transactions.type, "expense"),
           eq(transactions.categoryId, budget.categoryId),
+          isNull(transactions.deletedAt),
           gte(transactions.transactionDate, budget.startDate),
           lte(transactions.transactionDate, budget.endDate)
         )
@@ -121,7 +123,7 @@ export async function refreshGoalCurrentAmount(tx: Executor, goalId: string) {
       total: sql<number>`coalesce(sum(${goalContributions.amount}), 0)`,
     })
     .from(goalContributions)
-    .where(eq(goalContributions.goalId, goalId));
+    .where(and(eq(goalContributions.goalId, goalId), isNull(goalContributions.deletedAt)));
 
   await tx
     .update(goals)
