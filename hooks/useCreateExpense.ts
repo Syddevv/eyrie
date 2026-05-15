@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
-import { transactionsService } from "@/src/db/services";
-import { accountsService } from "@/src/db/services";
+import { accountsService, transactionsService } from "@/src/db/services";
 import { useCurrentUser } from "./useCurrentUser";
 import { useAuthStore } from "@/store/useAuthStore";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";

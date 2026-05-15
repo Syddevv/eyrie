@@ -1,4 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { themeColors } from "@/constants/colors";
@@ -6,14 +14,16 @@ import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useManualSync, useSyncStatus } from "../hooks";
 
+type BannerKind = "offline" | "syncing" | "success" | "error";
+
 function formatLastSynced(lastSyncedAt: string | null) {
   if (!lastSyncedAt) {
-    return "Not synced yet";
+    return "Just now";
   }
 
   const date = new Date(lastSyncedAt);
   if (Number.isNaN(date.getTime())) {
-    return "Not synced yet";
+    return "Just now";
   }
 
   return new Intl.DateTimeFormat("en-PH", {
@@ -35,80 +45,270 @@ export function SyncStatusBanner() {
     lastError,
     uiState,
     isRestoring,
+    lastRunReason,
   } = useSyncStatus();
   const { syncNow } = useManualSync();
 
-  if (uiState === "idle" && isOnline && !pendingCount && !lastError) {
+  const [banner, setBanner] = useState<{
+    kind: BannerKind;
+    title: string;
+    subtitle: string;
+  } | null>(null);
+  const [renderedBanner, setRenderedBanner] = useState<typeof banner>(null);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-10)).current;
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previous = useRef({
+    isOnline,
+    isSyncing,
+    lastRunReason,
+    lastSyncedAt,
+    uiState,
+    lastError,
+  });
+
+  const errorTone = useMemo(
+    () =>
+      uiState === "schema_error" || uiState === "failed"
+        ? "warning"
+        : uiState === "retrying"
+          ? "retrying"
+          : "default",
+    [uiState],
+  );
+
+  useEffect(() => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+
+    if (isRestoring) {
+      setBanner(null);
+      previous.current = {
+        isOnline,
+        isSyncing,
+        lastRunReason,
+        lastSyncedAt,
+        uiState,
+        lastError,
+      };
+      return;
+    }
+
+    const wentOffline =
+      previous.current.isOnline && !isOnline && uiState === "offline";
+    const cameBackOnline =
+      !previous.current.isOnline && isOnline && previous.current.uiState === "offline";
+    const startedSync = !previous.current.isSyncing && isSyncing;
+    const finishedSync = previous.current.isSyncing && !isSyncing;
+    const syncReason =
+      lastRunReason === "launch" ||
+      lastRunReason === "login" ||
+      lastRunReason === "reconnect" ||
+      lastRunReason === "manual" ||
+      lastRunReason === "foreground";
+
+    if (uiState === "schema_error" || uiState === "failed") {
+      setBanner({
+        kind: "error",
+        title:
+          uiState === "schema_error"
+            ? "Database needs attention"
+            : "Sync needs attention",
+        subtitle:
+          lastError ?? "A local sync issue needs manual review.",
+      });
+    } else if (!isOnline || uiState === "offline" || wentOffline) {
+      setBanner({
+        kind: "offline",
+        title: "Offline mode",
+        subtitle:
+          "Changes will sync automatically when your connection returns.",
+      });
+    } else if (startedSync && syncReason && !lastError) {
+      setBanner({
+        kind: "syncing",
+        title: "Syncing your data",
+        subtitle: "Keeping your finances up to date.",
+      });
+      hideTimer.current = setTimeout(() => {
+        setBanner(null);
+      }, 2200);
+    } else if (finishedSync && syncReason && !lastError && !pendingCount) {
+      setBanner({
+        kind: "success",
+        title: "All changes synced",
+        subtitle: `Last synced ${formatLastSynced(lastSyncedAt)}`,
+      });
+      hideTimer.current = setTimeout(() => {
+        setBanner(null);
+      }, 1500);
+    } else if (cameBackOnline && !lastError) {
+      setBanner({
+        kind: "syncing",
+        title: "Syncing your data",
+        subtitle: "Connection restored. Updating local changes.",
+      });
+      hideTimer.current = setTimeout(() => {
+        setBanner(null);
+      }, 2200);
+    } else if (uiState === "retrying" && lastError) {
+      setBanner({
+        kind: "error",
+        title: "Sync will retry",
+        subtitle: lastError,
+      });
+    } else {
+      setBanner(null);
+    }
+
+    previous.current = {
+      isOnline,
+      isSyncing,
+      lastRunReason,
+      lastSyncedAt,
+      uiState,
+      lastError,
+    };
+  }, [
+    isOnline,
+    isRestoring,
+    isSyncing,
+    lastError,
+    lastRunReason,
+    lastSyncedAt,
+    opacity,
+    pendingCount,
+    translateY,
+    uiState,
+  ]);
+
+  useEffect(() => {
+    if (exitTimer.current) {
+      clearTimeout(exitTimer.current);
+      exitTimer.current = null;
+    }
+
+    if (banner) {
+      if (exitTimer.current) {
+        clearTimeout(exitTimer.current);
+        exitTimer.current = null;
+      }
+
+      setRenderedBanner(banner);
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    Animated.timing(opacity, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(translateY, {
+      toValue: -10,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+
+    exitTimer.current = setTimeout(() => {
+      setRenderedBanner(null);
+    }, 180);
+
+    return () => {
+      if (exitTimer.current) {
+        clearTimeout(exitTimer.current);
+        exitTimer.current = null;
+      }
+    };
+  }, [banner, opacity, translateY]);
+
+  const palette =
+    renderedBanner?.kind === "offline"
+      ? {
+          background: colorScheme === "dark" ? "#102131" : "#EAF5FF",
+          border: colorScheme === "dark" ? "#5B8FD6" : "#8AC0F7",
+          accent: "#60A5FA",
+          icon: "wifi-off" as const,
+        }
+      : renderedBanner?.kind === "success"
+        ? {
+            background: colorScheme === "dark" ? "#0F241C" : "#E9F8F1",
+            border: colorScheme === "dark" ? "#2C8F68" : "#8CD8B5",
+            accent: "#17B26A",
+            icon: "check-circle" as const,
+          }
+        : renderedBanner?.kind === "error"
+          ? {
+              background:
+                errorTone === "warning"
+                  ? colorScheme === "dark"
+                    ? "#2A1C0B"
+                    : "#FFF7E6"
+                  : colorScheme === "dark"
+                    ? "#2A1518"
+                    : "#FFF0F2",
+              border: errorTone === "warning" ? "#F59E0B" : "#F97388",
+              accent: errorTone === "warning" ? "#F59E0B" : "#FF5C73",
+              icon: "alert-circle" as const,
+            }
+          : {
+              background: colorScheme === "dark" ? "#082131" : "#E7F4FF",
+              border: "#60A5FA",
+              accent: colors.primary,
+            icon: "sync" as const,
+          };
+
+  if (!renderedBanner) {
     return null;
   }
 
-  const tone =
-    uiState === "schema_error" || uiState === "failed"
-      ? "warning"
-      : uiState === "offline"
-        ? "offline"
-        : "info";
-
-  const backgroundColor =
-    tone === "warning"
-      ? colorScheme === "dark"
-        ? "#2A1C0B"
-        : "#FFF7E6"
-      : tone === "offline"
-        ? colorScheme === "dark"
-          ? "#102131"
-          : "#EAF5FF"
-        : colorScheme === "dark"
-          ? "#082131"
-          : "#E7F4FF";
-
-  const accentColor =
-    tone === "warning" ? "#F59E0B" : tone === "offline" ? "#60A5FA" : colors.primary;
-
-  const title = isRestoring
-    ? "Restoring your data"
-    : uiState === "offline"
-      ? "Offline mode"
-      : uiState === "retrying"
-        ? "Retrying sync soon"
-        : uiState === "schema_error"
-          ? "Database needs attention"
-          : uiState === "failed"
-            ? "Sync needs attention"
-            : isSyncing
-              ? "Syncing your data"
-              : "Changes waiting to sync";
-
-  const subtitle = isRestoring
-    ? "Downloading your latest finance data before showing the app."
-    : uiState === "offline"
-      ? "Changes will sync automatically when your connection returns."
-      : uiState === "retrying"
-        ? "Some changes are queued and will retry in the background."
-        : uiState === "schema_error"
-          ? lastError ?? "A local database schema repair is required."
-          : uiState === "failed"
-            ? lastError ?? "Sync needs manual attention."
-            : `Last synced ${formatLastSynced(lastSyncedAt)}${pendingCount ? ` • ${pendingCount} pending` : ""}`;
-
   return (
     <SafeAreaView pointerEvents="box-none" style={styles.safeArea}>
-      <View style={[styles.banner, { backgroundColor, borderColor: accentColor }]}>
+      <Animated.View
+        style={[
+          styles.banner,
+          {
+            backgroundColor: palette.background,
+            borderColor: palette.border,
+            opacity,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: palette.accent }]}>
+          <MaterialCommunityIcons name={palette.icon} size={16} color="#fff" />
+        </View>
+
         <View style={styles.textWrap}>
           <Text style={[styles.title, { color: colors.foreground }]}>
-            {title}
+            {renderedBanner.title}
           </Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            {subtitle}
+            {renderedBanner.subtitle}
           </Text>
         </View>
 
-        {uiState === "schema_error" || uiState === "failed" || uiState === "retrying" ? (
-          <Pressable style={[styles.button, { backgroundColor: accentColor }]} onPress={() => void syncNow()}>
-            <Text style={styles.buttonText}>{isSyncing ? "..." : "Retry"}</Text>
+        {renderedBanner.kind === "error" ? (
+          <Pressable
+            style={[styles.button, { backgroundColor: palette.accent }]}
+            onPress={() => void syncNow()}
+          >
+            <Feather name="refresh-cw" size={14} color="#FFFFFF" />
           </Pressable>
         ) : null}
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -125,17 +325,24 @@ const styles = StyleSheet.create({
   },
   banner: {
     borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     shadowColor: "#0F172A",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   textWrap: {
     flex: 1,
@@ -147,24 +354,16 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
   subtitle: {
-    marginTop: 3,
+    marginTop: 2,
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
   },
   button: {
-    minWidth: 58,
-    height: 34,
-    borderRadius: 17,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: fontWeights.bold,
   },
 });

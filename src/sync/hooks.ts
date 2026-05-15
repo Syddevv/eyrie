@@ -14,6 +14,7 @@ export function useSyncStatus() {
   const lastError = useSyncStore((state) => state.lastError);
   const lastErrorKind = useSyncStore((state) => state.lastErrorKind);
   const isRestoring = useSyncStore((state) => state.isRestoring);
+  const lastRunReason = useSyncStore((state) => state.lastRunReason);
 
   return {
     isOnline,
@@ -25,6 +26,7 @@ export function useSyncStatus() {
     lastError,
     lastErrorKind,
     isRestoring,
+    lastRunReason,
   } as const;
 }
 
