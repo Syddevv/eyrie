@@ -12,8 +12,12 @@ type IconLibrary = "feather" | "material";
 type TransactionTypeValue = "expense" | "income" | "transfer";
 type TransactionTypeLabel = "Expense" | "Income" | "Transfer";
 
-type TransactionRow = Awaited<ReturnType<typeof transactionsService.fetch>>[number];
-type TransactionDetailRow = Awaited<ReturnType<typeof transactionsService.fetchById>>;
+type TransactionRow = Awaited<
+  ReturnType<typeof transactionsService.fetch>
+>[number];
+type TransactionDetailRow = Awaited<
+  ReturnType<typeof transactionsService.fetchById>
+>;
 
 export type TransactionListItem = {
   id: string;
@@ -164,12 +168,11 @@ function normalizeMerchantName(value?: string | null) {
   }
 
   const normalized = raw.toLowerCase();
-  const prefix =
-    normalized.startsWith("merchant_default_")
-      ? "merchant_default_"
-      : normalized.startsWith("merchant_")
-        ? "merchant_"
-        : null;
+  const prefix = normalized.startsWith("merchant_default_")
+    ? "merchant_default_"
+    : normalized.startsWith("merchant_")
+      ? "merchant_"
+      : null;
 
   if (!prefix) {
     return raw;
@@ -203,8 +206,14 @@ export function resolveTransactionVisual(
         iconLibrary: "material" as const,
         iconName: options.categoryIcon ?? "cash-plus",
         iconColor: options.categoryColor ?? "#10B981",
-        iconBackgroundLight: withOpacity(options.categoryColor ?? "#10B981", 0.18),
-        iconBackgroundDark: withOpacity(options.categoryColor ?? "#10B981", 0.22),
+        iconBackgroundLight: withOpacity(
+          options.categoryColor ?? "#10B981",
+          0.18,
+        ),
+        iconBackgroundDark: withOpacity(
+          options.categoryColor ?? "#10B981",
+          0.22,
+        ),
       };
     }
 
@@ -232,7 +241,10 @@ export function resolveTransactionVisual(
       iconLibrary: "material" as const,
       iconName: matchedMerchant.icon ?? "storefront-outline",
       iconColor: matchedMerchant.color ?? "#94A3B8",
-      iconBackgroundLight: withOpacity(matchedMerchant.color ?? "#94A3B8", 0.16),
+      iconBackgroundLight: withOpacity(
+        matchedMerchant.color ?? "#94A3B8",
+        0.16,
+      ),
       iconBackgroundDark: withOpacity(matchedMerchant.color ?? "#94A3B8", 0.2),
     };
   }
@@ -323,11 +335,15 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
       : source.type === "transfer"
         ? "Transfer"
         : "Expense");
-  const visual = resolveTransactionVisual(source.category?.name ?? categoryName, source.type, {
-    merchantName: merchant,
-    categoryIcon: source.category?.icon ?? null,
-    categoryColor: source.category?.color ?? null,
-  });
+  const visual = resolveTransactionVisual(
+    source.category?.name ?? categoryName,
+    source.type,
+    {
+      merchantName: merchant,
+      categoryIcon: source.category?.icon ?? null,
+      categoryColor: source.category?.color ?? null,
+    },
+  );
   const isIncome = source.type === "income";
   const isTransfer = source.type === "transfer";
   const accountLabel = source.account
@@ -378,7 +394,8 @@ export function useTransactions() {
       return;
     }
 
-    setIsLoading(true);
+    // Only show loading state if we don't already have data
+    setIsLoading((prev) => prev || transactions.length === 0);
     setError(null);
 
     try {
@@ -389,7 +406,7 @@ export function useTransactions() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, transactions.length]);
 
   useEffect(() => {
     void refresh();
@@ -437,7 +454,9 @@ export function useTransactions() {
 }
 
 export function useTransaction(transactionId?: string | null) {
-  const [transaction, setTransaction] = useState<TransactionListItem | null>(null);
+  const [transaction, setTransaction] = useState<TransactionListItem | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -453,7 +472,8 @@ export function useTransaction(transactionId?: string | null) {
     setError(null);
 
     try {
-      const row: TransactionDetailRow = await transactionsService.fetchById(transactionId);
+      const row: TransactionDetailRow =
+        await transactionsService.fetchById(transactionId);
       const next = row ? mapTransactionRow(row) : null;
       setTransaction(next);
       return next;
@@ -494,7 +514,9 @@ export function useTransaction(transactionId?: string | null) {
   } as const;
 }
 
-export function groupTransactionsBySection(transactions: TransactionListItem[]) {
+export function groupTransactionsBySection(
+  transactions: TransactionListItem[],
+) {
   return Array.from(
     transactions.reduce((map, transaction) => {
       const existing = map.get(transaction.sectionTitle);

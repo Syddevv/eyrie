@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 import { useDashboardStore } from "./use-dashboard";
 import { toTransactionIso } from "@/src/db/utils/time";
+import { waitForHydrationReady } from "@/src/sync/store";
 
 const CASH_FALLBACK_ID = "cash-fallback";
 
@@ -53,6 +54,7 @@ export function useCreateIncome() {
         let accountId = input.accountId;
 
         if (accountId === CASH_FALLBACK_ID) {
+          await waitForHydrationReady();
           const cashAccount = await accountsService.ensureDefaultCashAccount(
             user.id,
             user.currency_code,

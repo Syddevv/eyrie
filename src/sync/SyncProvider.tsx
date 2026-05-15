@@ -11,14 +11,16 @@ import { type PropsWithChildren, useEffect, useRef } from "react";
 import { themeColors } from "@/constants/colors";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/store/useAuthStore";
-import { emitAllChanges, emitAccountsChanged } from "@/src/lib/dbSync";
+import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
+import { accountsService } from "@/src/db/services";
 
 function useSyncTriggers() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const setOnline = useSyncStore((state) => state.setOnline);
   const reset = useSyncStore((state) => state.reset);
+  const setHydrationReady = useSyncStore((state) => state.setHydrationReady);
   const previousUserId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -28,27 +30,64 @@ function useSyncTriggers() {
       return;
     }
 
+    let cancelled = false;
+
     void (async () => {
+      console.log(
+        `[sync] Starting for user: ${userId}, reason: ${previousUserId.current ? "launch" : "login"}`,
+      );
+      setHydrationReady(false);
       const shouldRestore = await needsInitialHydration(userId);
+      console.log(`[sync] Restore needed: ${shouldRestore}`);
+
       useSyncStore.getState().setRestoring(shouldRestore);
       await refreshSyncCounts(userId);
+
+      console.log(`[sync] Running sync...`);
       await runSync({
         userId,
         reason: previousUserId.current ? "launch" : "login",
       });
+      console.log(`[sync] Sync complete`);
+
+      if (cancelled) {
+        return;
+      }
+
+      // Reconcile after sync restores remote data, before hydration is exposed
+      // to UI subscribers.
+      console.log(`[sync] Cleaning up duplicate CASH accounts...`);
+      const cleanupResult = await accountsService.cleanupDuplicateCashAccounts();
+      console.log(`[sync] Duplicate CASH cleanup complete`, cleanupResult);
+      console.log(`[sync] Ensuring default CASH account...`);
+      await accountsService.ensureDefaultCashAccount(userId, null);
+      console.log(`[sync] Default CASH account ensured`);
+
+      if (cancelled) {
+        return;
+      }
+
+      console.log(`[sync] Hydration ready, exposing reconciled accounts to UI`);
       useSyncStore.getState().setRestoring(false);
+      setHydrationReady(true);
 
       // Refresh all UI after restore/sync completes
-      // This ensures all screens display the latest data without manual navigation
       if (shouldRestore) {
         setTimeout(() => {
+          console.log(`[sync] Emitting all changes after restore`);
           emitAllChanges();
         }, 100);
+      } else {
+        emitAllChanges();
       }
     })();
 
     previousUserId.current = userId;
-  }, [reset, userId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reset, setHydrationReady, userId]);
 
   useEffect(() => {
     // Do not touch the native NetInfo module in runtimes where it may be missing.

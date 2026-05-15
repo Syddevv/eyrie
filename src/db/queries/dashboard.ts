@@ -1,24 +1,29 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
+import { dedupeCashAccountsForDisplay } from "../services/accountsService";
 import { clamp, roundMoney } from "../utils/money";
 import { addDaysIso, endOfDayIso, nowIso, startOfDayIso } from "../utils/time";
 
 export async function getTotalBalance(userId: string) {
-  const [result] = await db
-    .select({
-      total: sql<number>`coalesce(sum(${accounts.balance}), 0)`,
-    })
+  const rows = await db
+    .select()
     .from(accounts)
     .where(
       and(
         eq(accounts.userId, userId),
         inArray(accounts.type, ["bank", "ewallet", "cash"]),
+        isNull(accounts.deletedAt),
       ),
     );
 
-  return roundMoney(result?.total ?? 0);
+  const total = dedupeCashAccountsForDisplay(rows).reduce(
+    (sum, account) => sum + (Number(account.balance) || 0),
+    0,
+  );
+
+  return roundMoney(total);
 }
 
 export async function getTotalIncome(

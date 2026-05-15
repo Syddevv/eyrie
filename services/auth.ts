@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
+import { accountsService } from "@/src/db/services";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -425,6 +426,9 @@ export async function signOut() {
   store.setSigningOut(true);
 
   try {
+    // Reset cached default cash account state before signing out
+    accountsService.resetDefaultCashCache();
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {

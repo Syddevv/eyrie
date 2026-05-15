@@ -14,6 +14,7 @@ type SyncStoreState = {
   pendingCount: number;
   failedCount: number;
   isRestoring: boolean;
+  hydrationReady: boolean;
   setOnline: (isOnline: boolean) => void;
   setSyncing: (input: {
     isSyncing: boolean;
@@ -27,6 +28,7 @@ type SyncStoreState = {
     isOnline?: boolean;
   }) => void;
   setRestoring: (isRestoring: boolean) => void;
+  setHydrationReady: (hydrationReady: boolean) => void;
   setSummary: (input: {
     lastSyncedAt?: string | null;
     lastError?: string | null;
@@ -48,6 +50,7 @@ const INITIAL_STATE = {
   pendingCount: 0,
   failedCount: 0,
   isRestoring: false,
+  hydrationReady: false,
 };
 
 export const useSyncStore = create<SyncStoreState>((set) => ({
@@ -78,8 +81,30 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
   setRestoring: (isRestoring) =>
     set((state) => ({
       isRestoring,
-      uiState: isRestoring ? "restoring" : state.uiState === "restoring" ? "idle" : state.uiState,
+      uiState: isRestoring
+        ? "restoring"
+        : state.uiState === "restoring"
+          ? "idle"
+          : state.uiState,
     })),
+  setHydrationReady: (hydrationReady) => set({ hydrationReady }),
   setSummary: (input) => set(input),
   reset: () => set(INITIAL_STATE),
 }));
+
+export function waitForHydrationReady() {
+  if (useSyncStore.getState().hydrationReady) {
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve) => {
+    const unsubscribe = useSyncStore.subscribe((state) => {
+      if (!state.hydrationReady) {
+        return;
+      }
+
+      unsubscribe();
+      resolve();
+    });
+  });
+}

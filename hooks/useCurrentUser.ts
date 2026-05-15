@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { usersService } from "@/src/db/services";
-import { accountsService } from "@/src/db/services";
 import { useAuthStore } from "@/store/useAuthStore";
 
 type CurrentUser = {
@@ -72,7 +71,8 @@ export function publishCurrentUserUpdate(
 
 export function useCurrentUser() {
   const supabaseUser = useAuthStore((s) => s.user) as SupabaseUser | null;
-  const [snapshot, setSnapshot] = useState<CurrentUserSnapshot>(currentSnapshot);
+  const [snapshot, setSnapshot] =
+    useState<CurrentUserSnapshot>(currentSnapshot);
 
   const refresh = useCallback(async () => {
     if (!supabaseUser) {
@@ -103,10 +103,9 @@ export function useCurrentUser() {
 
       const result = toCurrentUser(local);
 
-      await accountsService.ensureDefaultCashAccount(
-        result.id,
-        result.currency_code,
-      );
+      // NOTE: ensureDefaultCashAccount() is now called from SyncProvider AFTER sync restore completes
+      // to avoid race conditions with sync hydration. This prevents duplicate CASH accounts.
+      // See src/sync/SyncProvider.tsx for the actual call.
 
       publishSnapshot({
         user: result,
@@ -140,5 +139,9 @@ export function useCurrentUser() {
     });
   }, [refresh]);
 
-  return { user: snapshot.user, isLoading: snapshot.isLoading, refresh } as const;
+  return {
+    user: snapshot.user,
+    isLoading: snapshot.isLoading,
+    refresh,
+  } as const;
 }

@@ -12,6 +12,7 @@ import {
   validateAndRepairLocalSchema,
 } from "./schema-validation";
 import { seedDatabase } from "./services/seed.service";
+import { accountsService } from "./services/accountsService";
 
 export function DatabaseProvider({ children }: PropsWithChildren) {
   const colorScheme = useColorScheme() ?? "light";
@@ -109,6 +110,15 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
         });
 
         await seedDatabase();
+
+        // Phase 3b: Clean up any duplicate CASH accounts from previous app versions
+        const cleanupResult =
+          await accountsService.cleanupDuplicateCashAccounts();
+        if (cleanupResult.removed > 0) {
+          console.log(
+            `[db:boot] Cleanup removed ${cleanupResult.removed} duplicate CASH accounts`,
+          );
+        }
 
         // Phase 4: Ready
         if (isMounted) {
