@@ -5,7 +5,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { resolveBrandLabel } from "@/hooks/usePaymentMethods";
 import { transactionsService } from "@/src/db/services";
-import { onAccountsChanged } from "@/src/lib/dbSync";
+import { onAccountsChanged, onTransactionsChanged } from "@/src/lib/dbSync";
 import { getMerchantPresetByName } from "@/constants/expense-merchants";
 
 type IconLibrary = "feather" | "material";
@@ -416,9 +416,13 @@ export function useTransactions() {
     const off = onAccountsChanged(() => {
       void refresh();
     });
+    const offTransactions = onTransactionsChanged(() => {
+      void refresh();
+    });
 
     return () => {
       off();
+      offTransactions();
     };
   }, [refresh]);
 
@@ -493,9 +497,13 @@ export function useTransaction(transactionId?: string | null) {
     const off = onAccountsChanged(() => {
       void refresh();
     });
+    const offTransactions = onTransactionsChanged(() => {
+      void refresh();
+    });
 
     return () => {
       off();
+      offTransactions();
     };
   }, [refresh]);
 

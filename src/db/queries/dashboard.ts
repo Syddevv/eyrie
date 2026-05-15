@@ -40,6 +40,7 @@ export async function getTotalIncome(
       and(
         eq(transactions.userId, userId),
         eq(transactions.type, "income"),
+        isNull(transactions.deletedAt),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
         endDate ? lte(transactions.transactionDate, endDate) : undefined,
       ),
@@ -62,6 +63,7 @@ export async function getTotalExpenses(
       and(
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
+        isNull(transactions.deletedAt),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
         endDate ? lte(transactions.transactionDate, endDate) : undefined,
       ),
@@ -72,7 +74,7 @@ export async function getTotalExpenses(
 
 export async function getRecentTransactions(userId: string, limit = 10) {
   return db.query.transactions.findMany({
-    where: eq(transactions.userId, userId),
+    where: and(eq(transactions.userId, userId), isNull(transactions.deletedAt)),
     orderBy: [desc(transactions.transactionDate), desc(transactions.createdAt)],
     limit,
     with: {
@@ -101,13 +103,14 @@ export async function getBudgetProgress(userId: string) {
         })
         .from(transactions)
         .where(
-          and(
-            eq(transactions.userId, budget.userId),
-            eq(transactions.type, "expense"),
-            eq(transactions.categoryId, budget.categoryId),
-            gte(transactions.transactionDate, budget.startDate),
-            lte(transactions.transactionDate, budget.endDate),
-          ),
+        and(
+          eq(transactions.userId, budget.userId),
+          eq(transactions.type, "expense"),
+          eq(transactions.categoryId, budget.categoryId),
+          isNull(transactions.deletedAt),
+          gte(transactions.transactionDate, budget.startDate),
+          lte(transactions.transactionDate, budget.endDate),
+        ),
         );
 
       const rawRemaining = roundMoney(budget.amount - budget.spent);
@@ -146,6 +149,7 @@ export async function getSpendingBreakdown(
       and(
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
+        isNull(transactions.deletedAt),
         startDate ? gte(transactions.transactionDate, startDate) : undefined,
         endDate ? lte(transactions.transactionDate, endDate) : undefined,
       ),
@@ -173,6 +177,7 @@ export async function getWeeklySpending(userId: string, anchorDate = nowIso()) {
       and(
         eq(transactions.userId, userId),
         eq(transactions.type, "expense"),
+        isNull(transactions.deletedAt),
         gte(transactions.transactionDate, startDate),
         lte(transactions.transactionDate, endDate),
       ),

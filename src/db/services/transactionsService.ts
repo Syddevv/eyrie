@@ -22,7 +22,11 @@ import {
   assertTransactionType,
   assertTransferAccounts,
 } from "../utils/validation";
-import { emitAccountsChanged, emitMerchantsChanged } from "@/src/lib/dbSync";
+import {
+  emitAccountsChanged,
+  emitMerchantsChanged,
+  emitTransactionsChanged,
+} from "@/src/lib/dbSync";
 import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 
@@ -41,7 +45,7 @@ export type CreateTransactionInput = Omit<
 };
 
 export class TransactionsService {
-  private async enqueueTransactionDependencies(entries: Array<Pick<NewTransaction, "userId" | "accountId" | "transferAccountId" | "type" | "categoryId" | "transactionDate"> | null | undefined>) {
+  private async enqueueTransactionDependencies(entries: (Pick<NewTransaction, "userId" | "accountId" | "transferAccountId" | "type" | "categoryId" | "transactionDate"> | null | undefined)[]) {
     const accountIds = new Set<string>();
     const budgetIds = new Set<string>();
     let userId: string | null = null;
@@ -162,6 +166,7 @@ export class TransactionsService {
 
     emitAccountsChanged();
     emitMerchantsChanged();
+    emitTransactionsChanged();
     await enqueueSync("transactions", created.id, "upsert", created.userId);
     await this.enqueueTransactionDependencies([created]);
     return created;
@@ -287,6 +292,7 @@ export class TransactionsService {
 
     emitAccountsChanged();
     emitMerchantsChanged();
+    emitTransactionsChanged();
     await enqueueSync("transactions", updated.id, "upsert", updated.userId);
     await this.enqueueTransactionDependencies([existing, updated]);
     return updated;
@@ -327,6 +333,7 @@ export class TransactionsService {
     }
 
     emitAccountsChanged();
+    emitTransactionsChanged();
     if (deleted) {
       await enqueueSync("transactions", deleted.id, "delete", deleted.userId);
       await this.enqueueTransactionDependencies([deleted]);
