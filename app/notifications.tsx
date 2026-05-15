@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useNavigation, useRouter } from "expo-router";
+import { useCallback, useMemo } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -192,7 +192,12 @@ function NotificationRow({
 
                 <View style={styles.metadataRow}>
                   <Text style={[styles.notificationTime, { color: bodyColor }]}>
-                    {formatRelativeTime(item.created_at)}
+                    {formatRelativeTime(
+                      item.delivered_at ??
+                        item.scheduled_for ??
+                        item.updated_at ??
+                        item.created_at,
+                    )}
                   </Text>
                   <Text
                     style={[styles.notificationCategory, { color: item.color }]}
@@ -200,6 +205,16 @@ function NotificationRow({
                     {item.category.replace(/^\w/, (char) => char.toUpperCase())}
                   </Text>
                 </View>
+                {item.delivery_state === "scheduled" ? (
+                  <View style={styles.statusChip}>
+                    <Feather name="clock" size={12} color={item.color} />
+                    <Text
+                      style={[styles.statusChipText, { color: item.color }]}
+                    >
+                      Scheduled
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           </Pressable>
@@ -211,6 +226,7 @@ function NotificationRow({
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
@@ -223,6 +239,7 @@ export default function NotificationsScreen() {
     markAllAsRead,
     toggleRead,
     deleteNotification,
+    clearNotifications,
   } = useNotifications();
   const { preferences } = useNotificationPreferences();
 
@@ -282,6 +299,15 @@ export default function NotificationsScreen() {
     await refresh();
   };
 
+  const handleGoBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    router.replace("/");
+  }, [navigation, router]);
+
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
@@ -289,7 +315,7 @@ export default function NotificationsScreen() {
           <View style={styles.topRow}>
             <Pressable
               style={[styles.iconButton, pageStyles.iconButton]}
-              onPress={() => router.back()}
+              onPress={handleGoBack}
             >
               <Feather
                 name="chevron-left"
@@ -307,12 +333,22 @@ export default function NotificationsScreen() {
               </Text>
             </View>
 
-            <Pressable
-              style={[styles.iconButton, pageStyles.iconButton]}
-              onPress={() => markAllAsRead().catch(() => undefined)}
-            >
-              <Feather name="check" size={20} color={colors.foreground} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                style={[styles.iconButton, pageStyles.iconButton]}
+                onPress={() => markAllAsRead().catch(() => undefined)}
+              >
+                <Feather name="check" size={20} color={colors.foreground} />
+              </Pressable>
+              {!!notifications.length ? (
+                <Pressable
+                  style={[styles.iconButton, pageStyles.iconButton]}
+                  onPress={() => clearNotifications().catch(() => undefined)}
+                >
+                  <Feather name="trash-2" size={18} color={colors.foreground} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -345,6 +381,19 @@ export default function NotificationsScreen() {
               </Text>
             </View>
           </View>
+
+          {isLoading ? (
+            <View style={styles.syncHintRow}>
+              <Feather
+                name="refresh-cw"
+                size={12}
+                color={pageStyles.subtitle.color}
+              />
+              <Text style={[styles.syncHintText, pageStyles.subtitle]}>
+                Refreshing notifications in the background...
+              </Text>
+            </View>
+          ) : null}
 
           {!!notifications.length ? (
             <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
@@ -443,6 +492,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
   iconButton: {
     width: 40,
     height: 40,
@@ -506,6 +559,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     opacity: 0.8,
+  },
+  syncHintRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  syncHintText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    opacity: 0.85,
   },
   swipeHintChip: {
     marginTop: 14,
@@ -590,6 +656,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  statusChip: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(99, 102, 241, 0.1)",
+  },
+  statusChipText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.semibold,
   },
   notificationTime: {
     fontFamily: fontFamilies.sans,

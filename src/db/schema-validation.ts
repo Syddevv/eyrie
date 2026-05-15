@@ -103,6 +103,101 @@ const SCHEMA_SPECS: TableSpec[] = [
       },
     ],
   },
+  {
+    table: "notifications",
+    columns: [
+      {
+        name: "type",
+        sql: "ALTER TABLE notifications ADD COLUMN type TEXT NOT NULL DEFAULT 'reminder';",
+        recoverable: true,
+      },
+      {
+        name: "data",
+        sql: "ALTER TABLE notifications ADD COLUMN data TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "action_url",
+        sql: "ALTER TABLE notifications ADD COLUMN action_url TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "category",
+        sql: "ALTER TABLE notifications ADD COLUMN category TEXT NOT NULL DEFAULT 'reminders';",
+        recoverable: true,
+      },
+      {
+        name: "priority",
+        sql: "ALTER TABLE notifications ADD COLUMN priority TEXT NOT NULL DEFAULT 'medium';",
+        recoverable: true,
+      },
+      {
+        name: "icon",
+        sql: "ALTER TABLE notifications ADD COLUMN icon TEXT NOT NULL DEFAULT 'bell';",
+        recoverable: true,
+      },
+      {
+        name: "color",
+        sql: "ALTER TABLE notifications ADD COLUMN color TEXT NOT NULL DEFAULT '#6366F1';",
+        recoverable: true,
+      },
+      {
+        name: "dedupe_key",
+        sql: "ALTER TABLE notifications ADD COLUMN dedupe_key TEXT NOT NULL DEFAULT '';",
+        recoverable: true,
+      },
+      {
+        name: "read_at",
+        sql: "ALTER TABLE notifications ADD COLUMN read_at TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "scheduled_for",
+        sql: "ALTER TABLE notifications ADD COLUMN scheduled_for TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "delivered_at",
+        sql: "ALTER TABLE notifications ADD COLUMN delivered_at TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "delivery_state",
+        sql: "ALTER TABLE notifications ADD COLUMN delivery_state TEXT NOT NULL DEFAULT 'delivered';",
+        recoverable: true,
+      },
+      {
+        name: "local_schedule_id",
+        sql: "ALTER TABLE notifications ADD COLUMN local_schedule_id TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "updated_at",
+        sql: "ALTER TABLE notifications ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';",
+        recoverable: true,
+      },
+      {
+        name: "deleted_at",
+        sql: "ALTER TABLE notifications ADD COLUMN deleted_at TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "sync_status",
+        sql: "ALTER TABLE notifications ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced';",
+        recoverable: true,
+      },
+      {
+        name: "last_synced_at",
+        sql: "ALTER TABLE notifications ADD COLUMN last_synced_at TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "sync_error",
+        sql: "ALTER TABLE notifications ADD COLUMN sync_error TEXT;",
+        recoverable: true,
+      },
+    ],
+  },
 ];
 
 async function getTableColumns(table: string) {

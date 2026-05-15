@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
+  defaultNotificationPreferences,
   ensureNotificationPreferences,
   updateNotificationPreferences,
   type NotificationPreferences,
@@ -23,7 +24,9 @@ export function useNotificationPreferences() {
 
     setIsLoading(true);
     try {
-      const next = await ensureNotificationPreferences(userId);
+      const next = await ensureNotificationPreferences(userId).catch(() =>
+        defaultNotificationPreferences(userId),
+      );
       setPreferences(next);
       return next;
     } finally {
@@ -41,11 +44,18 @@ export function useNotificationPreferences() {
         return null;
       }
 
-      const next = await updateNotificationPreferences(userId, updates);
+      const next = await updateNotificationPreferences(userId, updates).catch(
+        () => ({
+          ...(preferences ?? defaultNotificationPreferences(userId)),
+          ...updates,
+          user_id: userId,
+          updated_at: new Date().toISOString(),
+        }),
+      );
       setPreferences(next);
       return next;
     },
-    [userId],
+    [preferences, userId],
   );
 
   useEffect(() => {

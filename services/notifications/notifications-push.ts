@@ -2,6 +2,8 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import { Platform } from "react-native";
 
+import { notificationsService } from "@/src/db/services";
+
 import { updateNotificationPreferences } from "./notifications-api";
 import type { AppNotification } from "./types";
 
@@ -72,6 +74,13 @@ function notificationUrlFromPayload(payload: {
 }) {
   const url = payload.request?.content?.data?.url;
   return typeof url === "string" ? url : null;
+}
+
+function notificationIdFromPayload(payload: {
+  request?: { content?: { data?: { notificationId?: unknown } } };
+}) {
+  const notificationId = payload.request?.content?.data?.notificationId;
+  return typeof notificationId === "string" ? notificationId : null;
 }
 
 export async function configureNotificationChannels() {
@@ -180,12 +189,31 @@ export function initializeNotificationListeners() {
     }
   }
 
-  receivedSubscription = Notifications.addNotificationReceivedListener(() => {
-    // Foreground presentation is handled by the notification handler.
-  });
+  receivedSubscription = Notifications.addNotificationReceivedListener(
+    (notification) => {
+      const notificationId = notificationIdFromPayload(notification);
+      if (notificationId) {
+        console.log("[notifications:push] Notification delivered", {
+          notificationId,
+        });
+        void notificationsService.markDelivered(
+          notificationId,
+          notification.request.identifier ?? null,
+        );
+      }
+    },
+  );
 
   responseSubscription =
     Notifications.addNotificationResponseReceivedListener((response) => {
+      const notificationId = notificationIdFromPayload(response.notification);
+      if (notificationId) {
+        void notificationsService.markDelivered(
+          notificationId,
+          response.notification.request.identifier ?? null,
+        );
+      }
+
       const url = notificationUrlFromPayload(response.notification);
       if (url) {
         router.push(url as any);
@@ -201,6 +229,80 @@ export function initializeNotificationListeners() {
   };
 }
 
+export async function reconcileScheduledReminderNotifications(userId: string) {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) {
+    return;
+  }
+
+  console.log("[notifications:push] Reconciling scheduled reminders", { userId });
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync().catch(
+    () => [],
+  );
+  const scheduledIds = new Set(scheduled.map((entry) => entry.identifier));
+  const localNotifications = await notificationsService.fetchAll(userId);
+
+  for (const notification of localNotifications) {
+    if (notification.delivery_state !== "scheduled") {
+      continue;
+    }
+
+    if (
+      notification.local_schedule_id &&
+      scheduledIds.has(notification.local_schedule_id)
+    ) {
+      continue;
+    }
+
+    const scheduledAt = notification.scheduled_for
+      ? new Date(notification.scheduled_for).getTime()
+      : NaN;
+    if (Number.isNaN(scheduledAt) || scheduledAt <= Date.now()) {
+      await notificationsService.markDelivered(notification.id);
+      continue;
+    }
+
+    const secondsFromNow = Math.max(
+      1,
+      Math.round((scheduledAt - Date.now()) / 1000),
+    );
+    const localScheduleId = await scheduleReminderNotification({
+      notificationId: notification.id,
+      title: notification.title,
+      body: notification.message,
+      secondsFromNow,
+      url: notification.action_url ?? notification.data?.url ?? "/notifications",
+    });
+
+    await notificationsService.upsertLocal(
+      userId,
+      {
+        id: notification.id,
+        user_id: userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data,
+        action_url: notification.action_url,
+        category: notification.category,
+        priority: notification.priority,
+        icon: notification.icon,
+        color: notification.color,
+        dedupe_key: notification.dedupe_key,
+        is_read: notification.is_read,
+        read_at: notification.read_at,
+        created_at: notification.created_at,
+      },
+      {
+        syncStatus: "pending",
+        localScheduleId: localScheduleId ?? null,
+        scheduledFor: notification.scheduled_for ?? null,
+        deliveryState: "scheduled",
+      },
+    );
+  }
+}
+
 export async function presentLocalNotification(notification: AppNotification) {
   const Notifications = getNotificationsModule();
   if (!Notifications) {
@@ -213,6 +315,7 @@ export async function presentLocalNotification(notification: AppNotification) {
       body: notification.message,
       data: {
         ...(notification.data ?? {}),
+        notificationId: notification.id,
         url: notification.action_url ?? notification.data?.url ?? "/notifications",
       },
       sound: notification.priority === "high" ? "default" : undefined,
@@ -222,6 +325,7 @@ export async function presentLocalNotification(notification: AppNotification) {
 }
 
 export async function scheduleReminderNotification(input: {
+  notificationId?: string;
   title: string;
   body: string;
   secondsFromNow: number;
@@ -232,11 +336,12 @@ export async function scheduleReminderNotification(input: {
     return;
   }
 
-  await Notifications.scheduleNotificationAsync({
+  return Notifications.scheduleNotificationAsync({
     content: {
       title: input.title,
       body: input.body,
       data: {
+        notificationId: input.notificationId,
         url: input.url ?? "/notifications",
       },
     },
@@ -245,6 +350,19 @@ export async function scheduleReminderNotification(input: {
       seconds: input.secondsFromNow,
     },
   });
+}
+
+export async function cancelScheduledReminderNotification(
+  localScheduleId: string | null | undefined,
+) {
+  const Notifications = getNotificationsModule();
+  if (!Notifications || !localScheduleId) {
+    return;
+  }
+
+  await Notifications.cancelScheduledNotificationAsync(localScheduleId).catch(
+    () => undefined,
+  );
 }
 
 export async function syncNotificationBadge(count: number) {

@@ -4,6 +4,7 @@ export { categoriesService } from "./categoriesService";
 export type { ManagedCategory } from "./categoriesService";
 export { goalsService } from "./goalsService";
 export { merchantsService } from "./merchantsService";
+export { notificationsService } from "./notificationsService";
 export { seedDatabase } from "./seed.service";
 export { transactionsService } from "./transactionsService";
 export { usersService } from "./usersService";

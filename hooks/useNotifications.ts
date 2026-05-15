@@ -2,76 +2,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  fetchNotifications,
-  fetchUnreadNotificationCount,
+  cancelScheduledReminderNotification,
   generatePeriodicNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  softDeleteNotification,
   subscribeToNotifications,
+  syncNotificationBadge,
+  syncNotificationsWithLocalStore,
   type AppNotification,
 } from "@/services/notifications";
-import { syncNotificationBadge } from "@/services/notifications";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { notificationsService } from "@/src/db/services";
+import { onNotificationsChanged } from "@/src/lib/dbSync";
 
 function normalizeNotificationsError(error: unknown) {
-  const fallback = "Notifications are temporarily unavailable.";
-
-  if (!error) {
-    return fallback;
-  }
-
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : fallback;
-
-  const normalized = message.toLowerCase();
-
-  if (
-    normalized.includes("relation") ||
-    normalized.includes("does not exist") ||
-    normalized.includes("schema cache") ||
-    normalized.includes("notification_preferences") ||
-    normalized.includes("notifications")
-  ) {
-    return "Notification tables are not ready yet. Apply the Supabase notification migration to enable synced notifications.";
-  }
-
-  if (
-    normalized.includes("row-level security") ||
-    normalized.includes("permission denied") ||
-    normalized.includes("not allowed")
-  ) {
-    return "Your account does not currently have access to notifications. Check the Supabase RLS policies for the notifications tables.";
-  }
-
-  if (
-    normalized.includes("failed to fetch") ||
-    normalized.includes("network") ||
-    normalized.includes("timed out")
-  ) {
-    return "Could not reach the notification service. Check your connection and try again.";
-  }
-
-  return message || fallback;
+  return error instanceof Error
+    ? error.message
+    : "Notifications are temporarily unavailable.";
 }
 
-function mergeNotifications(
-  current: AppNotification[],
-  incoming: AppNotification,
-) {
-  const next = current.filter((item) => item.id !== incoming.id);
-  if (!incoming.deleted_at) {
-    next.unshift(incoming);
-  }
-  return next.sort(
-    (left, right) =>
-      new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
-  );
-}
+type RefreshOptions = {
+  showLoading?: boolean;
+};
 
 export function useNotifications() {
   const { user } = useCurrentUser();
@@ -82,60 +32,78 @@ export function useNotifications() {
   const unreadCount = useNotificationStore((state) => state.unreadCount);
   const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
 
-  const refresh = useCallback(async () => {
+  const loadLocal = useCallback(async () => {
     if (!userId) {
       setNotifications([]);
       setUnreadCount(0);
+      await syncNotificationBadge(0);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      await generatePeriodicNotifications(userId).catch(() => undefined);
-      const [rows, count] = await Promise.all([
-        fetchNotifications(userId),
-        fetchUnreadNotificationCount(userId),
-      ]);
-      setNotifications(rows);
-      setUnreadCount(count);
-      await syncNotificationBadge(count);
-    } catch (refreshError) {
-      setError(normalizeNotificationsError(refreshError));
-    } finally {
-      setIsLoading(false);
-    }
+    console.log("[notifications:hook] Loading notifications from SQLite", {
+      userId,
+    });
+    const [rows, count] = await Promise.all([
+      notificationsService.fetchActive(userId),
+      notificationsService.fetchUnreadCount(userId),
+    ]);
+    setNotifications(rows);
+    setUnreadCount(count);
+    await syncNotificationBadge(count);
   }, [setUnreadCount, userId]);
+
+  const refresh = useCallback(
+    async (options: RefreshOptions = {}) => {
+      if (!userId) {
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      const showLoading = options.showLoading ?? true;
+
+      if (showLoading) {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      try {
+        await loadLocal();
+
+        if (showLoading) {
+          setIsLoading(false);
+        }
+
+        void (async () => {
+          try {
+            await generatePeriodicNotifications(userId).catch(() => undefined);
+            await syncNotificationsWithLocalStore(userId).catch(
+              () => undefined,
+            );
+            await loadLocal();
+          } catch (backgroundError) {
+            setError(normalizeNotificationsError(backgroundError));
+          }
+        })();
+      } catch (refreshError) {
+        setError(normalizeNotificationsError(refreshError));
+        if (showLoading) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [loadLocal, setUnreadCount, userId],
+  );
 
   const toggleRead = useCallback(
     async (notification: AppNotification, nextReadState: boolean) => {
-      const previous = notifications;
-      const updatedLocal = notifications.map((item) =>
-        item.id === notification.id
-          ? {
-              ...item,
-              is_read: nextReadState,
-              read_at: nextReadState ? new Date().toISOString() : null,
-            }
-          : item,
-      );
-
-      const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
-      setNotifications(updatedLocal);
-      setUnreadCount(nextUnreadCount);
-      await syncNotificationBadge(nextUnreadCount);
-
-      try {
-        await markNotificationRead(notification.id, nextReadState);
-      } catch (toggleError) {
-        setNotifications(previous);
-        const restoredCount = previous.filter((item) => !item.is_read).length;
-        setUnreadCount(restoredCount);
-        await syncNotificationBadge(restoredCount);
-        throw toggleError;
+      await notificationsService.markRead(notification.id, nextReadState);
+      await loadLocal();
+      if (userId) {
+        void syncNotificationsWithLocalStore(userId).catch(() => undefined);
       }
     },
-    [notifications, setUnreadCount],
+    [loadLocal, userId],
   );
 
   const markAllAsRead = useCallback(async () => {
@@ -143,75 +111,63 @@ export function useNotifications() {
       return;
     }
 
-    const previous = notifications;
-    const updatedLocal = notifications.map((item) => ({
-      ...item,
-      is_read: true,
-      read_at: item.read_at ?? new Date().toISOString(),
-    }));
-    setNotifications(updatedLocal);
-    setUnreadCount(0);
-    await syncNotificationBadge(0);
-
-    try {
-      await markAllNotificationsRead(userId);
-    } catch (markError) {
-      setNotifications(previous);
-      const restoredCount = previous.filter((item) => !item.is_read).length;
-      setUnreadCount(restoredCount);
-      await syncNotificationBadge(restoredCount);
-      throw markError;
-    }
-  }, [notifications, setUnreadCount, userId]);
+    await notificationsService.markAllRead(userId);
+    await loadLocal();
+    void syncNotificationsWithLocalStore(userId).catch(() => undefined);
+  }, [loadLocal, userId]);
 
   const deleteNotification = useCallback(
     async (notification: AppNotification) => {
-      const previous = notifications;
-      const updatedLocal = notifications.filter((item) => item.id !== notification.id);
-      const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
-      setNotifications(updatedLocal);
-      setUnreadCount(nextUnreadCount);
-      await syncNotificationBadge(nextUnreadCount);
-
-      try {
-        await softDeleteNotification(notification.id);
-      } catch (deleteError) {
-        setNotifications(previous);
-        const restoredCount = previous.filter((item) => !item.is_read).length;
-        setUnreadCount(restoredCount);
-        await syncNotificationBadge(restoredCount);
-        throw deleteError;
+      await cancelScheduledReminderNotification(notification.local_schedule_id);
+      await notificationsService.softDelete(notification.id);
+      await loadLocal();
+      if (userId) {
+        void syncNotificationsWithLocalStore(userId).catch(() => undefined);
       }
     },
-    [notifications, setUnreadCount],
+    [loadLocal, userId],
   );
 
+  const clearNotifications = useCallback(async () => {
+    if (!userId) {
+      return;
+    }
+
+    const currentNotifications = await notificationsService.fetchActive(userId);
+    await Promise.all(
+      currentNotifications.map((notification) =>
+        cancelScheduledReminderNotification(notification.local_schedule_id),
+      ),
+    );
+    await notificationsService.clearAll(userId);
+    await loadLocal();
+    void syncNotificationsWithLocalStore(userId).catch(() => undefined);
+  }, [loadLocal, userId]);
+
   useEffect(() => {
-    refresh().catch(() => undefined);
+    refresh({ showLoading: false }).catch(() => undefined);
   }, [refresh]);
+
+  useEffect(
+    () =>
+      onNotificationsChanged(() => {
+        void loadLocal().catch(() => undefined);
+      }),
+    [loadLocal],
+  );
 
   useEffect(() => {
     if (!userId) {
       return;
     }
 
-    return subscribeToNotifications(userId, (event) => {
-      if (event.eventType === "DELETE" && event.old) {
-        setNotifications((current) =>
-          current.filter((item) => item.id !== event.old.id),
-        );
-      } else if (event.new && !event.new.deleted_at) {
-        setNotifications((current) => mergeNotifications(current, event.new!));
-      }
-
-      void fetchUnreadNotificationCount(userId)
-        .then((count) => {
-          setUnreadCount(count);
-          return syncNotificationBadge(count);
-        })
+    return subscribeToNotifications(userId, () => {
+      console.log("[notifications:hook] Remote notification event observed");
+      void syncNotificationsWithLocalStore(userId)
+        .then(() => loadLocal())
         .catch(() => undefined);
     });
-  }, [setUnreadCount, userId]);
+  }, [loadLocal, userId]);
 
   const hasUnread = useMemo(() => unreadCount > 0, [unreadCount]);
 
@@ -225,5 +181,6 @@ export function useNotifications() {
     markAllAsRead,
     toggleRead,
     deleteNotification,
+    clearNotifications,
   } as const;
 }

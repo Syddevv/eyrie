@@ -5,16 +5,19 @@ import {
   getWeeklySpending,
 } from "@/src/db/queries/dashboard";
 import { db } from "@/src/db/client";
+import { notificationsService } from "@/src/db/services";
 import { accounts, budgets, goals, transactions } from "@/src/db/schema";
 import { roundMoney } from "@/src/db/utils/money";
 import { addDaysIso, nowIso } from "@/src/db/utils/time";
 
-import { ensureNotificationPreferences, upsertNotifications } from "./notifications-api";
+import {
+  ensureNotificationPreferences,
+  syncNotificationsWithLocalStore,
+} from "./notifications-api";
 import {
   buildNotificationCandidate,
   defaultNotificationPreferences,
   shouldNotifyViaPush,
-  toCreateNotificationInput,
 } from "./notifications-metadata";
 import { presentLocalNotification } from "./notifications-push";
 import type { AppNotification, NotificationCandidate } from "./types";
@@ -60,22 +63,35 @@ async function persistCandidates(userId: string, candidates: NotificationCandida
     defaultNotificationPreferences(userId),
   );
 
-  let inserted: AppNotification[] = [];
+  const inserted: AppNotification[] = [];
 
-  try {
-    inserted = await upsertNotifications(userId, candidates);
-  } catch {
-    inserted = candidates.map((candidate, index) => {
-      const payload = toCreateNotificationInput(userId, candidate);
-      return {
-        id: `local-${payload.dedupe_key}-${index}`,
-        ...payload,
+  for (const candidate of candidates) {
+    const created = await notificationsService.upsertLocal(
+      userId,
+      {
+        user_id: userId,
+        type: candidate.type,
+        title: candidate.title,
+        message: candidate.message,
+        data: candidate.data ?? null,
+        action_url: candidate.action_url ?? candidate.data?.url ?? null,
+        category: candidate.category,
+        priority: candidate.priority,
+        icon: candidate.icon,
+        color: candidate.color,
+        dedupe_key: candidate.dedupe_key,
         is_read: false,
-        created_at: nowIso(),
         read_at: null,
         deleted_at: null,
-      };
-    });
+        created_at: nowIso(),
+      },
+      {
+        syncStatus: "pending",
+      },
+    );
+    if (created) {
+      inserted.push(created);
+    }
   }
 
   for (const notification of inserted) {
@@ -83,6 +99,8 @@ async function persistCandidates(userId: string, candidates: NotificationCandida
       await presentLocalNotification(notification);
     }
   }
+
+  void syncNotificationsWithLocalStore(userId).catch(() => undefined);
 
   return inserted;
 }

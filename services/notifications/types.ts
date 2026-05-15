@@ -52,7 +52,11 @@ export type AppNotification = {
   data: NotificationData | null;
   is_read: boolean;
   created_at: string;
+  updated_at?: string;
   read_at: string | null;
+  scheduled_for?: string | null;
+  delivered_at?: string | null;
+  delivery_state?: "scheduled" | "delivered" | "dismissed";
   action_url: string | null;
   category: NotificationCategory;
   priority: NotificationPriority;
@@ -60,6 +64,10 @@ export type AppNotification = {
   color: string;
   dedupe_key: string;
   deleted_at: string | null;
+  sync_status?: "pending" | "synced" | "failed";
+  last_synced_at?: string | null;
+  sync_error?: string | null;
+  local_schedule_id?: string | null;
 };
 
 export type CreateNotificationInput = Omit<
