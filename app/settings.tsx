@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
+import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -23,7 +24,6 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { setThemePreference } from "@/hooks/theme-preference";
 import { signOut } from "@/services/auth";
-import { SyncDiagnosticsPanel } from "@/src/sync";
 
 type AccountItem = {
   title: string;
@@ -94,6 +94,7 @@ export default function SettingsScreen() {
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
   const [isThemeSaving, setIsThemeSaving] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const {
     preferences,
     updatePreference,
@@ -466,14 +467,10 @@ export default function SettingsScreen() {
             ))}
           </View>
 
-          {__DEV__ && <SyncDiagnosticsPanel embedded />}
-
           <Pressable
             disabled={isSigningOut}
             onPress={() => {
-              signOut().catch(() => {
-                // Global feedback is handled by the auth service/store.
-              });
+              setShowSignOutConfirm(true);
             }}
             style={[
               styles.signOutButton,
@@ -508,6 +505,33 @@ export default function SettingsScreen() {
         </ScrollView>
 
         <AppBottomNav activeTab="none" variant={isDark ? "dark" : "light"} />
+
+        <DeleteConfirmationModal
+          visible={showSignOutConfirm}
+          title="Sign out of Eyrie?"
+          message="You’ll need to sign in again to access your synced data and settings on this device."
+          isDeleting={isSigningOut}
+          confirmLabel="Sign Out"
+          loadingLabel="Signing Out..."
+          iconName="log-out"
+          iconColor="#FF2440"
+          iconBackgroundColor={
+            isDark ? "rgba(255, 36, 64, 0.18)" : "rgba(255, 36, 64, 0.12)"
+          }
+          primaryButtonColor="#FF2440"
+          onCancel={() => {
+            if (!isSigningOut) {
+              setShowSignOutConfirm(false);
+            }
+          }}
+          onConfirm={() => {
+            signOut()
+              .then(() => setShowSignOutConfirm(false))
+              .catch(() => {
+                // Global feedback is handled by the auth service/store.
+              });
+          }}
+        />
       </View>
     </SafeAreaView>
   );

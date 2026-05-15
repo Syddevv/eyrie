@@ -18,6 +18,12 @@ type DeleteConfirmationModalProps = {
   title?: string;
   message?: string;
   isDeleting?: boolean;
+  confirmLabel?: string;
+  loadingLabel?: string;
+  iconName?: "trash-2" | "log-out";
+  iconColor?: string;
+  iconBackgroundColor?: string;
+  primaryButtonColor?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -27,6 +33,12 @@ export function DeleteConfirmationModal({
   title = "Delete transaction?",
   message = "This transaction will be removed permanently and your balances and budgets will be updated.",
   isDeleting = false,
+  confirmLabel = "Delete",
+  loadingLabel = "Deleting...",
+  iconName = "trash-2",
+  iconColor = "#FF5C73",
+  iconBackgroundColor,
+  primaryButtonColor = "#FF5C73",
   onCancel,
   onConfirm,
 }: DeleteConfirmationModalProps) {
@@ -45,8 +57,15 @@ export function DeleteConfirmationModal({
         <View style={[styles.handle, { backgroundColor: getHandleColor(isDark) }]} />
 
         <View style={styles.iconRow}>
-          <View style={[styles.iconWrap, { backgroundColor: getDestructiveTint(isDark) }]}>
-            <Feather name="trash-2" size={18} color="#FF5C73" />
+          <View
+            style={[
+              styles.iconWrap,
+              {
+                backgroundColor:
+                  iconBackgroundColor ?? getDestructiveTint(isDark),
+              },
+            ]}>
+            <Feather name={iconName} size={18} color={iconColor} />
           </View>
           <Pressable
             disabled={isDeleting}
@@ -68,9 +87,15 @@ export function DeleteConfirmationModal({
           </Pressable>
           <Pressable
             disabled={isDeleting}
-            style={[styles.primaryButton, isDeleting && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: primaryButtonColor },
+              isDeleting && styles.buttonDisabled,
+            ]}
             onPress={onConfirm}>
-            <Text style={styles.primaryText}>{isDeleting ? "Deleting..." : "Delete"}</Text>
+            <Text style={styles.primaryText}>
+              {isDeleting ? loadingLabel : confirmLabel}
+            </Text>
           </Pressable>
         </View>
       </View>
