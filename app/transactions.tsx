@@ -23,7 +23,7 @@ import {
   useTransactions,
   type TransactionListItem,
 } from "@/hooks/useTransactions";
-import { useManualSync, useSyncStatus } from "@/src/sync";
+import { useSyncStatus } from "@/src/sync";
 
 const monthNames = [
   "January",
@@ -141,9 +141,7 @@ export default function TransactionsScreen() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
   const { transactions, summary, isLoading, refresh } = useTransactions();
-  const { syncNow, isSyncing } = useManualSync();
-  const { isOnline, lastSyncedAt, pendingCount, uiState, isRestoring } =
-    useSyncStatus();
+  const { lastSyncedAt, pendingCount, uiState, isRestoring } = useSyncStatus();
   const [searchQuery, setSearchQuery] = useState("");
   const [showTypeFilters, setShowTypeFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
@@ -254,7 +252,7 @@ export default function TransactionsScreen() {
       ? "Offline mode"
       : uiState === "retrying"
         ? "Retrying sync..."
-        : isSyncing
+        : uiState === "syncing" || uiState === "restoring"
           ? "Syncing..."
           : lastSyncedAt
             ? `Last synced ${new Intl.DateTimeFormat("en-PH", {
@@ -397,7 +395,9 @@ export default function TransactionsScreen() {
               styles.syncRow,
               {
                 backgroundColor: isDark ? "#101722" : colors.card,
-                borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(15, 23, 42, 0.08)",
+                borderColor: isDark
+                  ? "rgba(255,255,255,0.06)"
+                  : "rgba(15, 23, 42, 0.08)",
               },
             ]}
           >
@@ -413,14 +413,6 @@ export default function TransactionsScreen() {
                     : "Your local data stays available offline."}
               </Text>
             </View>
-            <Pressable
-              style={[styles.syncButton, { backgroundColor: colors.primary }]}
-              onPress={async () => {
-                await Promise.all([refresh(), syncNow()]);
-              }}
-            >
-              <Text style={styles.syncButtonText}>{isSyncing ? "..." : "Sync"}</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -430,10 +422,8 @@ export default function TransactionsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isLoading || isSyncing}
-              onRefresh={() =>
-                Promise.all([refresh(), syncNow()]).catch(() => undefined)
-              }
+              refreshing={isLoading}
+              onRefresh={() => refresh().catch(() => undefined)}
               tintColor={colors.primary}
             />
           }
@@ -452,8 +442,14 @@ export default function TransactionsScreen() {
           ) : null}
 
           {!isLoading
-            ? filteredSections.map((section) => (
-                <View key={section.title} style={styles.sectionBlock}>
+            ? filteredSections.map((section, index) => (
+                <View
+                  key={section.title}
+                  style={[
+                    styles.sectionBlock,
+                    index === 0 && styles.firstSectionBlock,
+                  ]}
+                >
                   <Text style={[styles.sectionTitle, pageStyles.sectionLabel]}>
                     {section.title}
                   </Text>
@@ -695,7 +691,7 @@ const styles = StyleSheet.create({
   headerBlock: {
     paddingHorizontal: 14,
     paddingTop: 8,
-    paddingBottom: 16,
+    paddingBottom: 8,
   },
   topRow: {
     flexDirection: "row",
@@ -780,6 +776,7 @@ const styles = StyleSheet.create({
   },
   syncRow: {
     marginTop: 14,
+    marginBottom: 6,
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 14,
@@ -860,11 +857,14 @@ const styles = StyleSheet.create({
   },
   recordsContent: {
     paddingHorizontal: 14,
-    paddingTop: 8,
+    paddingTop: 2,
     paddingBottom: 24,
   },
   sectionBlock: {
     marginTop: 12,
+  },
+  firstSectionBlock: {
+    marginTop: 4,
   },
   emptyCard: {
     marginTop: 20,

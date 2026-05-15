@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   AppState,
+  NativeModules,
   StyleSheet,
   Text,
   View,
@@ -15,6 +16,31 @@ import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
 import { accountsService } from "@/src/db/services";
+
+type NetInfoState = {
+  isConnected: boolean | null;
+  isInternetReachable: boolean | null;
+};
+
+type NetInfoModule = {
+  fetch: () => Promise<NetInfoState>;
+  addEventListener: (listener: (state: NetInfoState) => void) => () => void;
+};
+
+async function getNetInfoModule(): Promise<NetInfoModule | null> {
+  const nativeModule = (NativeModules as { RNCNetInfo?: unknown }).RNCNetInfo;
+
+  if (!nativeModule) {
+    return null;
+  }
+
+  try {
+    const module = await import("@react-native-community/netinfo");
+    return module.default as NetInfoModule;
+  } catch {
+    return null;
+  }
+}
 
 function useSyncTriggers() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
@@ -90,10 +116,58 @@ function useSyncTriggers() {
   }, [reset, setHydrationReady, userId]);
 
   useEffect(() => {
-    // Do not touch the native NetInfo module in runtimes where it may be missing.
-    // Sync still works on launch/login/foreground/manual triggers.
-    setOnline(true);
-    return () => undefined;
+    let isMounted = true;
+    let previousConnection: boolean | null = null;
+    let unsubscribe = () => {};
+
+    void (async () => {
+      const netInfo = await getNetInfoModule();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (!netInfo) {
+        setOnline(true);
+        return;
+      }
+
+      const applyConnectionState = async (state: NetInfoState) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const isOnline =
+          Boolean(state.isConnected) && state.isInternetReachable !== false;
+        const wasOnline = previousConnection;
+        previousConnection = isOnline;
+        setOnline(isOnline);
+
+        if (userId && isOnline && wasOnline === false) {
+          void runSync({ userId, reason: "reconnect", force: true });
+        }
+      };
+
+      void netInfo
+        .fetch()
+        .then(applyConnectionState)
+        .catch(() => {
+          if (!isMounted) {
+            return;
+          }
+
+          setOnline(true);
+        });
+
+      unsubscribe = netInfo.addEventListener((state) => {
+        void applyConnectionState(state);
+      });
+    })();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [setOnline, userId]);
 
   useEffect(() => {

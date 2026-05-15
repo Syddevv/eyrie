@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { accountsService } from "@/src/db/services";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { accountsService } from "@/src/db/services";
 import { onAccountsChanged } from "@/src/lib/dbSync";
 import { useSyncStore } from "@/src/sync/store";
+import { useAuthStore } from "@/store/useAuthStore";
 
 import type { Account } from "@/src/db/types";
 
 export function useAccounts() {
-  const { user } = useCurrentUser();
+  const { user, isLoading: isCurrentUserLoading } = useCurrentUser();
+  const isAuthReady = useAuthStore((state) => state.isReady);
   const userId = user?.id ?? null;
   const hydrationReady = useSyncStore((state) => state.hydrationReady);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -16,13 +18,14 @@ export function useAccounts() {
 
   const fetchAccounts = useCallback(async () => {
     if (!userId) {
-      setAccounts([]);
+      if (isAuthReady && !isCurrentUserLoading) {
+        setAccounts([]);
+      }
       setIsLoading(false);
       return;
     }
 
-    if (!hydrationReady) {
-      setAccounts([]);
+    if (!isAuthReady || !hydrationReady || isCurrentUserLoading) {
       setIsLoading(true);
       return;
     }
@@ -35,7 +38,13 @@ export function useAccounts() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, hydrationReady, accounts.length]);
+  }, [
+    accounts.length,
+    hydrationReady,
+    isAuthReady,
+    isCurrentUserLoading,
+    userId,
+  ]);
 
   useEffect(() => {
     fetchAccounts().catch(() => undefined);
