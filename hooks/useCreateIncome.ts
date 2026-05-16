@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { accountsService, transactionsService } from "@/src/db/services";
 import { useCurrentUser } from "./useCurrentUser";
-import { useAuthStore } from "@/store/useAuthStore";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 import { useDashboardStore } from "./use-dashboard";
 import { toTransactionIso } from "@/src/db/utils/time";
@@ -26,7 +25,6 @@ export type CreateIncomeResult = {
 export function useCreateIncome() {
   const { user } = useCurrentUser();
   const [isLoading, setIsLoading] = useState(false);
-  const showSnackbar = useAuthStore((state) => state.showSnackbar);
 
   const create = useCallback(
     async (input: CreateIncomeInput): Promise<CreateIncomeResult> => {
@@ -86,9 +84,6 @@ export function useCreateIncome() {
           force: true,
         });
 
-        // Show success notification
-        showSnackbar("Income added successfully", "success");
-
         return { success: true };
       } catch (error) {
         const message =
@@ -98,7 +93,7 @@ export function useCreateIncome() {
         setIsLoading(false);
       }
     },
-    [user, showSnackbar],
+    [user],
   );
 
   return { create, isLoading };

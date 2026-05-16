@@ -31,13 +31,14 @@ export default function GoalDetailsModal() {
   const { methods } = usePaymentMethods();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isClosingAfterDelete, setIsClosingAfterDelete] = useState(false);
   const [pendingDeleteContributionId, setPendingDeleteContributionId] =
     useState<string | null>(null);
   const [isDeletingContribution, setIsDeletingContribution] = useState(false);
   const contributionPlan = goal ? getGoalContributionPlan(goal) : null;
   const linkedWalletLabel = goal?.linkedWalletId
-    ? methods.find((method) => method.id === goal.linkedWalletId)?.label ??
-      goal.linkedWallet?.name
+    ? (methods.find((method) => method.id === goal.linkedWalletId)?.label ??
+      goal.linkedWallet?.name)
     : "Not linked";
 
   const ui = useMemo(
@@ -92,6 +93,10 @@ export default function GoalDetailsModal() {
 
   const close = () => router.back();
 
+  if (!goal && isClosingAfterDelete) {
+    return null;
+  }
+
   if (!goal) {
     return (
       <View style={[styles.overlay, ui.overlay]}>
@@ -112,13 +117,15 @@ export default function GoalDetailsModal() {
     }
 
     setIsDeleting(true);
+    setIsClosingAfterDelete(true);
 
     try {
       await goalsService.delete(goal.id);
       setShowDeleteConfirm(false);
-      router.replace("/(tabs)/goals");
+      router.dismissTo("/(tabs)/goals");
     } finally {
       setIsDeleting(false);
+      setIsClosingAfterDelete(false);
     }
   };
 
@@ -281,7 +288,9 @@ export default function GoalDetailsModal() {
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, ui.statCard]}>
               <Text style={[styles.summaryLabel, ui.muted]}>Linked wallet</Text>
-              <Text style={[styles.summaryValue, ui.title]}>{linkedWalletLabel}</Text>
+              <Text style={[styles.summaryValue, ui.title]}>
+                {linkedWalletLabel}
+              </Text>
             </View>
             <View style={[styles.summaryCard, ui.statCard]}>
               <Text style={[styles.summaryLabel, ui.muted]}>
@@ -340,7 +349,10 @@ export default function GoalDetailsModal() {
                         <Text style={[styles.historyDate, ui.title]}>
                           {formatShortDate(entry.createdAt)}
                         </Text>
-                        <Text style={[styles.historyMeta, ui.muted]} numberOfLines={2}>
+                        <Text
+                          style={[styles.historyMeta, ui.muted]}
+                          numberOfLines={2}
+                        >
                           {entry.wallet?.name ?? "Manual contribution"}
                           {entry.note ? ` • ${entry.note}` : ""}
                         </Text>

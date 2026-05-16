@@ -7,6 +7,7 @@ export type ToastInput = {
   title: string;
   message?: string;
   durationMs?: number;
+  deferMs?: number;
   dedupeKey?: string;
   source?: string;
 };
@@ -25,6 +26,9 @@ type ToastStoreState = {
 
 const DEFAULT_DURATION_MS = 2600;
 const DEDUPE_WINDOW_MS = 1600;
+const DEFAULT_DEFER_MS = 320;
+const pendingToastTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingToastRecords = new Map<string, ToastRecord>();
 
 function createToastId() {
   return `toast_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -60,19 +64,55 @@ export const useToastStore = create<ToastStoreState>((set, get) => ({
       ...input,
     };
 
-    set((state) => ({
-      toasts: [...state.toasts, nextToast],
-    }));
+    for (const scheduled of pendingToastRecords.values()) {
+      if (isDuplicateToast(scheduled, input, now)) {
+        return scheduled.id;
+      }
+    }
+
+    const deferMs = input.deferMs ?? DEFAULT_DEFER_MS;
+    const pushToast = () => {
+      pendingToastTimers.delete(nextToast.id);
+      pendingToastRecords.delete(nextToast.id);
+      set((state) => ({
+        toasts: [...state.toasts, nextToast],
+      }));
+    };
+
+    if (deferMs > 0) {
+      pendingToastRecords.set(nextToast.id, nextToast);
+      pendingToastTimers.set(nextToast.id, setTimeout(pushToast, deferMs));
+    } else {
+      pushToast();
+    }
 
     return nextToast.id;
   },
   dismissToast: (id) =>
-    set((state) => ({
-      toasts: id
-        ? state.toasts.filter((toast) => toast.id !== id)
-        : state.toasts.slice(1),
-    })),
-  clearToasts: () => set({ toasts: [] }),
+    set((state) => {
+      if (id) {
+        const pending = pendingToastTimers.get(id);
+        if (pending) {
+          clearTimeout(pending);
+          pendingToastTimers.delete(id);
+          pendingToastRecords.delete(id);
+        }
+      }
+
+      return {
+        toasts: id
+          ? state.toasts.filter((toast) => toast.id !== id)
+          : state.toasts.slice(1),
+      };
+    }),
+  clearToasts: () => {
+    for (const pending of pendingToastTimers.values()) {
+      clearTimeout(pending);
+    }
+    pendingToastTimers.clear();
+    pendingToastRecords.clear();
+    set({ toasts: [] });
+  },
 }));
 
 export function showToast(input: ToastInput) {

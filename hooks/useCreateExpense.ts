@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { accountsService, transactionsService } from "@/src/db/services";
 import { useCurrentUser } from "./useCurrentUser";
-import { useAuthStore } from "@/store/useAuthStore";
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 import { useDashboardStore } from "./use-dashboard";
 import { toTransactionIso } from "@/src/db/utils/time";
@@ -28,7 +27,6 @@ export type CreateExpenseResult = {
 export function useCreateExpense() {
   const { user } = useCurrentUser();
   const [isLoading, setIsLoading] = useState(false);
-  const showSnackbar = useAuthStore((state) => state.showSnackbar);
 
   const create = useCallback(
     async (input: CreateExpenseInput): Promise<CreateExpenseResult> => {
@@ -92,9 +90,6 @@ export function useCreateExpense() {
           force: true,
         });
 
-        // Show success notification
-        showSnackbar("Expense added successfully", "success");
-
         return { success: true };
       } catch (error) {
         const message =
@@ -104,7 +99,7 @@ export function useCreateExpense() {
         setIsLoading(false);
       }
     },
-    [user, showSnackbar],
+    [user],
   );
 
   return { create, isLoading };

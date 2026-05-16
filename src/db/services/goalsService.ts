@@ -22,7 +22,11 @@ import {
   assertRequiredText,
 } from "../utils/validation";
 import { emitAccountsChanged, emitGoalsChanged } from "@/src/lib/dbSync";
-import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import {
+  prepareCreateForSync,
+  prepareDeleteForSync,
+  prepareUpdateForSync,
+} from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
 
@@ -120,8 +124,14 @@ export class GoalsService {
       throw new Error("Goal not found.");
     }
 
-    const nextTarget = typeof input.targetAmount === "number" ? input.targetAmount : existing.targetAmount;
-    const nextCurrent = typeof input.currentAmount === "number" ? input.currentAmount : existing.currentAmount;
+    const nextTarget =
+      typeof input.targetAmount === "number"
+        ? input.targetAmount
+        : existing.targetAmount;
+    const nextCurrent =
+      typeof input.currentAmount === "number"
+        ? input.currentAmount
+        : existing.currentAmount;
 
     const updated = await goalsRepository.update(
       id,
@@ -160,16 +170,14 @@ export class GoalsService {
       return;
     }
 
-    const deleted = await goalsRepository.update(id, prepareDeleteForSync());
-    if (deleted) {
-      await enqueueSync("saving_goals", deleted.id, "delete", deleted.userId);
-      showSuccessToast({
-        title: "Goal deleted",
-        message: "The goal was removed successfully.",
-        dedupeKey: `goal:delete:${deleted.id}`,
-        source: "goals-service",
-      });
-    }
+    await goalsRepository.update(id, prepareDeleteForSync());
+    await enqueueSync("saving_goals", goal.id, "delete", goal.userId);
+    showSuccessToast({
+      title: "Goal deleted",
+      message: "The goal was removed successfully.",
+      dedupeKey: `goal:delete:${goal.id}`,
+      source: "goals-service",
+    });
     emitGoalsChanged();
   }
 
@@ -229,15 +237,22 @@ export class GoalsService {
 
       if (payload.walletId) {
         const wallet = await tx.query.accounts.findFirst({
-          where: (table, { eq: innerEq }) => innerEq(table.id, payload.walletId ?? ""),
+          where: (table, { eq: innerEq }) =>
+            innerEq(table.id, payload.walletId ?? ""),
         });
 
         if (!wallet) {
           throw new Error("Wallet not found.");
         }
 
-        if (!allowOverdraft && wallet.type !== "credit" && wallet.balance < payload.amount) {
-          throw new Error("Contribution is greater than the selected wallet balance.");
+        if (
+          !allowOverdraft &&
+          wallet.type !== "credit" &&
+          wallet.balance < payload.amount
+        ) {
+          throw new Error(
+            "Contribution is greater than the selected wallet balance.",
+          );
         }
       }
 
@@ -254,7 +269,11 @@ export class GoalsService {
       });
 
       if (payload.walletId) {
-        await adjustGoalContributionAccountBalance(tx, payload.walletId, -payload.amount);
+        await adjustGoalContributionAccountBalance(
+          tx,
+          payload.walletId,
+          -payload.amount,
+        );
       }
       await refreshGoalCurrentAmount(tx, payload.goalId);
 
@@ -278,10 +297,25 @@ export class GoalsService {
     }
 
     if (created?.contribution) {
-      await enqueueSync("goal_contributions", created.contribution.id, "upsert", created.userId);
-      await enqueueSync("saving_goals", payload.goalId, "upsert", created.userId);
+      await enqueueSync(
+        "goal_contributions",
+        created.contribution.id,
+        "upsert",
+        created.userId,
+      );
+      await enqueueSync(
+        "saving_goals",
+        payload.goalId,
+        "upsert",
+        created.userId,
+      );
       if (payload.walletId) {
-        await enqueueSync("accounts", payload.walletId, "upsert", created.userId);
+        await enqueueSync(
+          "accounts",
+          payload.walletId,
+          "upsert",
+          created.userId,
+        );
       }
     }
 
@@ -325,7 +359,11 @@ export class GoalsService {
       });
 
       if (existing.walletId) {
-        await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
+        await adjustGoalContributionAccountBalance(
+          tx,
+          existing.walletId,
+          existing.amount,
+        );
       }
       await tx
         .update(goalContributions)
@@ -337,7 +375,11 @@ export class GoalsService {
         )
         .where(eq(goalContributions.id, id));
       if (next.walletId) {
-        await adjustGoalContributionAccountBalance(tx, next.walletId, -next.amount);
+        await adjustGoalContributionAccountBalance(
+          tx,
+          next.walletId,
+          -next.amount,
+        );
       }
       await refreshGoalCurrentAmount(tx, existing.goalId);
 
@@ -362,10 +404,25 @@ export class GoalsService {
     emitAccountsChanged();
 
     if (updated?.contribution && updated.userId) {
-      await enqueueSync("goal_contributions", updated.contribution.id, "upsert", updated.userId);
-      await enqueueSync("saving_goals", updated.goalId, "upsert", updated.userId);
+      await enqueueSync(
+        "goal_contributions",
+        updated.contribution.id,
+        "upsert",
+        updated.userId,
+      );
+      await enqueueSync(
+        "saving_goals",
+        updated.goalId,
+        "upsert",
+        updated.userId,
+      );
       if (updated.contribution.walletId) {
-        await enqueueSync("accounts", updated.contribution.walletId, "upsert", updated.userId);
+        await enqueueSync(
+          "accounts",
+          updated.contribution.walletId,
+          "upsert",
+          updated.userId,
+        );
       }
     }
 
@@ -408,7 +465,11 @@ export class GoalsService {
         .set(prepareDeleteForSync())
         .where(eq(goalContributions.id, id));
       if (existing.walletId) {
-        await adjustGoalContributionAccountBalance(tx, existing.walletId, existing.amount);
+        await adjustGoalContributionAccountBalance(
+          tx,
+          existing.walletId,
+          existing.amount,
+        );
       }
       await refreshGoalCurrentAmount(tx, existing.goalId);
       return existing;
@@ -418,10 +479,25 @@ export class GoalsService {
     emitAccountsChanged();
 
     if (deleted) {
-      await enqueueSync("goal_contributions", deleted.id, "delete", deleted.userId);
-      await enqueueSync("saving_goals", deleted.goalId, "upsert", deleted.userId);
+      await enqueueSync(
+        "goal_contributions",
+        deleted.id,
+        "delete",
+        deleted.userId,
+      );
+      await enqueueSync(
+        "saving_goals",
+        deleted.goalId,
+        "upsert",
+        deleted.userId,
+      );
       if (deleted.walletId) {
-        await enqueueSync("accounts", deleted.walletId, "upsert", deleted.userId);
+        await enqueueSync(
+          "accounts",
+          deleted.walletId,
+          "upsert",
+          deleted.userId,
+        );
       }
       showSuccessToast({
         title: "Contribution deleted",
