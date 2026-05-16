@@ -15,7 +15,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { CategoryAvatar } from "@/components/category-avatar";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
@@ -26,6 +29,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
+import { showSuccessToast } from "@/store/useToastStore";
+import { useBottomNavStore } from "@/store/useBottomNavStore";
 
 type BudgetCard = ReturnType<typeof useBudgets>["budgets"][number];
 
@@ -76,8 +81,11 @@ function cycleLabel(value: BudgetCycle) {
   return "Monthly";
 }
 
+const FLOATING_TAB_BAR_CLEARANCE = 104;
+
 export default function BudgetScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const [selectedCycle, setSelectedCycle] = useState<BudgetCycle>("monthly");
@@ -225,6 +233,20 @@ export default function BudgetScreen() {
     setDraftBudgetValue("");
   };
 
+  // Hide the floating bottom nav while the edit sheet is open
+  const bottomNavVisible = useBottomNavStore((s) => s.visible);
+  useEffect(() => {
+    if (editingBudget) {
+      useBottomNavStore.getState().hide();
+    } else {
+      useBottomNavStore.getState().show();
+    }
+
+    return () => {
+      useBottomNavStore.getState().show();
+    };
+  }, [editingBudget]);
+
   const saveEditingBudget = async () => {
     if (!editingBudget) {
       return;
@@ -238,11 +260,21 @@ export default function BudgetScreen() {
     }
 
     try {
-      await budgetsService.update(editingBudget.id, {
-        amount: nextBudgetAmount,
-      });
+      await budgetsService.update(
+        editingBudget.id,
+        {
+          amount: nextBudgetAmount,
+        },
+        { notifySuccess: false },
+      );
       cancelEditingBudget();
-      await refresh();
+      await refresh(true);
+      showSuccessToast({
+        title: "Budget Updated",
+        message: "Your budget has been updated.",
+        dedupeKey: "budget:update:ui",
+        source: "budget-screen",
+      });
     } catch (error) {
       Alert.alert(
         "Update failed",
@@ -259,12 +291,20 @@ export default function BudgetScreen() {
     setIsDeletingBudget(true);
 
     try {
-      await budgetsService.delete(budgetPendingDelete.id);
+      await budgetsService.delete(budgetPendingDelete.id, {
+        notifySuccess: false,
+      });
       if (editingBudget?.id === budgetPendingDelete.id) {
         cancelEditingBudget();
       }
       setBudgetPendingDelete(null);
-      await refresh();
+      await refresh(true);
+      showSuccessToast({
+        title: "Budget Deleted",
+        message: "The budget has been removed.",
+        dedupeKey: "budget:delete:ui",
+        source: "budget-screen",
+      });
     } catch (error) {
       Alert.alert(
         "Delete failed",
@@ -566,7 +606,6 @@ export default function BudgetScreen() {
             </View>
           )}
         </ScrollView>
-
       </View>
 
       {editingBudget ? (
@@ -586,8 +625,16 @@ export default function BudgetScreen() {
                 styles.editSheet,
                 pageStyles.modalSheet,
                 shadows.floating,
-                keyboardHeight > 0 && {
-                  marginBottom: Math.max(12, keyboardHeight - 8),
+                {
+                  marginBottom:
+                    keyboardHeight > 0
+                      ? Math.max(12, keyboardHeight - 8)
+                      : bottomNavVisible
+                        ? Math.max(
+                            12,
+                            insets.bottom + FLOATING_TAB_BAR_CLEARANCE,
+                          )
+                        : 0,
                 },
               ]}
             >

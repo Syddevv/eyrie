@@ -4,9 +4,24 @@ import { refreshBudgetsForExpense } from "./financeOrchestrator";
 import type { NewBudget } from "../types";
 import { createId } from "../utils/ids";
 import { nowIso } from "../utils/time";
-import { assertBudgetPeriod, assertNonNegativeAmount, assertPositiveAmount, assertRequiredText } from "../utils/validation";
-import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import {
+  assertBudgetPeriod,
+  assertNonNegativeAmount,
+  assertPositiveAmount,
+  assertRequiredText,
+} from "../utils/validation";
+import {
+  prepareCreateForSync,
+  prepareDeleteForSync,
+  prepareUpdateForSync,
+} from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
+import { showSuccessToast } from "@/store/useToastStore";
+import { emitBudgetsChanged } from "@/src/lib/dbSync";
+
+export type BudgetMutationOptions = {
+  notifySuccess?: boolean;
+};
 
 export type CreateBudgetInput = Omit<
   NewBudget,
@@ -33,7 +48,8 @@ function rangesOverlap(
 }
 
 export class BudgetsService {
-  async create(input: CreateBudgetInput) {
+  async create(input: CreateBudgetInput, options: BudgetMutationOptions = {}) {
+    const { notifySuccess = true } = options;
     assertRequiredText(input.userId, "userId");
     assertRequiredText(input.categoryId, "categoryId");
     assertBudgetPeriod(input.period);
@@ -55,7 +71,9 @@ export class BudgetsService {
     );
 
     if (hasDuplicate) {
-      throw new Error("A budget already exists for this expense category in the selected cycle.");
+      throw new Error(
+        "A budget already exists for this expense category in the selected cycle.",
+      );
     }
 
     const timestamp = nowIso();
@@ -71,7 +89,12 @@ export class BudgetsService {
 
     if (budget) {
       await db.transaction(async (tx) => {
-        await refreshBudgetsForExpense(tx, budget.userId, budget.categoryId, budget.startDate);
+        await refreshBudgetsForExpense(
+          tx,
+          budget.userId,
+          budget.categoryId,
+          budget.startDate,
+        );
       });
     }
 
@@ -79,10 +102,27 @@ export class BudgetsService {
     if (created) {
       await enqueueSync("budgets", created.id, "upsert", created.userId);
     }
+
+    emitBudgetsChanged();
+
+    if (notifySuccess) {
+      showSuccessToast({
+        title: "Budget Added",
+        message: "Your budget has been created.",
+        dedupeKey: "budget:create",
+        source: "budgets-service",
+      });
+    }
+
     return created;
   }
 
-  async update(id: string, input: Partial<NewBudget>) {
+  async update(
+    id: string,
+    input: Partial<NewBudget>,
+    options: BudgetMutationOptions = {},
+  ) {
+    const { notifySuccess = true } = options;
     if (input.period) {
       assertBudgetPeriod(input.period);
     }
@@ -95,11 +135,19 @@ export class BudgetsService {
       assertNonNegativeAmount(input.spent, "spent amount");
     }
 
-    const budget = await budgetsRepository.update(id, prepareUpdateForSync(input));
+    const budget = await budgetsRepository.update(
+      id,
+      prepareUpdateForSync(input),
+    );
 
     if (budget) {
       await db.transaction(async (tx) => {
-        await refreshBudgetsForExpense(tx, budget.userId, budget.categoryId, budget.startDate);
+        await refreshBudgetsForExpense(
+          tx,
+          budget.userId,
+          budget.categoryId,
+          budget.startDate,
+        );
       });
     }
 
@@ -107,18 +155,40 @@ export class BudgetsService {
       await enqueueSync("budgets", budget.id, "upsert", budget.userId);
     }
 
+    if (budget) {
+      emitBudgetsChanged();
+
+      if (notifySuccess) {
+        showSuccessToast({
+          title: "Budget Updated",
+          message: "Your budget has been updated.",
+          dedupeKey: "budget:update",
+          source: "budgets-service",
+        });
+      }
+    }
+
     return budget;
   }
 
-  async delete(id: string) {
+  async delete(id: string, options: BudgetMutationOptions = {}) {
+    const { notifySuccess = true } = options;
     const existing = await budgetsRepository.findById(id);
     if (!existing) {
       return;
     }
 
-    const deleted = await budgetsRepository.update(id, prepareDeleteForSync());
-    if (deleted) {
-      await enqueueSync("budgets", deleted.id, "delete", deleted.userId);
+    await budgetsRepository.update(id, prepareDeleteForSync());
+    await enqueueSync("budgets", existing.id, "delete", existing.userId);
+    emitBudgetsChanged();
+
+    if (notifySuccess) {
+      showSuccessToast({
+        title: "Budget Deleted",
+        message: "The budget has been removed.",
+        dedupeKey: "budget:delete",
+        source: "budgets-service",
+      });
     }
   }
 

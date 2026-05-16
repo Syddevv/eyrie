@@ -13,7 +13,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
@@ -31,6 +34,7 @@ import {
 } from "@/hooks/useBudgets";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { budgetsService } from "@/src/db/services";
+import { showSuccessToast } from "@/store/useToastStore";
 
 function sanitizeBudgetAmount(value: string) {
   const normalized = value.replace(/[^0-9.]/g, "");
@@ -50,16 +54,17 @@ export default function AddCategoryModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
-  const selectedCycle = (Array.isArray(params.cycle) ? params.cycle[0] : params.cycle ?? "monthly") as BudgetCycle;
+  const selectedCycle = (
+    Array.isArray(params.cycle) ? params.cycle[0] : (params.cycle ?? "monthly")
+  ) as BudgetCycle;
   const { accounts } = useAccounts();
   const { categories: expenseCategories } = useExpenseCategories();
-  const {
-    categoryIdsWithActiveBudget,
-    cycleRange,
-    currentTotalBudgeted,
-  } = useAvailableBudgetCategories(selectedCycle);
+  const { categoryIdsWithActiveBudget, cycleRange, currentTotalBudgeted } =
+    useAvailableBudgetCategories(selectedCycle);
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
+    null,
+  );
   const [showCategoryList, setShowCategoryList] = useState(false);
   const [budgetAmount, setBudgetAmount] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -68,7 +73,11 @@ export default function AddCategoryModal() {
   const proposedBudgetAmount = Number(budgetAmount) || 0;
   const hasBudgetAmount = budgetAmount.trim().length > 0;
   const availableFunds = useMemo(
-    () => accounts.reduce((sum, account) => sum + (Number(account.balance) || 0), 0),
+    () =>
+      accounts.reduce(
+        (sum, account) => sum + (Number(account.balance) || 0),
+        0,
+      ),
     [accounts],
   );
   const planningOverview = useMemo(
@@ -82,10 +91,16 @@ export default function AddCategoryModal() {
   );
 
   const availableCategories = useMemo(
-    () => expenseCategories.filter((category) => !categoryIdsWithActiveBudget.has(category.id)),
+    () =>
+      expenseCategories.filter(
+        (category) => !categoryIdsWithActiveBudget.has(category.id),
+      ),
     [categoryIdsWithActiveBudget, expenseCategories],
   );
-  const selectedCategory = availableCategories.find((category) => category.id === selectedCategoryId) ?? null;
+  const selectedCategory =
+    availableCategories.find(
+      (category) => category.id === selectedCategoryId,
+    ) ?? null;
   const isAddEnabled = Boolean(selectedCategoryId) && Number(budgetAmount) > 0;
 
   useEffect(() => {
@@ -102,8 +117,10 @@ export default function AddCategoryModal() {
   }, [availableCategories]);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSubscription = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
@@ -122,18 +139,26 @@ export default function AddCategoryModal() {
   const ui = useMemo(
     () => ({
       overlay: {
-        backgroundColor: isDark ? "rgba(2, 6, 23, 0.52)" : "rgba(15, 23, 42, 0.22)",
+        backgroundColor: isDark
+          ? "rgba(2, 6, 23, 0.52)"
+          : "rgba(15, 23, 42, 0.22)",
       },
       sheet: {
         backgroundColor: colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(15, 23, 42, 0.06)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(15, 23, 42, 0.06)",
       },
       handle: { backgroundColor: isDark ? "#64748B" : "#CBD5E1" },
       title: { color: colors.foreground },
       label: { color: colors.foreground },
       fieldSurface: {
-        backgroundColor: isDark ? "rgba(15, 23, 42, 0.26)" : "rgba(241, 245, 249, 0.8)",
-        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(226, 232, 240, 0.92)",
+        backgroundColor: isDark
+          ? "rgba(15, 23, 42, 0.26)"
+          : "rgba(241, 245, 249, 0.8)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : "rgba(226, 232, 240, 0.92)",
       },
       placeholder: { color: colors.mutedForeground },
       value: { color: colors.foreground },
@@ -150,33 +175,53 @@ export default function AddCategoryModal() {
       addButtonText: { color: "#FFFFFF" },
       dropdownSurface: {
         backgroundColor: colors.card,
-        borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(226, 232, 240, 0.92)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(226, 232, 240, 0.92)",
       },
       dropdownItemBorder: {
-        borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(226, 232, 240, 0.72)",
+        borderBottomColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : "rgba(226, 232, 240, 0.72)",
       },
       helperText: {
         color: isDark ? "#94A3B8" : "#64748B",
       },
       overviewCard: {
-        backgroundColor: isDark ? "rgba(15, 23, 42, 0.4)" : "rgba(248, 250, 252, 0.92)",
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(226, 232, 240, 0.92)",
+        backgroundColor: isDark
+          ? "rgba(15, 23, 42, 0.4)"
+          : "rgba(248, 250, 252, 0.92)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(226, 232, 240, 0.92)",
       },
       overviewHealthyAccent: { color: isDark ? "#6EE7B7" : "#109669" },
       overviewHealthySurface: {
-        backgroundColor: isDark ? "rgba(16, 185, 129, 0.14)" : "rgba(220, 252, 231, 0.9)",
-        borderColor: isDark ? "rgba(52, 211, 153, 0.22)" : "rgba(52, 211, 153, 0.22)",
+        backgroundColor: isDark
+          ? "rgba(16, 185, 129, 0.14)"
+          : "rgba(220, 252, 231, 0.9)",
+        borderColor: isDark
+          ? "rgba(52, 211, 153, 0.22)"
+          : "rgba(52, 211, 153, 0.22)",
       },
       overviewWarningAccent: { color: isDark ? "#FDBA74" : "#EA7A15" },
       overviewWarningSurface: {
-        backgroundColor: isDark ? "rgba(249, 115, 22, 0.14)" : "rgba(255, 237, 213, 0.94)",
-        borderColor: isDark ? "rgba(251, 146, 60, 0.24)" : "rgba(251, 146, 60, 0.24)",
+        backgroundColor: isDark
+          ? "rgba(249, 115, 22, 0.14)"
+          : "rgba(255, 237, 213, 0.94)",
+        borderColor: isDark
+          ? "rgba(251, 146, 60, 0.24)"
+          : "rgba(251, 146, 60, 0.24)",
       },
       overviewMutedLabel: { color: isDark ? "#9FB0C4" : "#64748B" },
       overviewValue: { color: colors.foreground },
       insightCard: {
-        backgroundColor: isDark ? "rgba(26, 34, 48, 0.88)" : "rgba(255,255,255,0.94)",
-        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(251, 146, 60, 0.18)",
+        backgroundColor: isDark
+          ? "rgba(26, 34, 48, 0.88)"
+          : "rgba(255,255,255,0.94)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.05)"
+          : "rgba(251, 146, 60, 0.18)",
       },
     }),
     [colors, isDark],
@@ -189,25 +234,42 @@ export default function AddCategoryModal() {
     }
 
     if (!user?.id || !selectedCategoryId) {
-      Alert.alert("Missing category", "Choose an expense category to create a budget.");
+      Alert.alert(
+        "Missing category",
+        "Choose an expense category to create a budget.",
+      );
       return;
     }
 
     setIsSaving(true);
 
     try {
-      await budgetsService.create({
-        userId: user.id,
-        categoryId: selectedCategoryId,
-        amount: Number(budgetAmount),
-        period: selectedCycle,
-        startDate: cycleRange.startDate,
-        endDate: cycleRange.endDate,
-      });
+      await budgetsService.create(
+        {
+          userId: user.id,
+          categoryId: selectedCategoryId,
+          amount: Number(budgetAmount),
+          period: selectedCycle,
+          startDate: cycleRange.startDate,
+          endDate: cycleRange.endDate,
+        },
+        { notifySuccess: false },
+      );
 
       router.back();
+      setTimeout(() => {
+        showSuccessToast({
+          title: "Budget Added",
+          message: "Your budget has been created.",
+          dedupeKey: "budget:create:ui",
+          source: "add-category-modal",
+        });
+      }, 240);
     } catch (error) {
-      Alert.alert("Save failed", error instanceof Error ? error.message : "Unable to create budget.");
+      Alert.alert(
+        "Save failed",
+        error instanceof Error ? error.message : "Unable to create budget.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -217,7 +279,8 @@ export default function AddCategoryModal() {
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-      style={styles.keyboardWrap}>
+      style={styles.keyboardWrap}
+    >
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
@@ -229,24 +292,36 @@ export default function AddCategoryModal() {
             keyboardHeight > 0 && {
               marginBottom: Math.max(12, keyboardHeight - 8),
             },
-          ]}>
+          ]}
+        >
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>Create Budget</Text>
-            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+            <Pressable
+              style={[styles.closeButton, ui.closeButton]}
+              onPress={() => router.back()}
+            >
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.section}>
-              <Text style={[styles.label, ui.label]}>Choose expense category</Text>
+              <Text style={[styles.label, ui.label]}>
+                Choose expense category
+              </Text>
               <Pressable
                 style={[styles.selectField, ui.fieldSurface]}
-                onPress={() => setShowCategoryList((current) => !current)}>
+                onPress={() => setShowCategoryList((current) => !current)}
+              >
                 <Text style={[styles.selectText, ui.value]}>
-                  {selectedCategory ? selectedCategory.label : "Choose expense category"}
+                  {selectedCategory
+                    ? selectedCategory.label
+                    : "Choose expense category"}
                 </Text>
                 <Feather
                   name={showCategoryList ? "chevron-up" : "chevron-down"}
@@ -256,7 +331,13 @@ export default function AddCategoryModal() {
               </Pressable>
 
               {showCategoryList ? (
-                <View style={[styles.dropdownCard, ui.dropdownSurface, shadows.card]}>
+                <View
+                  style={[
+                    styles.dropdownCard,
+                    ui.dropdownSurface,
+                    shadows.card,
+                  ]}
+                >
                   {availableCategories.length ? (
                     availableCategories.map((option, index) => {
                       const isSelected = option.id === selectedCategory?.id;
@@ -273,31 +354,43 @@ export default function AddCategoryModal() {
                           onPress={() => {
                             setSelectedCategoryId(option.id);
                             setShowCategoryList(false);
-                          }}>
+                          }}
+                        >
                           <View style={styles.dropdownItemLeft}>
                             <View
                               style={[
                                 styles.categoryIconWrap,
                                 { backgroundColor: `${option.color}22` },
-                              ]}>
+                              ]}
+                            >
                               <CategoryAvatar category={option} size={18} />
                             </View>
                             <Text
                               style={[
                                 styles.dropdownItemText,
-                                isSelected ? { color: colors.primary } : ui.value,
-                              ]}>
+                                isSelected
+                                  ? { color: colors.primary }
+                                  : ui.value,
+                              ]}
+                            >
                               {option.label}
                             </Text>
                           </View>
-                          {isSelected ? <Feather name="check" size={16} color={colors.primary} /> : null}
+                          {isSelected ? (
+                            <Feather
+                              name="check"
+                              size={16}
+                              color={colors.primary}
+                            />
+                          ) : null}
                         </Pressable>
                       );
                     })
                   ) : (
                     <View style={styles.emptyDropdownState}>
                       <Text style={[styles.emptyDropdownText, ui.helperText]}>
-                        Budget already exists for every expense category in this cycle.
+                        Budget already exists for every expense category in this
+                        cycle.
                       </Text>
                     </View>
                   )}
@@ -311,7 +404,9 @@ export default function AddCategoryModal() {
                 <Text style={[styles.currencyMark, ui.placeholder]}>₱</Text>
                 <TextInput
                   value={budgetAmount}
-                  onChangeText={(value) => setBudgetAmount(sanitizeBudgetAmount(value))}
+                  onChangeText={(value) =>
+                    setBudgetAmount(sanitizeBudgetAmount(value))
+                  }
                   keyboardType="decimal-pad"
                   placeholder="0"
                   placeholderTextColor={ui.placeholder.color}
@@ -320,7 +415,8 @@ export default function AddCategoryModal() {
                 />
               </View>
               <Text style={[styles.helperText, ui.helperText]}>
-                This budget will track spending for the selected expense category automatically.
+                This budget will track spending for the selected expense
+                category automatically.
               </Text>
             </View>
 
@@ -328,8 +424,11 @@ export default function AddCategoryModal() {
               <Animated.View
                 entering={FadeInDown.duration(220)}
                 layout={LinearTransition.springify().damping(18).stiffness(180)}
-                style={styles.section}>
-                <View style={[styles.overviewCard, ui.overviewCard, shadows.card]}>
+                style={styles.section}
+              >
+                <View
+                  style={[styles.overviewCard, ui.overviewCard, shadows.card]}
+                >
                   <View style={styles.overviewHeader}>
                     <View
                       style={[
@@ -337,9 +436,14 @@ export default function AddCategoryModal() {
                         planningOverview.status === "warning"
                           ? ui.overviewWarningSurface
                           : ui.overviewHealthySurface,
-                      ]}>
+                      ]}
+                    >
                       <Feather
-                        name={planningOverview.status === "warning" ? "alert-triangle" : "check-circle"}
+                        name={
+                          planningOverview.status === "warning"
+                            ? "alert-triangle"
+                            : "check-circle"
+                        }
                         size={16}
                         color={
                           planningOverview.status === "warning"
@@ -349,30 +453,47 @@ export default function AddCategoryModal() {
                       />
                     </View>
                     <View style={styles.overviewHeaderText}>
-                      <Text style={[styles.overviewTitle, ui.title]}>Budget Overview</Text>
+                      <Text style={[styles.overviewTitle, ui.title]}>
+                        Budget Overview
+                      </Text>
                       <Text style={[styles.overviewSubtitle, ui.helperText]}>
-                        Compare available money with planned budgets before saving.
+                        Compare available money with planned budgets before
+                        saving.
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.overviewRows}>
                     <View style={styles.overviewRow}>
-                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Available Funds</Text>
+                      <Text
+                        style={[styles.overviewLabel, ui.overviewMutedLabel]}
+                      >
+                        Available Funds
+                      </Text>
                       <Text style={[styles.overviewValue, ui.overviewValue]}>
                         {formatCurrency(planningOverview.availableFunds)}
                       </Text>
                     </View>
                     <View style={styles.overviewRow}>
-                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Currently Budgeted</Text>
+                      <Text
+                        style={[styles.overviewLabel, ui.overviewMutedLabel]}
+                      >
+                        Currently Budgeted
+                      </Text>
                       <Text style={[styles.overviewValue, ui.overviewValue]}>
                         {formatCurrency(currentTotalBudgeted)}
                       </Text>
                     </View>
                     <View style={styles.overviewRow}>
-                      <Text style={[styles.overviewLabel, ui.overviewMutedLabel]}>Budgeted After Save</Text>
+                      <Text
+                        style={[styles.overviewLabel, ui.overviewMutedLabel]}
+                      >
+                        Budgeted After Save
+                      </Text>
                       <Text style={[styles.overviewValue, ui.overviewValue]}>
-                        {formatCurrency(planningOverview.newTotalBudgetedAfterSave)}
+                        {formatCurrency(
+                          planningOverview.newTotalBudgetedAfterSave,
+                        )}
                       </Text>
                     </View>
                   </View>
@@ -383,9 +504,12 @@ export default function AddCategoryModal() {
                       planningOverview.status === "warning"
                         ? ui.overviewWarningSurface
                         : ui.overviewHealthySurface,
-                    ]}>
+                    ]}
+                  >
                     <Feather
-                      name={planningOverview.status === "warning" ? "info" : "check"}
+                      name={
+                        planningOverview.status === "warning" ? "info" : "check"
+                      }
                       size={14}
                       color={
                         planningOverview.status === "warning"
@@ -399,7 +523,8 @@ export default function AddCategoryModal() {
                         planningOverview.status === "warning"
                           ? ui.overviewWarningAccent
                           : ui.overviewHealthyAccent,
-                      ]}>
+                      ]}
+                    >
                       {planningOverview.status === "warning"
                         ? `Budgets will exceed available funds by ${formatCurrency(
                             Math.abs(planningOverview.difference),
@@ -412,14 +537,24 @@ export default function AddCategoryModal() {
                 {planningOverview.status === "warning" ? (
                   <Animated.View
                     entering={FadeInDown.duration(240)}
-                    layout={LinearTransition.springify().damping(18).stiffness(180)}
-                    style={[styles.insightCard, ui.insightCard]}>
+                    layout={LinearTransition.springify()
+                      .damping(18)
+                      .stiffness(180)}
+                    style={[styles.insightCard, ui.insightCard]}
+                  >
                     <View style={styles.insightHeader}>
-                      <Feather name="info" size={15} color={ui.overviewWarningAccent.color} />
-                      <Text style={[styles.insightTitle, ui.title]}>Planning Insight</Text>
+                      <Feather
+                        name="info"
+                        size={15}
+                        color={ui.overviewWarningAccent.color}
+                      />
+                      <Text style={[styles.insightTitle, ui.title]}>
+                        Planning Insight
+                      </Text>
                     </View>
                     <Text style={[styles.insightText, ui.helperText]}>
-                      Budgets are planned spending limits and may include future income.
+                      Budgets are planned spending limits and may include future
+                      income.
                     </Text>
                     <Text style={[styles.insightText, ui.helperText]}>
                       Budgets are planning tools, not wallet restrictions.
@@ -435,7 +570,8 @@ export default function AddCategoryModal() {
               styles.addButton,
               isAddEnabled && !isSaving ? ui.addButton : ui.addButtonDisabled,
             ]}
-            onPress={handleSave}>
+            onPress={handleSave}
+          >
             <Text style={[styles.addButtonText, ui.addButtonText]}>
               {isSaving ? "Creating Budget..." : "Create Budget"}
             </Text>

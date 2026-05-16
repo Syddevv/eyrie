@@ -1,6 +1,7 @@
 type Callback = () => void;
 
 const accountListeners = new Set<Callback>();
+const budgetListeners = new Set<Callback>();
 const categoryListeners = new Set<Callback>();
 const goalListeners = new Set<Callback>();
 const merchantListeners = new Set<Callback>();
@@ -15,6 +16,23 @@ export function onAccountsChanged(cb: Callback) {
 
 export function emitAccountsChanged() {
   for (const cb of Array.from(accountListeners)) {
+    try {
+      cb();
+    } catch {
+      // swallow
+    }
+  }
+}
+
+export function onBudgetsChanged(cb: Callback) {
+  budgetListeners.add(cb);
+  return () => {
+    budgetListeners.delete(cb);
+  };
+}
+
+export function emitBudgetsChanged() {
+  for (const cb of Array.from(budgetListeners)) {
     try {
       cb();
     } catch {
@@ -97,6 +115,7 @@ export function emitGoalsChanged() {
  */
 export function emitAllChanges() {
   emitAccountsChanged();
+  emitBudgetsChanged();
   emitCategoriesChanged();
   emitGoalsChanged();
   emitMerchantsChanged();
@@ -106,6 +125,8 @@ export function emitAllChanges() {
 export default {
   onAccountsChanged,
   emitAccountsChanged,
+  onBudgetsChanged,
+  emitBudgetsChanged,
   onCategoriesChanged,
   emitCategoriesChanged,
   onGoalsChanged,

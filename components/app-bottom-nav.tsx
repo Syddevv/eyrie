@@ -2,7 +2,17 @@ import { Feather, Ionicons, Octicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import { usePathname, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  Animated,
+  Easing,
+} from "react-native";
+import { useEffect, useRef } from "react";
+
+import { useBottomNavStore } from "@/store/useBottomNavStore";
 
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
@@ -56,16 +66,33 @@ function NavBody({
 
   const isDark = variant === "dark";
   const backgroundColor = isDark ? "#111722" : colors.card;
-  const borderColor = isDark ? "rgba(255, 255, 255, 0.06)" : withOpacity(colors.border, 0.86);
+  const borderColor = isDark
+    ? "rgba(255, 255, 255, 0.06)"
+    : withOpacity(colors.border, 0.86);
   const mutedColor = isDark ? "#7E8796" : colors.mutedForeground;
   const activeColor = "#1495FF";
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
-      <View style={[styles.navBar, { backgroundColor, borderColor }, shadows.floating]}>
+      <View
+        style={[
+          styles.navBar,
+          { backgroundColor, borderColor },
+          shadows.floating,
+        ]}
+      >
         <Pressable style={styles.navItem} onPress={() => onNavigate("home")}>
-          <Ionicons name="home" size={22} color={activeTab === "home" ? activeColor : mutedColor} />
-          <Text style={[styles.navLabel, { color: activeTab === "home" ? activeColor : mutedColor }]}>
+          <Ionicons
+            name="home"
+            size={22}
+            color={activeTab === "home" ? activeColor : mutedColor}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              { color: activeTab === "home" ? activeColor : mutedColor },
+            ]}
+          >
             Home
           </Text>
         </Pressable>
@@ -76,26 +103,47 @@ function NavBody({
             size={22}
             color={activeTab === "budget" ? activeColor : mutedColor}
           />
-          <Text style={[styles.navLabel, { color: activeTab === "budget" ? activeColor : mutedColor }]}>
+          <Text
+            style={[
+              styles.navLabel,
+              { color: activeTab === "budget" ? activeColor : mutedColor },
+            ]}
+          >
             Budget
           </Text>
         </Pressable>
 
         <Pressable
-          style={[styles.plusButton, { backgroundColor: activeColor }, shadows.glow]}
+          style={[
+            styles.plusButton,
+            { backgroundColor: activeColor },
+            shadows.glow,
+          ]}
           onPress={onOpenAddTransaction}
         >
           <Feather name="plus" size={28} color="#FFFFFF" />
         </Pressable>
 
         <Pressable style={styles.navItem} onPress={() => onNavigate("goals")}>
-          <Octicons name="goal" size={20} color={activeTab === "goals" ? activeColor : mutedColor} />
-          <Text style={[styles.navLabel, { color: activeTab === "goals" ? activeColor : mutedColor }]}>
+          <Octicons
+            name="goal"
+            size={20}
+            color={activeTab === "goals" ? activeColor : mutedColor}
+          />
+          <Text
+            style={[
+              styles.navLabel,
+              { color: activeTab === "goals" ? activeColor : mutedColor },
+            ]}
+          >
             Goals
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navItem} onPress={() => onNavigate("assistant")}>
+        <Pressable
+          style={styles.navItem}
+          onPress={() => onNavigate("assistant")}
+        >
           <Image
             contentFit="cover"
             source={require("@/assets/images/Eyrie_Mascot_3.png")}
@@ -153,7 +201,7 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   };
 
   return (
-    <NavBody
+    <AnimatedView
       activeTab={activeTab}
       variant={variant}
       onNavigate={handleNavigate}
@@ -162,7 +210,10 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
-export function AppBottomNav({ activeTab, variant = "light" }: AppBottomNavProps) {
+export function AppBottomNav({
+  activeTab,
+  variant = "light",
+}: AppBottomNavProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -182,7 +233,7 @@ export function AppBottomNav({ activeTab, variant = "light" }: AppBottomNavProps
   };
 
   return (
-    <NavBody
+    <AnimatedView
       activeTab={activeTab}
       variant={variant}
       onNavigate={navigate}
@@ -192,6 +243,53 @@ export function AppBottomNav({ activeTab, variant = "light" }: AppBottomNavProps
         }
       }}
     />
+  );
+}
+
+function AnimatedView({
+  activeTab,
+  variant,
+  onNavigate,
+  onOpenAddTransaction,
+}: any) {
+  const visible = useBottomNavStore((s) => s.visible);
+  const anim = useRef(new Animated.Value(visible ? 0 : 1)).current;
+
+  useEffect(() => {
+    const toValue = visible ? 0 : 1;
+    Animated.timing(anim, {
+      toValue,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [visible, anim]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 120],
+  });
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  return (
+    <Animated.View
+      pointerEvents={visible ? "auto" : "none"}
+      style={{
+        transform: [{ translateY }],
+        opacity,
+        position: "absolute",
+        left: 16,
+        right: 16,
+        bottom: 12,
+      }}
+    >
+      <NavBody
+        activeTab={activeTab}
+        variant={variant}
+        onNavigate={onNavigate}
+        onOpenAddTransaction={onOpenAddTransaction}
+      />
+    </Animated.View>
   );
 }
 

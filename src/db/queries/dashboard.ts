@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
@@ -88,7 +98,7 @@ export async function getRecentTransactions(userId: string, limit = 10) {
 
 export async function getBudgetProgress(userId: string) {
   const rows = await db.query.budgets.findMany({
-    where: eq(budgets.userId, userId),
+    where: and(eq(budgets.userId, userId), isNull(budgets.deletedAt)),
     with: {
       category: true,
     },
@@ -103,14 +113,14 @@ export async function getBudgetProgress(userId: string) {
         })
         .from(transactions)
         .where(
-        and(
-          eq(transactions.userId, budget.userId),
-          eq(transactions.type, "expense"),
-          eq(transactions.categoryId, budget.categoryId),
-          isNull(transactions.deletedAt),
-          gte(transactions.transactionDate, budget.startDate),
-          lte(transactions.transactionDate, budget.endDate),
-        ),
+          and(
+            eq(transactions.userId, budget.userId),
+            eq(transactions.type, "expense"),
+            eq(transactions.categoryId, budget.categoryId),
+            isNull(transactions.deletedAt),
+            gte(transactions.transactionDate, budget.startDate),
+            lte(transactions.transactionDate, budget.endDate),
+          ),
         );
 
       const rawRemaining = roundMoney(budget.amount - budget.spent);
@@ -125,7 +135,8 @@ export async function getBudgetProgress(userId: string) {
         remaining,
         progress,
         transactionCount: countResult?.count ?? 0,
-        status: rawRemaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
+        status:
+          rawRemaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
       };
     }),
   );
@@ -225,7 +236,11 @@ export async function getMonthlyAnalytics(
 export async function getGoalsProgress(userId: string) {
   const rows = await db.query.goals.findMany({
     where: and(eq(goals.userId, userId), eq(goals.isArchived, false)),
-    orderBy: [asc(goals.isCompleted), asc(goals.targetDate), desc(goals.createdAt)],
+    orderBy: [
+      asc(goals.isCompleted),
+      asc(goals.targetDate),
+      desc(goals.createdAt),
+    ],
   });
 
   return rows.map((goal) => ({
