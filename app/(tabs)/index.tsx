@@ -885,6 +885,19 @@ export default function HomeScreen() {
               </Text>
             </View>
 
+            <View
+              style={[styles.balanceMetaChip, pageStyles.sectionHintChip]}
+            >
+              <Feather
+                name="rotate-cw"
+                size={11}
+                color={colors.mutedForeground}
+              />
+              <Text style={[styles.balanceMetaText, pageStyles.mutedText]}>
+                Monthly overview
+              </Text>
+            </View>
+
             <View style={styles.metricsRow}>
               <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
                 <View style={styles.metricLabelRow}>
@@ -1867,6 +1880,24 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     fontWeight: fontWeights.bold,
     letterSpacing: -1,
+  },
+  balanceMetaChip: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  balanceMetaText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    letterSpacing: 0.3,
   },
   metricsRow: {
     flexDirection: "row",
