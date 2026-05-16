@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppBottomNav } from "@/components/app-bottom-nav";
 import { CategoryAvatar } from "@/components/category-avatar";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { themeColors } from "@/constants/colors";
@@ -568,10 +567,6 @@ export default function BudgetScreen() {
           )}
         </ScrollView>
 
-        <AppBottomNav
-          activeTab="budget"
-          variant={colorScheme === "dark" ? "dark" : "light"}
-        />
       </View>
 
       {editingBudget ? (

@@ -24,6 +24,7 @@ import {
 import { emitAccountsChanged, emitGoalsChanged } from "@/src/lib/dbSync";
 import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
+import { showSuccessToast } from "@/store/useToastStore";
 
 export type CreateGoalInput = Omit<
   NewGoal,
@@ -82,6 +83,14 @@ export class GoalsService {
       await enqueueSync("saving_goals", created.id, "upsert", created.userId);
     }
     emitGoalsChanged();
+    if (created) {
+      showSuccessToast({
+        title: "Goal created",
+        message: "Your new savings goal is ready.",
+        dedupeKey: `goal:create:${created.id}`,
+        source: "goals-service",
+      });
+    }
     return created;
   }
 
@@ -134,6 +143,14 @@ export class GoalsService {
       .catch(() => undefined);
 
     emitGoalsChanged();
+    if (updated) {
+      showSuccessToast({
+        title: "Goal updated",
+        message: "Goal changes saved successfully.",
+        dedupeKey: `goal:update:${updated.id}:${updated.updatedAt}`,
+        source: "goals-service",
+      });
+    }
     return updated;
   }
 
@@ -146,6 +163,12 @@ export class GoalsService {
     const deleted = await goalsRepository.update(id, prepareDeleteForSync());
     if (deleted) {
       await enqueueSync("saving_goals", deleted.id, "delete", deleted.userId);
+      showSuccessToast({
+        title: "Goal deleted",
+        message: "The goal was removed successfully.",
+        dedupeKey: `goal:delete:${deleted.id}`,
+        source: "goals-service",
+      });
     }
     emitGoalsChanged();
   }
@@ -273,6 +296,15 @@ export class GoalsService {
         .catch(() => undefined);
     }
 
+    if (created?.contribution) {
+      showSuccessToast({
+        title: "Contribution added",
+        message: "Goal progress updated successfully.",
+        dedupeKey: `goal:contribution:create:${created.contribution.id}`,
+        source: "goals-service",
+      });
+    }
+
     return created?.contribution ?? null;
   }
 
@@ -349,6 +381,15 @@ export class GoalsService {
         .catch(() => undefined);
     }
 
+    if (updated?.contribution) {
+      showSuccessToast({
+        title: "Contribution updated",
+        message: "Goal contribution changes were saved.",
+        dedupeKey: `goal:contribution:update:${updated.contribution.id}:${updated.contribution.updatedAt}`,
+        source: "goals-service",
+      });
+    }
+
     return updated?.contribution ?? null;
   }
 
@@ -382,6 +423,12 @@ export class GoalsService {
       if (deleted.walletId) {
         await enqueueSync("accounts", deleted.walletId, "upsert", deleted.userId);
       }
+      showSuccessToast({
+        title: "Contribution deleted",
+        message: "The goal contribution was removed successfully.",
+        dedupeKey: `goal:contribution:delete:${deleted.id}`,
+        source: "goals-service",
+      });
     }
   }
 

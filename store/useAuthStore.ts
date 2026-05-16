@@ -1,5 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
+import { showToast } from "@/store/useToastStore";
 
 export type AuthMode = "sign-in" | "sign-up";
 export type SnackbarTone = "success" | "error" | "info";
@@ -12,12 +13,6 @@ export type OtpModalState = {
   fullName?: string;
   resendAvailableAt: number;
   status: OtpStatus;
-};
-
-type SnackbarState = {
-  visible: boolean;
-  message: string;
-  tone: SnackbarTone;
 };
 
 type AuthStoreState = {
@@ -33,7 +28,6 @@ type AuthStoreState = {
   isGoogleLoading: boolean;
   isSigningOut: boolean;
   otpModal: OtpModalState;
-  snackbar: SnackbarState | null;
   setSession: (session: Session | null) => void;
   setReady: (isReady: boolean) => void;
   setSigningIn: (value: boolean) => void;
@@ -47,7 +41,6 @@ type AuthStoreState = {
   setOtpModalStatus: (status: OtpStatus) => void;
   setOtpResendAvailableAt: (timestamp: number) => void;
   showSnackbar: (message: string, tone?: SnackbarTone) => void;
-  hideSnackbar: () => void;
 };
 
 const initialOtpModal: OtpModalState = {
@@ -70,7 +63,6 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   isGoogleLoading: false,
   isSigningOut: false,
   otpModal: initialOtpModal,
-  snackbar: null,
   setSession: (session) =>
     set({
       session,
@@ -114,12 +106,9 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       },
     })),
   showSnackbar: (message, tone = "info") =>
-    set({
-      snackbar: {
-        visible: true,
-        message,
-        tone,
-      },
+    showToast({
+      variant: tone,
+      title: message,
+      source: "auth-store-compat",
     }),
-  hideSnackbar: () => set({ snackbar: null }),
 }));

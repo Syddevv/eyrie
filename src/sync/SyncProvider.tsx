@@ -1,5 +1,6 @@
 import { AppState, NativeModules, type AppStateStatus } from "react-native";
 import { type PropsWithChildren, useEffect, useRef } from "react";
+import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
@@ -85,6 +86,15 @@ function useSyncTriggers() {
       console.log(`[sync] Hydration ready, exposing reconciled accounts to UI`);
       useSyncStore.getState().setRestoring(false);
       setHydrationReady(true);
+
+      if (shouldRestore) {
+        showSuccessToast({
+          title: "Restore complete",
+          message: "Your latest synced finance data is ready.",
+          dedupeKey: `restore:${userId}`,
+          source: "sync-provider",
+        });
+      }
 
       // Refresh all UI after restore/sync completes
       if (shouldRestore) {

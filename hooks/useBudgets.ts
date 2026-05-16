@@ -10,6 +10,7 @@ import { roundMoney } from "@/src/db/utils/money";
 import { getBudgetCycleRange } from "@/src/db/utils/time";
 
 export type BudgetCycle = "weekly" | "biweekly" | "monthly";
+const BUDGETS_STALE_MS = 30_000;
 
 export type BudgetCardItem = {
   id: string;
@@ -89,17 +90,25 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
   const anchorIso = resolvedAnchorDate.toISOString();
   const [budgets, setBudgets] = useState<BudgetCardItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasResolved, setHasResolved] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!userId) {
       setBudgets([]);
       setError(null);
       setIsLoading(false);
+      setIsRefreshing(false);
+      setHasResolved(false);
+      setLastLoadedAt(null);
       return;
     }
 
-    setIsLoading(true);
+    const shouldRefreshInBackground = force && budgets.length > 0;
+    setIsLoading((prev) => prev || budgets.length === 0);
+    setIsRefreshing(shouldRefreshInBackground);
     setError(null);
 
     try {
@@ -125,12 +134,15 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         }));
 
       setBudgets(next);
+      setHasResolved(true);
+      setLastLoadedAt(Date.now());
     } catch (error) {
       setError(describeError(error, "Unable to load budgets."));
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [anchorIso, selectedCycle, userId]);
+  }, [anchorIso, budgets.length, selectedCycle, userId]);
 
   useEffect(() => {
     void refresh();
@@ -138,7 +150,7 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
 
   useEffect(() => {
     const off = onAccountsChanged(() => {
-      void refresh();
+      void refresh(true);
     });
 
     return () => {
@@ -148,9 +160,17 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
+      const shouldRefresh =
+        !hasResolved ||
+        lastLoadedAt === null ||
+        Date.now() - lastLoadedAt > BUDGETS_STALE_MS;
+
+      if (shouldRefresh) {
+        void refresh(lastLoadedAt !== null);
+      }
+
       return undefined;
-    }, [refresh]),
+    }, [hasResolved, lastLoadedAt, refresh]),
   );
 
   const summary = useMemo(() => {
@@ -169,6 +189,8 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
     budgets,
     summary,
     isLoading,
+    isRefreshing,
+    hasResolved,
     error,
     refresh,
   } as const;

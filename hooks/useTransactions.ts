@@ -11,6 +11,7 @@ import { getMerchantPresetByName } from "@/constants/expense-merchants";
 type IconLibrary = "feather" | "material";
 type TransactionTypeValue = "expense" | "income" | "transfer";
 type TransactionTypeLabel = "Expense" | "Income" | "Transfer";
+const TRANSACTIONS_STALE_MS = 30_000;
 
 type TransactionRow = Awaited<
   ReturnType<typeof transactionsService.fetch>
@@ -384,27 +385,37 @@ export function useTransactions() {
   const userId = user?.id ?? null;
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasResolved, setHasResolved] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!userId) {
       setTransactions([]);
       setError(null);
       setIsLoading(false);
+      setIsRefreshing(false);
+      setHasResolved(false);
+      setLastLoadedAt(null);
       return;
     }
 
-    // Only show loading state if we don't already have data
+    const shouldRefreshInBackground = force && transactions.length > 0;
     setIsLoading((prev) => prev || transactions.length === 0);
+    setIsRefreshing(shouldRefreshInBackground);
     setError(null);
 
     try {
       const rows = await transactionsService.fetch(userId);
       setTransactions(rows.map(mapTransactionRow));
+      setHasResolved(true);
+      setLastLoadedAt(Date.now());
     } catch (error) {
       setError(describeError(error, "Unable to load transactions."));
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [userId, transactions.length]);
 
@@ -414,10 +425,10 @@ export function useTransactions() {
 
   useEffect(() => {
     const off = onAccountsChanged(() => {
-      void refresh();
+      void refresh(true);
     });
     const offTransactions = onTransactionsChanged(() => {
-      void refresh();
+      void refresh(true);
     });
 
     return () => {
@@ -428,9 +439,17 @@ export function useTransactions() {
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
+      const shouldRefresh =
+        !hasResolved ||
+        lastLoadedAt === null ||
+        Date.now() - lastLoadedAt > TRANSACTIONS_STALE_MS;
+
+      if (shouldRefresh) {
+        void refresh(lastLoadedAt !== null);
+      }
+
       return undefined;
-    }, [refresh]),
+    }, [hasResolved, lastLoadedAt, refresh]),
   );
 
   const summary = useMemo(() => {
@@ -452,6 +471,8 @@ export function useTransactions() {
     transactions,
     summary,
     isLoading,
+    isRefreshing,
+    hasResolved,
     error,
     refresh,
   } as const;

@@ -1,25 +1,38 @@
-import { Feather, Ionicons, Octicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { usePathname, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather, Ionicons, Octicons } from "@expo/vector-icons";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { Image } from "expo-image";
+import { usePathname, useRouter } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { themeColors } from '@/constants/colors';
-import { radius, shadows } from '@/constants/theme';
-import { fontFamilies } from '@/constants/typography';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { themeColors } from "@/constants/colors";
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
-type NavVariant = 'light' | 'dark';
-type ActiveTab = 'home' | 'budget' | 'goals' | 'assistant' | 'none';
+type NavVariant = "light" | "dark";
+type ActiveTab = "home" | "budget" | "goals" | "assistant" | "none";
 
 interface AppBottomNavProps {
   activeTab: ActiveTab;
   variant?: NavVariant;
 }
 
+const TAB_ROUTE_TO_ACTIVE: Record<string, Exclude<ActiveTab, "none">> = {
+  index: "home",
+  explore: "budget",
+  goals: "goals",
+  assistant: "assistant",
+};
+
 function withOpacity(hex: string, opacity: number) {
-  const normalized = hex.replace('#', '');
+  const normalized = hex.replace("#", "");
   const full =
-    normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized;
+    normalized.length === 3
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : normalized;
   const red = parseInt(full.slice(0, 2), 16);
   const green = parseInt(full.slice(2, 4), 16);
   const blue = parseInt(full.slice(4, 6), 16);
@@ -27,76 +40,73 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const colorScheme = useColorScheme() ?? 'light';
+function NavBody({
+  activeTab,
+  variant,
+  onNavigate,
+  onOpenAddTransaction,
+}: {
+  activeTab: ActiveTab;
+  variant: NavVariant;
+  onNavigate: (tab: Exclude<ActiveTab, "none">) => void;
+  onOpenAddTransaction: () => void;
+}) {
+  const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
 
-  const isDark = variant === 'dark';
-  const backgroundColor = isDark ? '#111722' : colors.card;
-  const borderColor = isDark ? 'rgba(255, 255, 255, 0.06)' : withOpacity(colors.border, 0.86);
-  const mutedColor = isDark ? '#7E8796' : colors.mutedForeground;
-  const activeColor = '#1495FF';
-  const plusShadow = isDark ? shadows.glow : shadows.glow;
-
-  const navigate = (href: '/' | '/explore' | '/goals' | '/assistant') => {
-    if (pathname !== href) {
-      router.replace(href);
-    }
-  };
-
-  const openAddTransaction = () => {
-    if (pathname !== '/modal') {
-      router.push('/modal');
-    }
-  };
+  const isDark = variant === "dark";
+  const backgroundColor = isDark ? "#111722" : colors.card;
+  const borderColor = isDark ? "rgba(255, 255, 255, 0.06)" : withOpacity(colors.border, 0.86);
+  const mutedColor = isDark ? "#7E8796" : colors.mutedForeground;
+  const activeColor = "#1495FF";
 
   return (
-    <View style={styles.wrap}>
+    <View pointerEvents="box-none" style={styles.wrap}>
       <View style={[styles.navBar, { backgroundColor, borderColor }, shadows.floating]}>
-        <Pressable style={styles.navItem} onPress={() => navigate('/')}>
-          <Ionicons name="home" size={22} color={activeTab === 'home' ? activeColor : mutedColor} />
-          <Text style={[styles.navLabel, { color: activeTab === 'home' ? activeColor : mutedColor }]}>
+        <Pressable style={styles.navItem} onPress={() => onNavigate("home")}>
+          <Ionicons name="home" size={22} color={activeTab === "home" ? activeColor : mutedColor} />
+          <Text style={[styles.navLabel, { color: activeTab === "home" ? activeColor : mutedColor }]}>
             Home
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navItem} onPress={() => navigate('/explore')}>
+        <Pressable style={styles.navItem} onPress={() => onNavigate("budget")}>
           <Ionicons
             name="wallet-outline"
             size={22}
-            color={activeTab === 'budget' ? activeColor : mutedColor}
+            color={activeTab === "budget" ? activeColor : mutedColor}
           />
-          <Text style={[styles.navLabel, { color: activeTab === 'budget' ? activeColor : mutedColor }]}>
+          <Text style={[styles.navLabel, { color: activeTab === "budget" ? activeColor : mutedColor }]}>
             Budget
           </Text>
         </Pressable>
 
         <Pressable
-          style={[styles.plusButton, { backgroundColor: activeColor }, plusShadow]}
-          onPress={openAddTransaction}>
+          style={[styles.plusButton, { backgroundColor: activeColor }, shadows.glow]}
+          onPress={onOpenAddTransaction}
+        >
           <Feather name="plus" size={28} color="#FFFFFF" />
         </Pressable>
 
-        <Pressable style={styles.navItem} onPress={() => navigate('/goals')}>
-          <Octicons name="goal" size={20} color={activeTab === 'goals' ? activeColor : mutedColor} />
-          <Text style={[styles.navLabel, { color: activeTab === 'goals' ? activeColor : mutedColor }]}>
+        <Pressable style={styles.navItem} onPress={() => onNavigate("goals")}>
+          <Octicons name="goal" size={20} color={activeTab === "goals" ? activeColor : mutedColor} />
+          <Text style={[styles.navLabel, { color: activeTab === "goals" ? activeColor : mutedColor }]}>
             Goals
           </Text>
         </Pressable>
 
-        <Pressable style={styles.navItem} onPress={() => navigate('/assistant')}>
+        <Pressable style={styles.navItem} onPress={() => onNavigate("assistant")}>
           <Image
             contentFit="cover"
-            source={require('@/assets/images/Eyrie_Mascot_3.png')}
+            source={require("@/assets/images/Eyrie_Mascot_3.png")}
             style={styles.assistantIcon}
           />
           <Text
             style={[
               styles.navLabel,
-              { color: activeTab === 'assistant' ? activeColor : mutedColor },
-            ]}>
+              { color: activeTab === "assistant" ? activeColor : mutedColor },
+            ]}
+          >
             Assistant
           </Text>
         </Pressable>
@@ -105,9 +115,89 @@ export function AppBottomNav({ activeTab, variant = 'light' }: AppBottomNavProps
   );
 }
 
+export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+  const colorScheme = useColorScheme() ?? "light";
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const activeRoute = state.routes[state.index]?.name ?? "index";
+  const activeTab = TAB_ROUTE_TO_ACTIVE[activeRoute] ?? "home";
+  const variant = colorScheme === "dark" ? "dark" : "light";
+
+  const handleNavigate = (tab: Exclude<ActiveTab, "none">) => {
+    const routeName =
+      tab === "home"
+        ? "index"
+        : tab === "budget"
+          ? "explore"
+          : tab === "goals"
+            ? "goals"
+            : "assistant";
+
+    const targetRoute = state.routes.find((route) => route.name === routeName);
+    if (!targetRoute) {
+      return;
+    }
+
+    if (targetRoute.key === state.routes[state.index]?.key) {
+      return;
+    }
+
+    navigation.navigate(targetRoute.name, targetRoute.params);
+  };
+
+  const handleAdd = () => {
+    if (pathname !== "/modal") {
+      router.push("/modal");
+    }
+  };
+
+  return (
+    <NavBody
+      activeTab={activeTab}
+      variant={variant}
+      onNavigate={handleNavigate}
+      onOpenAddTransaction={handleAdd}
+    />
+  );
+}
+
+export function AppBottomNav({ activeTab, variant = "light" }: AppBottomNavProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const navigate = (tab: Exclude<ActiveTab, "none">) => {
+    const href =
+      tab === "home"
+        ? "/"
+        : tab === "budget"
+          ? "/explore"
+          : tab === "goals"
+            ? "/goals"
+            : "/assistant";
+
+    if (pathname !== href) {
+      router.replace(href);
+    }
+  };
+
+  return (
+    <NavBody
+      activeTab={activeTab}
+      variant={variant}
+      onNavigate={navigate}
+      onOpenAddTransaction={() => {
+        if (pathname !== "/modal") {
+          router.push("/modal");
+        }
+      }}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
+    position: "absolute",
     left: 16,
     right: 16,
     bottom: 12,
@@ -116,14 +206,14 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 28,
     borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
     paddingHorizontal: 10,
   },
   navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     width: 58,
     gap: 4,
   },
@@ -136,8 +226,8 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: -18,
   },
   assistantIcon: {

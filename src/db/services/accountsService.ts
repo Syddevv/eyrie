@@ -17,6 +17,7 @@ import {
   prepareUpdateForSync,
 } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
+import { showSuccessToast } from "@/store/useToastStore";
 
 const defaultCashAccountRequests = new Map<
   string,
@@ -40,6 +41,14 @@ function hasMeaningfulBalance(account: Pick<Account, "balance">) {
 
 function isDefaultCashAccount(account: Pick<Account, "id" | "userId">) {
   return account.id === getDefaultCashAccountId(account.userId);
+}
+
+function accountLabel(type: string) {
+  if (type === "ewallet" || type === "cash") {
+    return "Wallet";
+  }
+
+  return "Card";
 }
 
 function pickCanonicalCashAccount<T extends Pick<Account, "id" | "userId" | "balance" | "createdAt" | "updatedAt">>(
@@ -144,6 +153,14 @@ export class AccountsService {
       await enqueueSync("accounts", created.id, "upsert", created.userId);
     }
     emitAccountsChanged();
+    if (created && created.type !== "cash") {
+      showSuccessToast({
+        title: `${accountLabel(created.type)} added`,
+        message: `${created.name} is ready to use.`,
+        dedupeKey: `account:create:${created.id}`,
+        source: "accounts-service",
+      });
+    }
     return created;
   }
 
@@ -251,6 +268,14 @@ export class AccountsService {
       await enqueueSync("accounts", updated.id, "upsert", updated.userId);
     }
     emitAccountsChanged();
+    if (updated && updated.type !== "cash") {
+      showSuccessToast({
+        title: `${accountLabel(updated.type)} updated`,
+        message: "Your account changes were saved successfully.",
+        dedupeKey: `account:update:${updated.id}:${updated.updatedAt}`,
+        source: "accounts-service",
+      });
+    }
     return updated;
   }
 
@@ -263,6 +288,14 @@ export class AccountsService {
     const deleted = await accountsRepository.update(id, prepareDeleteForSync());
     if (deleted) {
       await enqueueSync("accounts", deleted.id, "delete", deleted.userId);
+      if (deleted.type !== "cash") {
+        showSuccessToast({
+          title: `${accountLabel(deleted.type)} deleted`,
+          message: `${deleted.name} was removed successfully.`,
+          dedupeKey: `account:delete:${deleted.id}`,
+          source: "accounts-service",
+        });
+      }
     }
     emitAccountsChanged();
   }

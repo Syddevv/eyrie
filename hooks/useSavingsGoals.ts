@@ -31,29 +31,38 @@ export function useSavingsGoals() {
   const userId = user?.id ?? null;
   const [goals, setGoals] = useState<GoalSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasResolved, setHasResolved] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!userId) {
       setGoals([]);
+      setHasResolved(false);
+      setIsRefreshing(false);
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    const shouldRefreshInBackground = force && goals.length > 0;
+    setIsLoading((prev) => prev || goals.length === 0);
+    setIsRefreshing(shouldRefreshInBackground);
     try {
       const rows = await goalsService.fetch(userId);
       setGoals((rows as GoalWithDetails[]).map(hydrateGoal));
+      setHasResolved(true);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [userId]);
+  }, [goals.length, userId]);
 
   useEffect(() => {
     refresh().catch(() => undefined);
     const offGoals = onGoalsChanged(() => {
-      refresh().catch(() => undefined);
+      refresh(true).catch(() => undefined);
     });
     const offAccounts = onAccountsChanged(() => {
-      refresh().catch(() => undefined);
+      refresh(true).catch(() => undefined);
     });
 
     return () => {
@@ -64,7 +73,7 @@ export function useSavingsGoals() {
 
   const overview = useMemo(() => getGoalsOverview(goals), [goals]);
 
-  return { goals, overview, isLoading, refresh } as const;
+  return { goals, overview, isLoading, isRefreshing, hasResolved, refresh } as const;
 }
 
 export function useSavingsGoal(goalId?: string | null) {

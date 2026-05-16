@@ -91,6 +91,7 @@ type DashboardState = {
 
 const dashboardLoadRequests = new Map<string, Promise<void>>();
 const pendingDashboardRefreshes = new Set<string>();
+const DASHBOARD_STALE_MS = 30_000;
 
 function describeDashboardError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -650,7 +651,16 @@ export function useDashboardBootstrap(userId?: string | null) {
         return undefined;
       }
 
-      void loadDashboard(userId, { force: true });
+      const snapshot = useDashboardStore.getState();
+      const shouldRefresh =
+        snapshot.activeUserId !== userId ||
+        snapshot.lastLoadedAt === null ||
+        Date.now() - snapshot.lastLoadedAt > DASHBOARD_STALE_MS;
+
+      if (shouldRefresh) {
+        void loadDashboard(userId, { force: snapshot.lastLoadedAt !== null });
+      }
+
       return undefined;
     }, [clearDashboard, loadDashboard, userId]),
   );

@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-import { AppBottomNav } from '@/components/app-bottom-nav';
 import { themeColors } from '@/constants/colors';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { radius, shadows } from '@/constants/theme';
@@ -596,7 +595,6 @@ export default function AssistantScreen() {
           </View>
         )}
 
-        <AppBottomNav activeTab="assistant" variant={isDark ? 'dark' : 'light'} />
       </View>
     </SafeAreaView>
   );

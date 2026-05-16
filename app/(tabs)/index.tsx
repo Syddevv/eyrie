@@ -15,7 +15,6 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppBottomNav } from "@/components/app-bottom-nav";
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { themeColors } from "@/constants/colors";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -1542,10 +1541,6 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <AppBottomNav
-          activeTab="home"
-          variant={colorScheme === "dark" ? "dark" : "light"}
-        />
       </View>
     </SafeAreaView>
   );

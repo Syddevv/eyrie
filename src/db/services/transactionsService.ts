@@ -29,6 +29,7 @@ import {
 } from "@/src/lib/dbSync";
 import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
+import { showSuccessToast } from "@/store/useToastStore";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
@@ -169,6 +170,12 @@ export class TransactionsService {
     emitTransactionsChanged();
     await enqueueSync("transactions", created.id, "upsert", created.userId);
     await this.enqueueTransactionDependencies([created]);
+    showSuccessToast({
+      title: created.type === "income" ? "Income added" : created.type === "transfer" ? "Transfer added" : "Expense added",
+      message: "Transaction saved successfully.",
+      dedupeKey: `transaction:create:${created.id}`,
+      source: "transactions-service",
+    });
     return created;
   }
 
@@ -295,6 +302,12 @@ export class TransactionsService {
     emitTransactionsChanged();
     await enqueueSync("transactions", updated.id, "upsert", updated.userId);
     await this.enqueueTransactionDependencies([existing, updated]);
+    showSuccessToast({
+      title: "Transaction updated",
+      message: "Your changes were saved successfully.",
+      dedupeKey: `transaction:update:${updated.id}:${updated.updatedAt}`,
+      source: "transactions-service",
+    });
     return updated;
   }
 
@@ -337,6 +350,12 @@ export class TransactionsService {
     if (deleted) {
       await enqueueSync("transactions", deleted.id, "delete", deleted.userId);
       await this.enqueueTransactionDependencies([deleted]);
+      showSuccessToast({
+        title: "Transaction deleted",
+        message: "The transaction was removed successfully.",
+        dedupeKey: `transaction:delete:${deleted.id}`,
+        source: "transactions-service",
+      });
     }
   }
 

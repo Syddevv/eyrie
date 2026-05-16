@@ -11,9 +11,7 @@ export function useAuth() {
   const isGoogleLoading = useAuthStore((state) => state.isGoogleLoading);
   const isSigningOut = useAuthStore((state) => state.isSigningOut);
   const otpModal = useAuthStore((state) => state.otpModal);
-  const snackbar = useAuthStore((state) => state.snackbar);
   const closeOtpModal = useAuthStore((state) => state.closeOtpModal);
-  const hideSnackbar = useAuthStore((state) => state.hideSnackbar);
 
   return {
     session,
@@ -27,8 +25,6 @@ export function useAuth() {
     isGoogleLoading,
     isSigningOut,
     otpModal,
-    snackbar,
     closeOtpModal,
-    hideSnackbar,
   };
 }

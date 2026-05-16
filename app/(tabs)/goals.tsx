@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppBottomNav } from "@/components/app-bottom-nav";
 import { GoalAvatar } from "@/components/goal-avatar";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
@@ -582,10 +581,6 @@ export default function GoalsScreen() {
           </View>
         </ScrollView>
 
-        <AppBottomNav
-          activeTab="goals"
-          variant={colorScheme === "dark" ? "dark" : "light"}
-        />
       </View>
     </SafeAreaView>
   );

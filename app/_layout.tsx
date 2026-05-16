@@ -5,6 +5,7 @@ import "../global.css";
 import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { ToastHost } from "@/components/ui/ToastHost";
 import { navigationThemes } from "@/constants/theme";
 import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -262,6 +263,7 @@ export default function RootLayout() {
           <AuthProvider>
             <SyncProvider>
               <AppShell />
+              <ToastHost />
               <SyncStatusBanner />
             </SyncProvider>
           </AuthProvider>

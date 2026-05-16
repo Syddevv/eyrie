@@ -123,7 +123,6 @@ export default function PaymentMethodsModal() {
       await accountsService.delete(deletingAccountId);
       await refresh();
       setDeletingAccountId(null);
-      showSnackbar("Account deleted successfully");
     } catch {
       showSnackbar("Failed to delete account. Please try again.");
     } finally {

@@ -14,38 +14,16 @@ import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useManualSync, useSyncStatus } from "../hooks";
 
-type BannerKind = "offline" | "syncing" | "success" | "error";
-
-function formatLastSynced(lastSyncedAt: string | null) {
-  if (!lastSyncedAt) {
-    return "Just now";
-  }
-
-  const date = new Date(lastSyncedAt);
-  if (Number.isNaN(date.getTime())) {
-    return "Just now";
-  }
-
-  return new Intl.DateTimeFormat("en-PH", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(date);
-}
+type BannerKind = "offline" | "error";
 
 export function SyncStatusBanner() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const {
     isOnline,
-    isSyncing,
-    pendingCount,
-    lastSyncedAt,
     lastError,
     uiState,
     isRestoring,
-    lastRunReason,
   } = useSyncStatus();
   const { syncNow } = useManualSync();
 
@@ -57,13 +35,9 @@ export function SyncStatusBanner() {
   const [renderedBanner, setRenderedBanner] = useState<typeof banner>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-10)).current;
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previous = useRef({
     isOnline,
-    isSyncing,
-    lastRunReason,
-    lastSyncedAt,
     uiState,
     lastError,
   });
@@ -79,18 +53,10 @@ export function SyncStatusBanner() {
   );
 
   useEffect(() => {
-    if (hideTimer.current) {
-      clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-
     if (isRestoring) {
       setBanner(null);
       previous.current = {
         isOnline,
-        isSyncing,
-        lastRunReason,
-        lastSyncedAt,
         uiState,
         lastError,
       };
@@ -99,16 +65,6 @@ export function SyncStatusBanner() {
 
     const wentOffline =
       previous.current.isOnline && !isOnline && uiState === "offline";
-    const cameBackOnline =
-      !previous.current.isOnline && isOnline && previous.current.uiState === "offline";
-    const startedSync = !previous.current.isSyncing && isSyncing;
-    const finishedSync = previous.current.isSyncing && !isSyncing;
-    const syncReason =
-      lastRunReason === "launch" ||
-      lastRunReason === "login" ||
-      lastRunReason === "reconnect" ||
-      lastRunReason === "manual" ||
-      lastRunReason === "foreground";
 
     if (uiState === "schema_error" || uiState === "failed") {
       setBanner({
@@ -127,33 +83,6 @@ export function SyncStatusBanner() {
         subtitle:
           "Changes will sync automatically when your connection returns.",
       });
-    } else if (startedSync && syncReason && !lastError) {
-      setBanner({
-        kind: "syncing",
-        title: "Syncing your data",
-        subtitle: "Keeping your finances up to date.",
-      });
-      hideTimer.current = setTimeout(() => {
-        setBanner(null);
-      }, 2200);
-    } else if (finishedSync && syncReason && !lastError && !pendingCount) {
-      setBanner({
-        kind: "success",
-        title: "All changes synced",
-        subtitle: `Last synced ${formatLastSynced(lastSyncedAt)}`,
-      });
-      hideTimer.current = setTimeout(() => {
-        setBanner(null);
-      }, 1500);
-    } else if (cameBackOnline && !lastError) {
-      setBanner({
-        kind: "syncing",
-        title: "Syncing your data",
-        subtitle: "Connection restored. Updating local changes.",
-      });
-      hideTimer.current = setTimeout(() => {
-        setBanner(null);
-      }, 2200);
     } else if (uiState === "retrying" && lastError) {
       setBanner({
         kind: "error",
@@ -166,21 +95,14 @@ export function SyncStatusBanner() {
 
     previous.current = {
       isOnline,
-      isSyncing,
-      lastRunReason,
-      lastSyncedAt,
       uiState,
       lastError,
     };
   }, [
     isOnline,
     isRestoring,
-    isSyncing,
     lastError,
-    lastRunReason,
-    lastSyncedAt,
     opacity,
-    pendingCount,
     translateY,
     uiState,
   ]);
@@ -242,13 +164,6 @@ export function SyncStatusBanner() {
           accent: "#60A5FA",
           icon: "wifi-off" as const,
         }
-      : renderedBanner?.kind === "success"
-        ? {
-            background: colorScheme === "dark" ? "#0F241C" : "#E9F8F1",
-            border: colorScheme === "dark" ? "#2C8F68" : "#8CD8B5",
-            accent: "#17B26A",
-            icon: "check-circle" as const,
-          }
         : renderedBanner?.kind === "error"
           ? {
               background:
@@ -267,8 +182,8 @@ export function SyncStatusBanner() {
               background: colorScheme === "dark" ? "#082131" : "#E7F4FF",
               border: "#60A5FA",
               accent: colors.primary,
-            icon: "sync" as const,
-          };
+              icon: "wifi-off" as const,
+            };
 
   if (!renderedBanner) {
     return null;

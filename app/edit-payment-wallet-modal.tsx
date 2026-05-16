@@ -204,7 +204,6 @@ export default function EditPaymentWalletModal() {
       });
 
       refresh();
-      showSnackbar("Wallet updated successfully");
       router.replace({
         pathname: "/payment-wallet-details-modal",
         params: { accountId: account.id },

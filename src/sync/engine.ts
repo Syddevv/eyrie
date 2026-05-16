@@ -30,6 +30,7 @@ import { syncRegistry } from "./registry";
 import { useSyncStore } from "./store";
 import { fetchRemoteRowById, fetchRemoteRowsPage, upsertRemoteRows } from "./supabase";
 import type { SyncRunReason, SyncRunResult, SyncableTable } from "./types";
+import { showSuccessToast } from "@/store/useToastStore";
 
 let activeRun: Promise<SyncRunResult | null> | null = null;
 
@@ -342,6 +343,14 @@ export async function runSync(input?: {
         lastErrorKind: result.failed ? "network" : null,
         isOnline: true,
       });
+      if (reason === "manual" && !result.failed) {
+        showSuccessToast({
+          title: "Sync successful",
+          message: "Your latest changes are now up to date.",
+          dedupeKey: "sync:manual-success",
+          source: "sync-engine",
+        });
+      }
       logSync("sync completed", result);
       return result;
     } catch (error) {

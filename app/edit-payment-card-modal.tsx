@@ -228,7 +228,6 @@ export default function EditPaymentCardModal() {
       });
 
       refresh();
-      showSnackbar("Card updated successfully");
       router.replace({
         pathname: "/payment-card-details-modal",
         params: { accountId: account.id },

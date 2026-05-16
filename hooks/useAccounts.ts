@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { accountsService } from "@/src/db/services";
 import { onAccountsChanged } from "@/src/lib/dbSync";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -108,20 +107,19 @@ async function loadAccounts(userId: string, force = false) {
 }
 
 export function useAccounts() {
-  const { user, isLoading: isCurrentUserLoading } = useCurrentUser();
   const isAuthReady = useAuthStore((state) => state.isReady);
-  const userId = user?.id ?? null;
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const [snapshot, setSnapshot] = useState<AccountsSnapshot>(currentSnapshot);
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      if (isAuthReady && !isCurrentUserLoading) {
+      if (isAuthReady) {
         resetSnapshot(null);
       }
       return null;
     }
 
-    if (!isAuthReady || isCurrentUserLoading) {
+    if (!isAuthReady) {
       publishSnapshot((previous) => ({
         ...previous,
         userId,
@@ -134,7 +132,7 @@ export function useAccounts() {
     }
 
     return loadAccounts(userId);
-  }, [isAuthReady, isCurrentUserLoading, userId]);
+  }, [isAuthReady, userId]);
 
   useEffect(() => {
     listeners.add(setSnapshot);
@@ -146,7 +144,7 @@ export function useAccounts() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthReady || isCurrentUserLoading) {
+    if (!isAuthReady) {
       return;
     }
 
@@ -167,11 +165,11 @@ export function useAccounts() {
     }
 
     void loadAccounts(userId, currentSnapshot.userId !== userId);
-  }, [isAuthReady, isCurrentUserLoading, userId]);
+  }, [isAuthReady, userId]);
 
   useEffect(() => {
     const off = onAccountsChanged(() => {
-      if (!userId || !isAuthReady || isCurrentUserLoading) {
+      if (!userId || !isAuthReady) {
         return;
       }
 
@@ -179,7 +177,7 @@ export function useAccounts() {
     });
 
     return () => off();
-  }, [isAuthReady, isCurrentUserLoading, userId]);
+  }, [isAuthReady, userId]);
 
   useEffect(() => {
     if (!__DEV__) {
