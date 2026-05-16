@@ -444,15 +444,7 @@ export default function EditTransactionModal() {
     const normalizedType = transaction.typeValue;
     const normalizedMerchant = isIncomeTransaction
       ? undefined
-      : merchantQuery.trim();
-
-    if (!isIncomeTransaction && !normalizedMerchant) {
-      Alert.alert(
-        "Missing merchant",
-        "Select a merchant for this transaction.",
-      );
-      return;
-    }
+      : merchantQuery.trim() || null;
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       Alert.alert("Invalid amount", "Enter a valid amount greater than zero.");
