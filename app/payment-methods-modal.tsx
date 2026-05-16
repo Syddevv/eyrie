@@ -6,7 +6,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import Logo from "@/components/logo";
-import { settingsPaymentMethods } from "@/constants/settings-payment-methods";
 import { useAccounts } from "@/hooks/useAccounts";
 import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
@@ -23,8 +22,17 @@ export default function PaymentMethodsModal() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
-  const { accounts, isLoading: accountsLoading, refresh } = useAccounts();
-  const { total, isLoading: totalLoading } = useTotalAssets();
+  const {
+    accounts,
+    hasResolved: accountsResolved,
+    isInitialLoading: accountsInitialLoading,
+    refresh,
+  } = useAccounts();
+  const {
+    total,
+    hasResolved: totalResolved,
+    isInitialLoading: totalInitialLoading,
+  } = useTotalAssets();
   const { showSnackbar } = useAuthStore();
 
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(
@@ -36,6 +44,8 @@ export default function PaymentMethodsModal() {
     () => accounts.filter((account) => !account.isHidden),
     [accounts],
   );
+  const showAccountsEmptyState =
+    accountsResolved && !accountsInitialLoading && visibleAccounts.length === 0;
 
   const resolveBrandName = (acct: any) => {
     const nameLower = (acct?.name || "").toLowerCase();
@@ -114,7 +124,7 @@ export default function PaymentMethodsModal() {
       await refresh();
       setDeletingAccountId(null);
       showSnackbar("Account deleted successfully");
-    } catch (error) {
+    } catch {
       showSnackbar("Failed to delete account. Please try again.");
     } finally {
       setIsDeleting(false);
@@ -220,7 +230,9 @@ export default function PaymentMethodsModal() {
                 All accounts combined
               </Text>
               <Text style={[styles.methodBalance, ui.methodBalance]}>
-                {totalLoading ? "---" : formatCurrency(total)}
+                {!totalResolved && totalInitialLoading
+                  ? "---"
+                  : formatCurrency(total)}
               </Text>
             </View>
             <View style={styles.methodRight}>
@@ -233,7 +245,7 @@ export default function PaymentMethodsModal() {
           </View>
 
           {/* Account list from SQLite */}
-          {!accountsLoading && visibleAccounts.length === 0 ? (
+          {showAccountsEmptyState ? (
             <View style={[styles.infoCard, ui.infoCard]}>
               <View style={styles.infoAvatarFrame}>
                 <Image

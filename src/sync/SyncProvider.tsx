@@ -1,16 +1,5 @@
-import {
-  ActivityIndicator,
-  AppState,
-  NativeModules,
-  StyleSheet,
-  Text,
-  View,
-  type AppStateStatus,
-} from "react-native";
+import { AppState, NativeModules, type AppStateStatus } from "react-native";
 import { type PropsWithChildren, useEffect, useRef } from "react";
-
-import { themeColors } from "@/constants/colors";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/store/useAuthStore";
 import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
@@ -185,9 +174,6 @@ function useSyncTriggers() {
 }
 
 export function SyncProvider({ children }: PropsWithChildren) {
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = themeColors[colorScheme];
-  const isRestoring = useSyncStore((state) => state.isRestoring);
   const isOnline = useSyncStore((state) => state.isOnline);
   const userId = useAuthStore((state) => state.user?.id ?? null);
 
@@ -211,42 +197,5 @@ export function SyncProvider({ children }: PropsWithChildren) {
     };
   }, [isOnline, userId]);
 
-  return (
-    <>
-      {children}
-      {isRestoring ? (
-        <View style={[styles.overlay, { backgroundColor: colors.background }]}>
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            Restoring your finance data...
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Your local database is hydrating from the latest synced records.
-          </Text>
-        </View>
-      ) : null}
-    </>
-  );
+  return <>{children}</>;
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingHorizontal: 28,
-    zIndex: 40,
-  },
-  title: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-});

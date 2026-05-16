@@ -1,38 +1,161 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getTotalBalance } from "@/src/db/queries/dashboard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { getTotalBalance } from "@/src/db/queries/dashboard";
 import { onAccountsChanged } from "@/src/lib/dbSync";
+
+type TotalAssetsSnapshot = {
+  userId: string | null;
+  total: number;
+  hasResolved: boolean;
+  isInitialLoading: boolean;
+  isRefreshing: boolean;
+};
+
+const EMPTY_SNAPSHOT: TotalAssetsSnapshot = {
+  userId: null,
+  total: 0,
+  hasResolved: false,
+  isInitialLoading: false,
+  isRefreshing: false,
+};
+
+const listeners = new Set<(snapshot: TotalAssetsSnapshot) => void>();
+let currentSnapshot: TotalAssetsSnapshot = EMPTY_SNAPSHOT;
+let inFlightRequest: Promise<number | null> | null = null;
+
+function publishSnapshot(
+  input:
+    | TotalAssetsSnapshot
+    | ((previous: TotalAssetsSnapshot) => TotalAssetsSnapshot),
+) {
+  currentSnapshot =
+    typeof input === "function" ? input(currentSnapshot) : input;
+
+  for (const listener of Array.from(listeners)) {
+    listener(currentSnapshot);
+  }
+}
+
+function resetSnapshot() {
+  inFlightRequest = null;
+  publishSnapshot({
+    userId: null,
+    total: 0,
+    hasResolved: true,
+    isInitialLoading: false,
+    isRefreshing: false,
+  });
+}
+
+async function loadTotal(userId: string, force = false) {
+  if (!force && inFlightRequest) {
+    return inFlightRequest;
+  }
+
+  const hasCachedValue =
+    currentSnapshot.userId === userId && currentSnapshot.hasResolved;
+
+  publishSnapshot((previous) => ({
+    ...previous,
+    userId,
+    isInitialLoading: !hasCachedValue,
+    isRefreshing: hasCachedValue,
+  }));
+
+  const request = getTotalBalance(userId)
+    .then((value) => {
+      const nextTotal = value ?? 0;
+      publishSnapshot({
+        userId,
+        total: nextTotal,
+        hasResolved: true,
+        isInitialLoading: false,
+        isRefreshing: false,
+      });
+      return nextTotal;
+    })
+    .catch((error) => {
+      publishSnapshot((previous) => ({
+        ...previous,
+        userId,
+        isInitialLoading: false,
+        isRefreshing: false,
+      }));
+      throw error;
+    })
+    .finally(() => {
+      if (inFlightRequest === request) {
+        inFlightRequest = null;
+      }
+    });
+
+  inFlightRequest = request;
+  return request;
+}
 
 export function useTotalAssets() {
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
-  const [total, setTotal] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [snapshot, setSnapshot] = useState<TotalAssetsSnapshot>(currentSnapshot);
 
-  const fetchTotal = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!userId) {
-      setTotal(0);
-      return;
+      resetSnapshot();
+      return null;
     }
 
-    setIsLoading(true);
-    try {
-      const value = await getTotalBalance(userId);
-      setTotal(value ?? 0);
-    } finally {
-      setIsLoading(false);
-    }
+    return loadTotal(userId);
   }, [userId]);
 
   useEffect(() => {
-    fetchTotal().catch(() => undefined);
+    listeners.add(setSnapshot);
+    setSnapshot(currentSnapshot);
+
+    return () => {
+      listeners.delete(setSnapshot);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      resetSnapshot();
+      return;
+    }
+
+    if (currentSnapshot.userId !== userId) {
+      publishSnapshot({
+        userId,
+        total: 0,
+        hasResolved: false,
+        isInitialLoading: true,
+        isRefreshing: false,
+      });
+    }
+
+    void loadTotal(userId, currentSnapshot.userId !== userId).catch(
+      () => undefined,
+    );
+  }, [userId]);
+
+  useEffect(() => {
     const off = onAccountsChanged(() => {
-      fetchTotal().catch(() => undefined);
+      if (!userId) {
+        return;
+      }
+
+      void loadTotal(userId, true).catch(() => undefined);
     });
 
     return () => off();
-  }, [fetchTotal]);
+  }, [userId]);
 
-  return { total, isLoading, refresh: fetchTotal } as const;
+  return {
+    total: snapshot.total,
+    isLoading: snapshot.isInitialLoading,
+    isInitialLoading: snapshot.isInitialLoading,
+    isRefreshing: snapshot.isRefreshing,
+    hasResolved: snapshot.hasResolved,
+    refresh,
+  } as const;
 }

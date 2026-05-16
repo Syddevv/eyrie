@@ -92,7 +92,7 @@ const HOME_CARD_WIDTH = (HOME_CONTENT_WIDTH - HOME_CARD_GAP) / 2;
 const HOME_CARD_HEIGHT = 138;
 
 type EmptyStateVariant = "cards" | "budgets" | "transactions";
-type ThemePalette = typeof themeColors.light;
+type ThemePalette = (typeof themeColors)[keyof typeof themeColors];
 
 interface PremiumEmptyStateProps {
   variant: EmptyStateVariant;
@@ -107,6 +107,83 @@ interface PremiumEmptyStateProps {
   colorScheme: "light" | "dark";
   mutedTextColor: string;
 }
+
+const AccountsSectionSkeleton = memo(function AccountsSectionSkeleton({
+  colors,
+  colorScheme,
+}: {
+  colors: ThemePalette;
+  colorScheme: "light" | "dark";
+}) {
+  const isLight = colorScheme === "light";
+  const surface = isLight ? "#FFFFFF" : colors.card;
+  const border = withOpacity(colors.border, isLight ? 0.88 : 0.96);
+  const shine = withOpacity(colors.foreground, isLight ? 0.08 : 0.12);
+
+  return (
+    <>
+      {[0, 1].map((index) => (
+        <View
+          key={`accounts-skeleton-${index}`}
+          style={[
+            styles.cardPressable,
+            styles.accountSkeletonCard,
+            {
+              backgroundColor: surface,
+              borderColor: border,
+            },
+          ]}
+        >
+          <View style={styles.accountSkeletonHeader}>
+            <View
+              style={[
+                styles.accountSkeletonAvatar,
+                { backgroundColor: shine },
+              ]}
+            />
+            <View style={styles.accountSkeletonHeaderCopy}>
+              <View
+                style={[
+                  styles.accountSkeletonLine,
+                  styles.accountSkeletonLinePrimary,
+                  { backgroundColor: shine },
+                ]}
+              />
+              <View
+                style={[
+                  styles.accountSkeletonLine,
+                  styles.accountSkeletonLineSecondary,
+                  { backgroundColor: withOpacity(colors.foreground, isLight ? 0.05 : 0.08) },
+                ]}
+              />
+            </View>
+          </View>
+          <View
+            style={[
+              styles.accountSkeletonBalance,
+              { backgroundColor: shine },
+            ]}
+          />
+          <View style={styles.accountSkeletonFooter}>
+            <View
+              style={[
+                styles.accountSkeletonLine,
+                styles.accountSkeletonLineTertiary,
+                { backgroundColor: withOpacity(colors.foreground, isLight ? 0.06 : 0.1) },
+              ]}
+            />
+            <View
+              style={[
+                styles.accountSkeletonTag,
+                { backgroundColor: withOpacity(colors.foreground, isLight ? 0.06 : 0.1) },
+              ]}
+            />
+          </View>
+        </View>
+      ))}
+    </>
+  );
+});
 
 const EmptyStateIllustration = memo(function EmptyStateIllustration({
   variant,
@@ -412,7 +489,11 @@ export default function HomeScreen() {
   const goalsProgress = useGoalsProgress();
   const isLoading = useDashboardLoading();
   const error = useDashboardError();
-  const { accounts: allAccounts, isLoading: accountsLoading } = useAccounts();
+  const {
+    accounts: allAccounts,
+    isInitialLoading: accountsInitialLoading,
+    hasResolved: accountsResolved,
+  } = useAccounts();
   const [showCardsSwipeHint, setShowCardsSwipeHint] = useState(true);
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
   const [showTotalBalance, setShowTotalBalance] = useState(true);
@@ -430,6 +511,11 @@ export default function HomeScreen() {
   const walletAccounts = visibleAccounts.filter(
     (account) => account.type === "ewallet" || account.type === "cash",
   );
+  const showAccountsSkeleton = accountsInitialLoading && !accountsResolved;
+  const showCardsEmptyState =
+    accountsResolved && !accountsInitialLoading && cardAccounts.length === 0;
+  const showWalletsEmptyState =
+    accountsResolved && !accountsInitialLoading && walletAccounts.length === 0;
   const visibleBudgets = activeBudgets.slice(0, 2);
   const visibleRecentTransactions = recentTransactions.slice(0, 3);
 
@@ -810,7 +896,16 @@ export default function HomeScreen() {
             scrollEventThrottle={16}
           >
             {(() => {
-              if (!accountsLoading && cardAccounts.length === 0) {
+              if (showAccountsSkeleton) {
+                return (
+                  <AccountsSectionSkeleton
+                    colors={colors}
+                    colorScheme={colorScheme}
+                  />
+                );
+              }
+
+              if (showCardsEmptyState) {
                 return (
                   <PremiumEmptyState
                     variant="cards"
@@ -824,9 +919,12 @@ export default function HomeScreen() {
                     colorScheme={colorScheme}
                     mutedTextColor={pageStyles.mutedText.color}
                     onPress={() =>
-                      router.push("/add-bank-card-method-modal", {
-                        returnTo: "/(tabs)",
-                        parentTo: "/(tabs)",
+                      router.push({
+                        pathname: "/add-bank-card-method-modal",
+                        params: {
+                          returnTo: "/(tabs)",
+                          parentTo: "/(tabs)",
+                        },
                       })
                     }
                   />
@@ -921,9 +1019,12 @@ export default function HomeScreen() {
                   key="add-account-card"
                   style={[styles.cardPressable, styles.addAccountCardPressable]}
                   onPress={() =>
-                    router.push("/add-bank-card-method-modal", {
-                      returnTo: "/(tabs)",
-                      parentTo: "/(tabs)",
+                    router.push({
+                      pathname: "/add-bank-card-method-modal",
+                      params: {
+                        returnTo: "/(tabs)",
+                        parentTo: "/(tabs)",
+                      },
                     })
                   }
                 >
@@ -989,7 +1090,16 @@ export default function HomeScreen() {
             scrollEventThrottle={16}
           >
             {(() => {
-              if (!accountsLoading && walletAccounts.length === 0) {
+              if (showAccountsSkeleton) {
+                return (
+                  <AccountsSectionSkeleton
+                    colors={colors}
+                    colorScheme={colorScheme}
+                  />
+                );
+              }
+
+              if (showWalletsEmptyState) {
                 return (
                   <View
                     style={[
@@ -1043,9 +1153,12 @@ export default function HomeScreen() {
                         { backgroundColor: colors.primary },
                       ]}
                       onPress={() =>
-                        router.push("/add-e-wallet-method-modal", {
-                          returnTo: "/(tabs)",
-                          parentTo: "/(tabs)",
+                        router.push({
+                          pathname: "/add-e-wallet-method-modal",
+                          params: {
+                            returnTo: "/(tabs)",
+                            parentTo: "/(tabs)",
+                          },
                         })
                       }
                     >
@@ -1144,9 +1257,12 @@ export default function HomeScreen() {
                   key="add-account-wallet"
                   style={[styles.cardPressable, styles.addAccountCardPressable]}
                   onPress={() =>
-                    router.push("/add-e-wallet-method-modal", {
-                      returnTo: "/(tabs)",
-                      parentTo: "/(tabs)",
+                    router.push({
+                      pathname: "/add-e-wallet-method-modal",
+                      params: {
+                        returnTo: "/(tabs)",
+                        parentTo: "/(tabs)",
+                      },
                     })
                   }
                 >
@@ -1801,6 +1917,57 @@ const styles = StyleSheet.create({
   cardPressable: {
     width: HOME_CARD_WIDTH,
     height: HOME_CARD_HEIGHT,
+  },
+  accountSkeletonCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: "space-between",
+  },
+  accountSkeletonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  accountSkeletonAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+  },
+  accountSkeletonHeaderCopy: {
+    flex: 1,
+    gap: 8,
+  },
+  accountSkeletonLine: {
+    borderRadius: radius.full,
+  },
+  accountSkeletonLinePrimary: {
+    width: "58%",
+    height: 12,
+  },
+  accountSkeletonLineSecondary: {
+    width: "36%",
+    height: 9,
+  },
+  accountSkeletonBalance: {
+    width: "74%",
+    height: 24,
+    borderRadius: 10,
+  },
+  accountSkeletonFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  accountSkeletonLineTertiary: {
+    width: "34%",
+    height: 10,
+  },
+  accountSkeletonTag: {
+    width: 48,
+    height: 10,
+    borderRadius: radius.full,
   },
   addAccountCardPressable: {
     height: HOME_CARD_HEIGHT,
