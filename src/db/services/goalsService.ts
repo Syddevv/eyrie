@@ -345,7 +345,8 @@ export class GoalsService {
   async updateContribution(id: string, input: Partial<NewGoalContribution>) {
     const updated = await db.transaction(async (tx) => {
       const existing = await tx.query.goalContributions.findFirst({
-        where: (table, { eq }) => eq(table.id, id),
+        where: (table, { and, eq, isNull }) =>
+          and(eq(table.id, id), isNull(table.deletedAt)),
       });
 
       if (!existing) {
@@ -456,7 +457,7 @@ export class GoalsService {
         where: (table, { eq }) => eq(table.id, id),
       });
 
-      if (!existing) {
+      if (!existing || existing.deletedAt) {
         return null;
       }
 

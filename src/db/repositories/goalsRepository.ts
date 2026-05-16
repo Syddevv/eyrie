@@ -30,10 +30,16 @@ export class GoalsRepository {
   async findAllByUser(userId: string) {
     return db.query.goals.findMany({
       where: and(eq(goals.userId, userId), isNull(goals.deletedAt)),
-      orderBy: [asc(goals.isArchived), asc(goals.isCompleted), asc(goals.targetDate), desc(goals.createdAt)],
+      orderBy: [
+        asc(goals.isArchived),
+        asc(goals.isCompleted),
+        asc(goals.targetDate),
+        desc(goals.createdAt),
+      ],
       with: {
         linkedWallet: true,
         contributions: {
+          where: isNull(goalContributions.deletedAt),
           orderBy: [desc(goalContributions.createdAt)],
           with: {
             wallet: true,
@@ -49,6 +55,7 @@ export class GoalsRepository {
       with: {
         linkedWallet: true,
         contributions: {
+          where: isNull(goalContributions.deletedAt),
           orderBy: [desc(goalContributions.createdAt)],
           with: {
             wallet: true,
@@ -64,7 +71,10 @@ export class GoalsRepository {
   }
 
   async updateContribution(id: string, input: Partial<NewGoalContribution>) {
-    await db.update(goalContributions).set(input).where(eq(goalContributions.id, id));
+    await db
+      .update(goalContributions)
+      .set(input)
+      .where(eq(goalContributions.id, id));
     return this.findContributionById(id);
   }
 
@@ -74,13 +84,19 @@ export class GoalsRepository {
 
   async findContributionById(id: string) {
     return db.query.goalContributions.findFirst({
-      where: and(eq(goalContributions.id, id), isNull(goalContributions.deletedAt)),
+      where: and(
+        eq(goalContributions.id, id),
+        isNull(goalContributions.deletedAt),
+      ),
     });
   }
 
   async findContributionsByGoal(goalId: string) {
     return db.query.goalContributions.findMany({
-      where: and(eq(goalContributions.goalId, goalId), isNull(goalContributions.deletedAt)),
+      where: and(
+        eq(goalContributions.goalId, goalId),
+        isNull(goalContributions.deletedAt),
+      ),
       orderBy: [desc(goalContributions.createdAt)],
       with: {
         wallet: true,
