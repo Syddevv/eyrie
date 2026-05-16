@@ -173,6 +173,32 @@ function formatBudgetLabel(value: number) {
   return formatCurrency(value);
 }
 
+function getCurrentMonthRange(reference = new Date()) {
+  const start = new Date(
+    reference.getFullYear(),
+    reference.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  );
+  const end = new Date(
+    reference.getFullYear(),
+    reference.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999,
+  );
+
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+  };
+}
+
 function categoryKey(value?: string | null) {
   return (value ?? "").trim().toLowerCase();
 }
@@ -477,6 +503,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
 
     const request = (async () => {
+      const { startDate, endDate } = getCurrentMonthRange();
       const [
         summaryResult,
         recentTransactionsResult,
@@ -486,12 +513,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       ] = await Promise.allSettled([
         Promise.all([
           getTotalBalance(userId),
-          getTotalIncome(userId),
-          getTotalExpenses(userId),
+          getTotalIncome(userId, startDate, endDate),
+          getTotalExpenses(userId, startDate, endDate),
         ]),
         getRecentTransactions(userId, 5),
         getBudgetProgress(userId),
-        getSpendingBreakdown(userId),
+        getSpendingBreakdown(userId, startDate, endDate),
         getGoalsProgress(userId),
       ]);
 

@@ -427,7 +427,11 @@ export default function AddCategoryModal() {
                 style={styles.section}
               >
                 <View
-                  style={[styles.overviewCard, ui.overviewCard, shadows.card]}
+                  style={[
+                    styles.overviewCard,
+                    ui.overviewCard,
+                    isDark ? shadows.card : styles.overviewCardLight,
+                  ]}
                 >
                   <View style={styles.overviewHeader}>
                     <View
@@ -732,6 +736,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  overviewCardLight: {
+    shadowColor: "transparent",
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   overviewHeader: {
     flexDirection: "row",

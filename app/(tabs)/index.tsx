@@ -1,8 +1,9 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { memo, useMemo, useState, type ComponentProps } from "react";
+import { memo, useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -89,6 +90,7 @@ const HOME_CONTENT_WIDTH = Dimensions.get("window").width - 32;
 const HOME_CARD_GAP = 12;
 const HOME_CARD_WIDTH = (HOME_CONTENT_WIDTH - HOME_CARD_GAP) / 2;
 const HOME_CARD_HEIGHT = 138;
+const BALANCE_VISIBILITY_STORAGE_KEY = "eyrie:home-balance-visibility";
 
 type EmptyStateVariant = "cards" | "budgets" | "transactions";
 type ThemePalette = (typeof themeColors)[keyof typeof themeColors];
@@ -105,6 +107,25 @@ interface PremiumEmptyStateProps {
   colors: ThemePalette;
   colorScheme: "light" | "dark";
   mutedTextColor: string;
+}
+
+function getGreetingForHour(hour: number) {
+  if (hour >= 5 && hour < 12) {
+    return "Good morning";
+  }
+
+  if (hour >= 12 && hour < 18) {
+    return "Good afternoon";
+  }
+
+  return "Good evening";
+}
+
+function formatHomeContextDate(value: Date) {
+  return `Today, ${new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+  }).format(value)}`;
 }
 
 const AccountsSectionSkeleton = memo(function AccountsSectionSkeleton({
@@ -497,11 +518,61 @@ export default function HomeScreen() {
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
   const [showTotalBalance, setShowTotalBalance] = useState(true);
   const [showCardBalances, setShowCardBalances] = useState(true);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const unreadNotificationCount = useNotificationStore(
     (state) => state.unreadCount,
   );
 
   useDashboardBootstrap(currentUser?.id);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    AsyncStorage.getItem(BALANCE_VISIBILITY_STORAGE_KEY)
+      .then((stored) => {
+        if (!stored || !isMounted) {
+          return;
+        }
+
+        const parsed = JSON.parse(stored) as {
+          showTotalBalance?: boolean;
+          showCardBalances?: boolean;
+        };
+
+        if (typeof parsed.showTotalBalance === "boolean") {
+          setShowTotalBalance(parsed.showTotalBalance);
+        }
+
+        if (typeof parsed.showCardBalances === "boolean") {
+          setShowCardBalances(parsed.showCardBalances);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(
+      BALANCE_VISIBILITY_STORAGE_KEY,
+      JSON.stringify({
+        showTotalBalance,
+        showCardBalances,
+      }),
+    ).catch(() => undefined);
+  }, [showCardBalances, showTotalBalance]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
 
   const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
   const cardAccounts = visibleAccounts.filter(
@@ -590,6 +661,14 @@ export default function HomeScreen() {
   const totalBalanceValue = summary?.totalBalance ?? totalBalanceIncludingCash;
   const hiddenMoneyValue = "••••••";
   const hiddenCardDigits = "••••";
+  const greetingText = useMemo(
+    () => getGreetingForHour(currentTime.getHours()),
+    [currentTime],
+  );
+  const balanceContextLabel = useMemo(
+    () => formatHomeContextDate(currentTime),
+    [currentTime],
+  );
 
   const pageStyles = useMemo(
     () => ({
@@ -659,7 +738,7 @@ export default function HomeScreen() {
       headline: topCategory
         ? `${spendingLabel} is your top spend`
         : "Your dashboard is ready",
-      body: `${goalLabel}. ${topCategory ? formatCurrency(topCategory.total) + " spent there so far." : "Start adding transactions to fill this view."}`,
+      body: `${goalLabel}. ${topCategory ? formatCurrency(topCategory.total) + " spent there this month." : "Start adding transactions to fill this month's view."}`,
       pill: topCategory ? "Spending pulse" : "Ready",
     };
   }, [error, goalsProgress, isLoading, spendingBreakdown, summary]);
@@ -679,7 +758,7 @@ export default function HomeScreen() {
               </View>
               <View>
                 <Text style={[styles.greeting, pageStyles.mutedText]}>
-                  Good evening
+                  {greetingText}
                 </Text>
                 <Text style={[styles.userName, { color: colors.foreground }]}>
                   {currentUser?.first_name ?? "You"}
@@ -788,8 +867,8 @@ export default function HomeScreen() {
                     : styles.growthPillDark,
                 ]}
               >
-                <Text style={styles.growthText}>+12.5%</Text>
-                <Text style={styles.growthSubtext}>vs last month</Text>
+                <Text style={styles.growthText}>{balanceContextLabel}</Text>
+                <Text style={styles.growthSubtext}>Updated today</Text>
               </View>
             </View>
 
@@ -809,9 +888,7 @@ export default function HomeScreen() {
             <View style={styles.metricsRow}>
               <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
                 <View style={styles.metricLabelRow}>
-                  <View
-                    style={[styles.metricDot, { backgroundColor: "#14B86A" }]}
-                  />
+                  <Feather name="arrow-up-right" size={13} color="#14B86A" />
                   <Text style={[styles.metricLabel, pageStyles.mutedText]}>
                     Income
                   </Text>
@@ -827,8 +904,10 @@ export default function HomeScreen() {
 
               <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
                 <View style={styles.metricLabelRow}>
-                  <View
-                    style={[styles.metricDot, { backgroundColor: "#F05454" }]}
+                  <Feather
+                    name="arrow-down-right"
+                    size={13}
+                    color="#F05454"
                   />
                   <Text style={[styles.metricLabel, pageStyles.mutedText]}>
                     Expenses
@@ -1753,10 +1832,11 @@ const styles = StyleSheet.create({
   },
   growthText: {
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 15,
     fontWeight: fontWeights.bold,
     color: "#12A25D",
+    textAlign: "center",
   },
   growthSubtext: {
     marginTop: 1,
@@ -1764,6 +1844,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
     color: "#4D8D6A",
+    textAlign: "center",
   },
   balanceAmountBlock: {
     marginTop: 10,
