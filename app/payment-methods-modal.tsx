@@ -16,6 +16,7 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { accountsService } from "@/src/db/services";
+import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export default function PaymentMethodsModal() {
@@ -116,13 +117,26 @@ export default function PaymentMethodsModal() {
   );
 
   const handleDeleteAccount = async () => {
-    if (!deletingAccountId) return;
+    if (!deletingAccountId || !accountToDelete) return;
+
+    const deletingAccount = accountToDelete;
+    const deletingAccountLabel =
+      deletingAccount.type === "ewallet" ? "Wallet" : "Card";
+    const deletingAccountName = resolveBrandName(deletingAccount);
 
     setIsDeleting(true);
     try {
-      await accountsService.delete(deletingAccountId);
+      await accountsService.delete(deletingAccountId, { notifySuccess: false });
       await refresh();
       setDeletingAccountId(null);
+      setTimeout(() => {
+        showSuccessToast({
+          title: `${deletingAccountLabel} Deleted`,
+          message: `${deletingAccountName} was removed successfully.`,
+          dedupeKey: `settings:${deletingAccountLabel.toLowerCase()}:delete:${deletingAccount.id}`,
+          source: "settings-payment-methods",
+        });
+      }, 240);
     } catch {
       showSnackbar("Failed to delete account. Please try again.");
     } finally {

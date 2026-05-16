@@ -51,10 +51,12 @@ function accountLabel(type: string) {
   return "Card";
 }
 
-function pickCanonicalCashAccount<T extends Pick<Account, "id" | "userId" | "balance" | "createdAt" | "updatedAt">>(
-  cashAccounts: T[],
-  transactionCounts = new Map<string, number>(),
-) {
+function pickCanonicalCashAccount<
+  T extends Pick<
+    Account,
+    "id" | "userId" | "balance" | "createdAt" | "updatedAt"
+  >,
+>(cashAccounts: T[], transactionCounts = new Map<string, number>()) {
   return [...cashAccounts].sort((left, right) => {
     const leftHasTransactions = (transactionCounts.get(left.id) ?? 0) > 0;
     const rightHasTransactions = (transactionCounts.get(right.id) ?? 0) > 0;
@@ -80,7 +82,9 @@ function pickCanonicalCashAccount<T extends Pick<Account, "id" | "userId" | "bal
       return updatedDelta;
     }
 
-    return new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+    return (
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+    );
   })[0];
 }
 
@@ -129,8 +133,12 @@ export type CreateAccountInput = Omit<
   isHidden?: boolean;
 };
 
+type AccountMutationOptions = {
+  notifySuccess?: boolean;
+};
+
 export class AccountsService {
-  async create(input: CreateAccountInput) {
+  async create(input: CreateAccountInput, options?: AccountMutationOptions) {
     assertRequiredText(input.userId, "userId");
     assertRequiredText(input.name, "account name");
     assertAccountType(input.type);
@@ -153,7 +161,11 @@ export class AccountsService {
       await enqueueSync("accounts", created.id, "upsert", created.userId);
     }
     emitAccountsChanged();
-    if (created && created.type !== "cash") {
+    if (
+      (options?.notifySuccess ?? true) &&
+      created &&
+      created.type !== "cash"
+    ) {
       showSuccessToast({
         title: `${accountLabel(created.type)} added`,
         message: `${created.name} is ready to use.`,
@@ -209,7 +221,9 @@ export class AccountsService {
           `[accounts:cash] No deterministic ID, checking for any CASH`,
         );
         const accounts = await accountsRepository.findAllByUser(userId);
-        const cashAccounts = accounts.filter((account) => account.type === "cash");
+        const cashAccounts = accounts.filter(
+          (account) => account.type === "cash",
+        );
         const existingCashAccount = pickCanonicalCashAccount(cashAccounts);
 
         if (existingCashAccount) {
@@ -247,7 +261,11 @@ export class AccountsService {
     return request;
   }
 
-  async update(id: string, input: Partial<NewAccount>) {
+  async update(
+    id: string,
+    input: Partial<NewAccount>,
+    options?: AccountMutationOptions,
+  ) {
     if (input.type) {
       assertAccountType(input.type);
     }
@@ -268,7 +286,11 @@ export class AccountsService {
       await enqueueSync("accounts", updated.id, "upsert", updated.userId);
     }
     emitAccountsChanged();
-    if (updated && updated.type !== "cash") {
+    if (
+      (options?.notifySuccess ?? true) &&
+      updated &&
+      updated.type !== "cash"
+    ) {
       showSuccessToast({
         title: `${accountLabel(updated.type)} updated`,
         message: "Your account changes were saved successfully.",
@@ -279,23 +301,21 @@ export class AccountsService {
     return updated;
   }
 
-  async delete(id: string) {
+  async delete(id: string, options?: AccountMutationOptions) {
     const existing = await accountsRepository.findById(id);
     if (!existing) {
       return;
     }
 
-    const deleted = await accountsRepository.update(id, prepareDeleteForSync());
-    if (deleted) {
-      await enqueueSync("accounts", deleted.id, "delete", deleted.userId);
-      if (deleted.type !== "cash") {
-        showSuccessToast({
-          title: `${accountLabel(deleted.type)} deleted`,
-          message: `${deleted.name} was removed successfully.`,
-          dedupeKey: `account:delete:${deleted.id}`,
-          source: "accounts-service",
-        });
-      }
+    await accountsRepository.update(id, prepareDeleteForSync());
+    await enqueueSync("accounts", existing.id, "delete", existing.userId);
+    if ((options?.notifySuccess ?? true) && existing.type !== "cash") {
+      showSuccessToast({
+        title: `${accountLabel(existing.type)} deleted`,
+        message: `${existing.name} was removed successfully.`,
+        dedupeKey: `account:delete:${existing.id}`,
+        source: "accounts-service",
+      });
     }
     emitAccountsChanged();
   }
@@ -308,8 +328,7 @@ export class AccountsService {
       const cashRows = rows
         .filter((account) => account.type === "cash")
         .map(
-          (account) =>
-            `${account.id}:${account.balance}:${account.updatedAt}`,
+          (account) => `${account.id}:${account.balance}:${account.updatedAt}`,
         );
       console.log("[accounts:cash] Display deduped duplicate CASH rows", {
         before: rows.length,
@@ -333,7 +352,8 @@ export class AccountsService {
     try {
       // Import db and accounts schema to query directly
       const { db } = await import("../client");
-      const { accounts: accountsTable, transactions } = await import("../schema");
+      const { accounts: accountsTable, transactions } =
+        await import("../schema");
 
       // Get all CASH accounts that aren't deleted
       const allCashAccounts = await db
@@ -415,11 +435,14 @@ export class AccountsService {
             if (account.id !== keepAccount!.id) {
               const transactionCount = transactionCounts.get(account.id) ?? 0;
               if (hasMeaningfulBalance(account) || transactionCount > 0) {
-                console.log("[accounts:cleanup] Preserving non-empty CASH duplicate", {
-                  id: account.id,
-                  balance: account.balance,
-                  transactionCount,
-                });
+                console.log(
+                  "[accounts:cleanup] Preserving non-empty CASH duplicate",
+                  {
+                    id: account.id,
+                    balance: account.balance,
+                    transactionCount,
+                  },
+                );
                 continue;
               }
 

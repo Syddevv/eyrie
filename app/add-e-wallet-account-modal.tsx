@@ -17,11 +17,11 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { showSuccessToast } from "@/store/useToastStore";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
 import { WALLETS } from "@/constants/wallets";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { emitAccountsChanged } from "@/src/lib/dbSync";
 import Logo from "@/components/logo";
 import { getBrandTheme } from "@/constants/brand-themes";
 
@@ -152,7 +152,9 @@ export default function AddEWalletAccountModal() {
         (account) =>
           !account.isHidden &&
           account.type === "ewallet" &&
-          account.name.toLowerCase().includes(selectedWallet.name.toLowerCase()),
+          account.name
+            .toLowerCase()
+            .includes(selectedWallet.name.toLowerCase()),
       ),
     [accounts, selectedWallet.name],
   );
@@ -375,22 +377,32 @@ export default function AddEWalletAccountModal() {
               }
 
               try {
-                await accountsService.create({
-                  userId: user?.id ?? "",
-                  name: selectedWallet.name,
-                  type: "ewallet",
-                  balance: Number(balance) || 0,
-                  currencyCode: undefined as any,
-                  color: selectedWallet.color,
-                  icon: null,
-                });
+                const created = await accountsService.create(
+                  {
+                    userId: user?.id ?? "",
+                    name: selectedWallet.name,
+                    type: "ewallet",
+                    balance: Number(balance) || 0,
+                    currencyCode: undefined as any,
+                    color: selectedWallet.color,
+                    icon: null,
+                  },
+                  { notifySuccess: false },
+                );
 
-                emitAccountsChanged();
+                router.dismissTo(parentTo);
+                setTimeout(() => {
+                  showSuccessToast({
+                    title: "Wallet Added",
+                    message: `${selectedWallet.name} is ready to use.`,
+                    dedupeKey: `settings:wallet:add:${created?.id ?? "unknown"}`,
+                    source: "settings-add-wallet",
+                  });
+                }, 240);
               } catch {
                 // ignore
+                return;
               }
-
-              router.back();
             }}
           >
             <Text style={[styles.connectButtonText, ui.buttonText]}>

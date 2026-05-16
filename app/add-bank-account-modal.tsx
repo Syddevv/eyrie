@@ -19,10 +19,10 @@ import { CARD_NETWORKS } from "@/constants/cardNetworks";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { showSuccessToast } from "@/store/useToastStore";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { emitAccountsChanged } from "@/src/lib/dbSync";
 
 function formatCardNumber(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 16);
@@ -86,7 +86,9 @@ export default function AddBankAccountModal() {
             (account) =>
               !account.isHidden &&
               (account.type === "bank" || account.type === "credit") &&
-              account.name.toLowerCase().includes(selectedBank.name.toLowerCase()),
+              account.name
+                .toLowerCase()
+                .includes(selectedBank.name.toLowerCase()),
           )
         : false,
     [accounts, selectedBank],
@@ -318,25 +320,35 @@ export default function AddBankAccountModal() {
               const last4 = cardNumber.replace(/\D/g, "").slice(-4) || null;
 
               try {
-                await accountsService.create({
-                  userId: user?.id ?? "",
-                  name: selectedBank?.name ?? cardholderName.trim(),
-                  accountHolderName: cardholderName.trim() || null,
-                  type: "bank",
-                  balance: Number(balance) || 0,
-                  currencyCode: undefined as any,
-                  accountNumberLast4: last4,
-                  color: selectedBank?.primaryColor || "#6DB2EE",
-                  // store selected card network id so we can show Visa/Mastercard later
-                  icon: selectedCardType?.id ?? null,
-                });
+                const created = await accountsService.create(
+                  {
+                    userId: user?.id ?? "",
+                    name: selectedBank?.name ?? cardholderName.trim(),
+                    accountHolderName: cardholderName.trim() || null,
+                    type: "bank",
+                    balance: Number(balance) || 0,
+                    currencyCode: undefined as any,
+                    accountNumberLast4: last4,
+                    color: selectedBank?.primaryColor || "#6DB2EE",
+                    // store selected card network id so we can show Visa/Mastercard later
+                    icon: selectedCardType?.id ?? null,
+                  },
+                  { notifySuccess: false },
+                );
 
-                emitAccountsChanged();
+                router.dismissTo(parentTo);
+                setTimeout(() => {
+                  showSuccessToast({
+                    title: "Card Added",
+                    message: `${selectedBank?.name ?? "Card"} is ready to use.`,
+                    dedupeKey: `settings:card:add:${created?.id ?? "unknown"}`,
+                    source: "settings-add-card",
+                  });
+                }, 240);
               } catch {
                 // ignore - global feedback handled elsewhere
+                return;
               }
-
-              router.back();
             }}
           >
             <Text style={[styles.addButtonText, ui.buttonText]}>Add Card</Text>

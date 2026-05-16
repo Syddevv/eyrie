@@ -16,6 +16,7 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { showSuccessToast } from "@/store/useToastStore";
 import { accountsService } from "@/src/db/services";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -219,19 +220,27 @@ export default function EditPaymentCardModal() {
     try {
       const brandName = resolveBrandName(account);
 
-      await accountsService.update(account.id, {
-        name: brandName,
-        accountHolderName: accountName.trim() || null,
-        accountNumberLast4:
-          formatDigits(accountNumber, 16).slice(-4) || null,
-        balance: parseFloat(balance) || 0,
-      });
+      await accountsService.update(
+        account.id,
+        {
+          name: brandName,
+          accountHolderName: accountName.trim() || null,
+          accountNumberLast4: formatDigits(accountNumber, 16).slice(-4) || null,
+          balance: parseFloat(balance) || 0,
+        },
+        { notifySuccess: false },
+      );
 
       refresh();
-      router.replace({
-        pathname: "/payment-card-details-modal",
-        params: { accountId: account.id },
-      });
+      router.dismissTo("/payment-methods-modal");
+      setTimeout(() => {
+        showSuccessToast({
+          title: "Card Updated",
+          message: "Your card changes were saved successfully.",
+          dedupeKey: `settings:card:update:${account.id}`,
+          source: "settings-edit-card",
+        });
+      }, 240);
     } catch {
       showSnackbar("Failed to update card");
     } finally {
@@ -358,7 +367,9 @@ export default function EditPaymentCardModal() {
             <View style={[styles.fieldSurface, ui.fieldSurface]}>
               <TextInput
                 value={accountNumber}
-                onChangeText={(value) => setAccountNumber(formatCardNumber(value))}
+                onChangeText={(value) =>
+                  setAccountNumber(formatCardNumber(value))
+                }
                 placeholder="1234 5678 9012 3456"
                 placeholderTextColor={ui.placeholder.color}
                 keyboardType="number-pad"

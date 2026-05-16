@@ -16,6 +16,7 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { showSuccessToast } from "@/store/useToastStore";
 import { accountsService } from "@/src/db/services";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -198,16 +199,25 @@ export default function EditPaymentWalletModal() {
     try {
       const brandName = resolveBrandName(account);
 
-      await accountsService.update(account.id, {
-        name: brandName,
-        balance: parseFloat(balance) || 0,
-      });
+      await accountsService.update(
+        account.id,
+        {
+          name: brandName,
+          balance: parseFloat(balance) || 0,
+        },
+        { notifySuccess: false },
+      );
 
       refresh();
-      router.replace({
-        pathname: "/payment-wallet-details-modal",
-        params: { accountId: account.id },
-      });
+      router.dismissTo("/payment-methods-modal");
+      setTimeout(() => {
+        showSuccessToast({
+          title: "Wallet Updated",
+          message: "Your wallet changes were saved successfully.",
+          dedupeKey: `settings:wallet:update:${account.id}`,
+          source: "settings-edit-wallet",
+        });
+      }, 240);
     } catch {
       showSnackbar("Failed to update wallet");
     } finally {
