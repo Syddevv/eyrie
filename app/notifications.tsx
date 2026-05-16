@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -10,7 +10,12 @@ import {
   Text,
   View,
 } from "react-native";
-import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import {
+  Pressable as GestureHandlerPressable,
+} from "react-native-gesture-handler";
+import Swipeable, {
+  type SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   FadeInDown,
   FadeOutUp,
@@ -89,33 +94,61 @@ function NotificationRow({
   cardStyle: object;
   unreadDotStyle: object;
   onPress: () => void;
-  onToggleRead: () => void;
-  onDelete: () => void;
+  onToggleRead: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
-  const rightAction = () => (
-    <Pressable
+  const swipeableRef = useRef<SwipeableMethods | null>(null);
+
+  const handleToggleRead = async (swipeable: SwipeableMethods) => {
+    try {
+      await onToggleRead();
+    } finally {
+      swipeable.close();
+      swipeable.reset();
+    }
+  };
+
+  const handleDelete = async (swipeable: SwipeableMethods) => {
+    try {
+      await onDelete();
+    } finally {
+      swipeable.close();
+      swipeable.reset();
+    }
+  };
+
+  const rightAction = (
+    _progress: unknown,
+    _translation: unknown,
+    swipeable: SwipeableMethods,
+  ) => (
+    <GestureHandlerPressable
       style={[styles.swipeAction, styles.swipeDelete]}
-      onPress={onDelete}
+      onPress={() => void handleDelete(swipeable)}
     >
       <Feather name="trash-2" size={18} color="#FFFFFF" />
       <Text style={styles.swipeActionText}>Delete</Text>
-    </Pressable>
+    </GestureHandlerPressable>
   );
 
-  const leftAction = () => (
-    <Pressable
+  const leftAction = (
+    _progress: unknown,
+    _translation: unknown,
+    swipeable: SwipeableMethods,
+  ) => (
+    <GestureHandlerPressable
       style={[styles.swipeAction, styles.swipeRead]}
-      onPress={onToggleRead}
+      onPress={() => void handleToggleRead(swipeable)}
     >
       <Feather
-        name={item.is_read ? "mail" : "check"}
+        name={item.is_read ? "mail" : "check-circle"}
         size={18}
         color="#FFFFFF"
       />
       <Text style={styles.swipeActionText}>
-        {item.is_read ? "Unread" : "Read"}
+        {item.is_read ? "Mark unread" : "Mark read"}
       </Text>
-    </Pressable>
+    </GestureHandlerPressable>
   );
 
   return (
@@ -126,6 +159,7 @@ function NotificationRow({
     >
       <View style={[styles.notificationCardContainer, cardStyle, shadows.soft]}>
         <Swipeable
+          ref={swipeableRef}
           renderLeftActions={leftAction}
           renderRightActions={rightAction}
           overshootLeft={false}
@@ -243,14 +277,14 @@ export default function NotificationsScreen() {
       infoTitle: { color: isDark ? "#FFFFFF" : "#0D1B2A" },
       infoText: { color: isDark ? "#A5B2C2" : "#5C7694" },
       unreadCard: {
-        backgroundColor: isDark ? "#111C2B" : "#FFFFFF",
-        borderColor: isDark ? "rgba(20,149,255,0.34)" : "rgba(20,149,255,0.24)",
+        backgroundColor: isDark ? "#12233B" : "#F8FCFF",
+        borderColor: isDark ? "rgba(20,149,255,0.38)" : "rgba(20,149,255,0.26)",
       },
       readCard: {
-        backgroundColor: isDark ? "#101722" : colors.card,
+        backgroundColor: isDark ? "#0F1724" : "#F4F7FB",
         borderColor: isDark
-          ? "rgba(255,255,255,0.16)"
-          : withOpacity(colors.border, 1),
+          ? "rgba(255,255,255,0.12)"
+          : withOpacity(colors.border, 0.9),
       },
       swipeHintChip: {
         backgroundColor: isDark
@@ -416,10 +450,10 @@ export default function NotificationsScreen() {
                   }
                 }}
                 onToggleRead={() => {
-                  void toggleRead(item, !item.is_read);
+                  return toggleRead(item, !item.is_read);
                 }}
                 onDelete={() => {
-                  void deleteNotification(item);
+                  return deleteNotification(item);
                 }}
               />
             ))}
