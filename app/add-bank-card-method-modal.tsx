@@ -229,17 +229,21 @@ export default function AddBankCardMethodModal() {
                 ]}
                 onPress={() => setSelectedCardType(cardType.id)}
               >
-                <View
-                  style={[
-                    styles.logoBubble,
-                    { backgroundColor: cardType.primaryColor || "#6DB2EE" },
-                  ]}
-                >
-                  <Text style={styles.logoText}>
-                    {(cardType.shortName || cardType.name)
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </Text>
+                <View style={styles.logoBubble}>
+                  {cardType.logo ? (
+                    <Logo
+                      logo={cardType.logo}
+                      size={34}
+                      backgroundColor={cardType.primaryColor || "#6DB2EE"}
+                      style={{ borderRadius: 10 }}
+                    />
+                  ) : (
+                    <Text style={styles.logoText}>
+                      {(cardType.shortName || cardType.name)
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <Text
                   style={[styles.cardTypeLabel, ui.optionText]}
