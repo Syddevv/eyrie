@@ -30,6 +30,7 @@ import {
 import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
+import { usersService } from "./usersService";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
@@ -168,6 +169,7 @@ export class TransactionsService {
     emitAccountsChanged();
     emitMerchantsChanged();
     emitTransactionsChanged();
+    await usersService.markUserActive(created.userId).catch(() => undefined);
     await enqueueSync("transactions", created.id, "upsert", created.userId);
     await this.enqueueTransactionDependencies([created]);
     showSuccessToast({

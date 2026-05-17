@@ -79,6 +79,21 @@ const SCHEMA_SPECS: TableSpec[] = [
         sql: "ALTER TABLE users ADD COLUMN sync_error TEXT;",
         recoverable: true,
       },
+      {
+        name: "current_streak",
+        sql: "ALTER TABLE users ADD COLUMN current_streak INTEGER NOT NULL DEFAULT 0;",
+        recoverable: true,
+      },
+      {
+        name: "last_active_date",
+        sql: "ALTER TABLE users ADD COLUMN last_active_date TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "longest_streak",
+        sql: "ALTER TABLE users ADD COLUMN longest_streak INTEGER NOT NULL DEFAULT 0;",
+        recoverable: true,
+      },
     ],
   },
   {

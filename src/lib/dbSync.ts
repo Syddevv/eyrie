@@ -6,6 +6,7 @@ const categoryListeners = new Set<Callback>();
 const goalListeners = new Set<Callback>();
 const merchantListeners = new Set<Callback>();
 const transactionListeners = new Set<Callback>();
+const userListeners = new Set<Callback>();
 
 export function onAccountsChanged(cb: Callback) {
   accountListeners.add(cb);
@@ -65,6 +66,13 @@ export function onGoalsChanged(cb: Callback) {
   };
 }
 
+export function onUsersChanged(cb: Callback) {
+  userListeners.add(cb);
+  return () => {
+    userListeners.delete(cb);
+  };
+}
+
 export function onMerchantsChanged(cb: Callback) {
   merchantListeners.add(cb);
   return () => {
@@ -99,6 +107,16 @@ export function emitTransactionsChanged() {
   }
 }
 
+export function emitUsersChanged() {
+  for (const cb of Array.from(userListeners)) {
+    try {
+      cb();
+    } catch {
+      // swallow
+    }
+  }
+}
+
 export function emitGoalsChanged() {
   for (const cb of Array.from(goalListeners)) {
     try {
@@ -114,6 +132,7 @@ export function emitGoalsChanged() {
  * Called after sync restore completes to update all screens
  */
 export function emitAllChanges() {
+  emitUsersChanged();
   emitAccountsChanged();
   emitBudgetsChanged();
   emitCategoriesChanged();
@@ -131,6 +150,8 @@ export default {
   emitCategoriesChanged,
   onGoalsChanged,
   emitGoalsChanged,
+  onUsersChanged,
+  emitUsersChanged,
   onMerchantsChanged,
   emitMerchantsChanged,
   onTransactionsChanged,

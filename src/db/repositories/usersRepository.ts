@@ -18,6 +18,9 @@ export class UsersRepository {
     email?: string | null;
     avatarUrl?: string | null;
     currencyCode?: string;
+    currentStreak?: number;
+    lastActiveDate?: string | null;
+    longestStreak?: number;
     createdAt: string;
     updatedAt: string;
   }) {

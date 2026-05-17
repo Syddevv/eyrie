@@ -5,6 +5,7 @@ import { nowIso } from "../utils/time";
 import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
 import { prepareCreateForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
+import { emitUsersChanged } from "@/src/lib/dbSync";
 
 type LocalUser = {
   id: string;
@@ -12,9 +13,29 @@ type LocalUser = {
   email?: string | null;
   avatarUrl?: string | null;
   currencyCode?: string;
+  currentStreak?: number;
+  lastActiveDate?: string | null;
+  longestStreak?: number;
   createdAt: string;
   updatedAt: string;
 };
+
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return Date.UTC(year, (month ?? 1) - 1, day ?? 1);
+}
+
+function diffDays(left: string, right: string) {
+  const msPerDay = 86_400_000;
+  return Math.round((parseDateKey(left) - parseDateKey(right)) / msPerDay);
+}
 
 export class UsersService {
   /**
@@ -39,17 +60,22 @@ export class UsersService {
     const existing = await usersRepository.findById(id);
 
     if (!existing) {
-      return usersRepository.create({
+      const created = await usersRepository.create({
         ...prepareCreateForSync({
           id,
           fullName,
           email,
           avatarUrl,
           currencyCode: undefined as any,
+          currentStreak: 0,
+          lastActiveDate: null,
+          longestStreak: 0,
           createdAt: now,
           updatedAt: now,
         }),
-      }) as Promise<LocalUser>;
+      }) as LocalUser;
+      emitUsersChanged();
+      return created;
     }
 
     // Update changed fields if necessary
@@ -61,7 +87,9 @@ export class UsersService {
 
     if (Object.keys(updates).length > 0) {
       updates.updatedAt = now;
-      return usersRepository.update(id, updates) as Promise<LocalUser>;
+      const updated = (await usersRepository.update(id, updates)) as LocalUser;
+      emitUsersChanged();
+      return updated;
     }
 
     return existing as LocalUser;
@@ -100,6 +128,7 @@ export class UsersService {
       prepareUpdateForSync(updates),
     )) as LocalUser;
     await enqueueSync("users", updated.id, "upsert", updated.id);
+    emitUsersChanged();
     return updated;
   }
 
@@ -115,6 +144,45 @@ export class UsersService {
       }),
     )) as LocalUser;
     await enqueueSync("users", updated.id, "upsert", updated.id);
+    emitUsersChanged();
+    return updated;
+  }
+
+  async markUserActive(id: string) {
+    const existing = (await usersRepository.findById(id)) as LocalUser | null;
+    if (!existing) {
+      return null;
+    }
+
+    const today = getLocalDateKey();
+    const previousDate = existing.lastActiveDate ?? null;
+
+    if (previousDate === today) {
+      return existing;
+    }
+
+    const previousStreak = existing.currentStreak ?? 0;
+    const nextCurrentStreak =
+      previousDate && diffDays(today, previousDate) === 1
+        ? previousStreak + 1
+        : 1;
+    const nextLongestStreak = Math.max(
+      existing.longestStreak ?? 0,
+      nextCurrentStreak,
+    );
+
+    const updated = (await usersRepository.update(
+      id,
+      prepareUpdateForSync({
+        currentStreak: nextCurrentStreak,
+        lastActiveDate: today,
+        longestStreak: nextLongestStreak,
+        updatedAt: nowIso(),
+      }),
+    )) as LocalUser;
+
+    await enqueueSync("users", updated.id, "upsert", updated.id);
+    emitUsersChanged();
     return updated;
   }
 }

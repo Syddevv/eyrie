@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
+import { useProfileStats } from "@/hooks/useProfileStats";
 import { setThemePreference } from "@/hooks/theme-preference";
 import { signOut } from "@/services/auth";
 
@@ -94,6 +95,13 @@ export default function SettingsScreen() {
   const { isSigningOut } = useAuth();
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
+  const {
+    currentStreak,
+    transactionCount,
+    activeGoalsCount,
+    budgetHealthScore,
+    isLoading: isProfileStatsLoading,
+  } = useProfileStats();
   const [isThemeSaving, setIsThemeSaving] = useState(false);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
   const [notificationToggleValue, setNotificationToggleValue] = useState(false);
@@ -253,26 +261,32 @@ export default function SettingsScreen() {
             <View style={[styles.streakChip, pageStyles.streakChip]}>
               <Ionicons name="flame" size={16} color="#FF8A1F" />
               <Text style={[styles.streakText, pageStyles.streakText]}>
-                127 Day Streak
+                {isProfileStatsLoading ? "..." : currentStreak} Day Streak
               </Text>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={[styles.statCard, pageStyles.statCard, shadows.soft]}>
-              <Text style={[styles.statValue, pageStyles.title]}>127</Text>
+              <Text style={[styles.statValue, pageStyles.title]}>
+                {isProfileStatsLoading ? "--" : transactionCount}
+              </Text>
               <Text style={[styles.statLabel, pageStyles.subtitle]}>
                 Transactions
               </Text>
             </View>
             <View style={[styles.statCard, pageStyles.statCard, shadows.soft]}>
-              <Text style={[styles.statValue, pageStyles.title]}>85</Text>
+              <Text style={[styles.statValue, pageStyles.title]}>
+                {isProfileStatsLoading ? "--" : budgetHealthScore}
+              </Text>
               <Text style={[styles.statLabel, pageStyles.subtitle]}>
-                Health Score
+                Budget Health
               </Text>
             </View>
             <View style={[styles.statCard, pageStyles.statCard, shadows.soft]}>
-              <Text style={[styles.statValue, pageStyles.title]}>4</Text>
+              <Text style={[styles.statValue, pageStyles.title]}>
+                {isProfileStatsLoading ? "--" : activeGoalsCount}
+              </Text>
               <Text style={[styles.statLabel, pageStyles.subtitle]}>
                 Goals Active
               </Text>

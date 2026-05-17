@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { navigationThemes } from "@/constants/theme";
 import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
+import { useUserActivityTracker } from "@/hooks/useUserActivityTracker";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { DatabaseProvider } from "@/src/db/DatabaseProvider";
@@ -19,6 +20,7 @@ export const unstable_settings = {
 
 function AppShell() {
   useNotificationBootstrap();
+  useUserActivityTracker();
 
   return (
     <Stack>

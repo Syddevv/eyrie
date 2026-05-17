@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 import { usersService } from "@/src/db/services";
+import { onUsersChanged } from "@/src/lib/dbSync";
 import { useAuthStore } from "@/store/useAuthStore";
 
 type CurrentUser = {
@@ -11,6 +12,9 @@ type CurrentUser = {
   email?: string | null;
   avatar_url?: string | null;
   currency_code?: string | null;
+  current_streak?: number;
+  last_active_date?: string | null;
+  longest_streak?: number;
 };
 
 type CurrentUserSnapshot = {
@@ -43,6 +47,9 @@ function toCurrentUser(local: {
   email?: string | null;
   avatarUrl?: string | null;
   currencyCode?: string | null;
+  currentStreak?: number | null;
+  lastActiveDate?: string | null;
+  longestStreak?: number | null;
 }): CurrentUser {
   return {
     id: local.id,
@@ -51,6 +58,9 @@ function toCurrentUser(local: {
     email: local.email ?? null,
     avatar_url: local.avatarUrl ?? null,
     currency_code: local.currencyCode ?? null,
+    current_streak: local.currentStreak ?? 0,
+    last_active_date: local.lastActiveDate ?? null,
+    longest_streak: local.longestStreak ?? 0,
   };
 }
 
@@ -153,6 +163,30 @@ export function useCurrentUser() {
       });
     });
   }, [refresh, supabaseUser]);
+
+  useEffect(() => {
+    if (!supabaseUser) {
+      return;
+    }
+
+    const off = onUsersChanged(() => {
+      usersService
+        .fetchLocalUser(supabaseUser.id)
+        .then((local) => {
+          if (!local) {
+            return;
+          }
+
+          publishSnapshot({
+            user: toCurrentUser(local),
+            isLoading: false,
+          });
+        })
+        .catch(() => undefined);
+    });
+
+    return off;
+  }, [supabaseUser]);
 
   return {
     user: snapshot.user,

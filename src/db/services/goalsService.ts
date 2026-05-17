@@ -29,6 +29,7 @@ import {
 } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
+import { usersService } from "./usersService";
 
 export type CreateGoalInput = Omit<
   NewGoal,
@@ -87,6 +88,9 @@ export class GoalsService {
       await enqueueSync("saving_goals", created.id, "upsert", created.userId);
     }
     emitGoalsChanged();
+    if (created) {
+      await usersService.markUserActive(created.userId).catch(() => undefined);
+    }
     if (created) {
       showSuccessToast({
         title: "Goal created",
@@ -295,6 +299,7 @@ export class GoalsService {
     if (payload.walletId) {
       emitAccountsChanged();
     }
+    await usersService.markUserActive(created.userId).catch(() => undefined);
 
     if (created?.contribution) {
       await enqueueSync(
