@@ -66,6 +66,7 @@ export default function PaymentWalletDetailsModal() {
   const account = accounts.find((a) => a.id === accountId);
   const { isRunning: isSettingDefault, run: runSetDefault } = useAsyncAction();
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
+  const isCashAccount = account?.type === "cash";
 
   const resolveBrandName = (acct: any) => {
     const nameLower = (acct?.name || "").toLowerCase();
@@ -269,7 +270,7 @@ export default function PaymentWalletDetailsModal() {
             >
               <Feather name="edit-2" size={16} color={ui.actionText.color} />
               <Text style={[styles.primaryButtonText, ui.actionText]}>
-                Edit Details
+                {isCashAccount ? "Edit Balance" : "Edit Details"}
               </Text>
             </Pressable>
             <LoadingActionButton

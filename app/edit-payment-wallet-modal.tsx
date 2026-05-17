@@ -120,6 +120,7 @@ export default function EditPaymentWalletModal() {
     ? params.accountId[0]
     : params.accountId;
   const account = accounts.find((a) => a.id === accountId);
+  const isCashAccount = account?.type === "cash";
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
 
   const [balance, setBalance] = useState((account?.balance ?? 0).toString());
@@ -198,16 +199,18 @@ export default function EditPaymentWalletModal() {
     if (!account) return;
 
     await run(async () => {
-      const brandName = resolveBrandName(account);
+      const updateInput = isCashAccount
+        ? {
+            balance: parseFloat(balance) || 0,
+          }
+        : {
+            name: resolveBrandName(account),
+            balance: parseFloat(balance) || 0,
+          };
 
-      await accountsService.update(
-        account.id,
-        {
-          name: brandName,
-          balance: parseFloat(balance) || 0,
-        },
-        { notifySuccess: false },
-      );
+      await accountsService.update(account.id, updateInput, {
+        notifySuccess: false,
+      });
 
       refresh();
       router.dismissTo("/payment-methods-modal");
@@ -250,7 +253,11 @@ export default function EditPaymentWalletModal() {
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>
-              {account ? resolveBrandName(account) : "Edit Wallet"}
+              {account
+                ? isCashAccount
+                  ? "Edit Cash Balance"
+                  : resolveBrandName(account)
+                : "Edit Wallet"}
             </Text>
             <Pressable
               disabled={isSaving}
@@ -289,7 +296,7 @@ export default function EditPaymentWalletModal() {
                   backgroundColor={brandTheme.primary}
                 />
                 <Text style={styles.heroLabel}>
-                  {resolveBrandName(account)}
+                  {isCashAccount ? "CASH" : resolveBrandName(account)}
                 </Text>
               </View>
             </View>
@@ -354,9 +361,9 @@ export default function EditPaymentWalletModal() {
               spinnerColor={ui.primaryButtonText.color}
               leftAdornment={
                 <Feather
-                name="check"
-                size={16}
-                color={ui.primaryButtonText.color}
+                  name="check"
+                  size={16}
+                  color={ui.primaryButtonText.color}
                 />
               }
             />

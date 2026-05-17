@@ -231,7 +231,13 @@ export default function PaymentMethodsModal() {
           </View>
 
           {/* Total assets */}
-          <View style={[styles.methodCard, ui.methodCard]}>
+          <View
+            style={[
+              styles.methodCard,
+              styles.totalAssetsCard,
+              isDark ? styles.totalAssetsCardDark : styles.totalAssetsCardLight,
+            ]}
+          >
             <View style={[styles.brandBubble, { backgroundColor: "#14B86A" }]}>
               <Text style={styles.brandText}>₱</Text>
             </View>
@@ -247,13 +253,6 @@ export default function PaymentMethodsModal() {
                   ? "---"
                   : formatCurrency(total)}
               </Text>
-            </View>
-            <View style={styles.methodRight}>
-              <Feather
-                name="chevron-right"
-                size={18}
-                color={ui.chevron.color}
-              />
             </View>
           </View>
 
@@ -276,12 +275,7 @@ export default function PaymentMethodsModal() {
             visibleAccounts.map((acct) => (
               <View key={acct.id}>
                 <Pressable
-                  style={[
-                    styles.methodCard,
-                    ui.methodCard,
-                    acct.type === "cash" && { opacity: 0.6 },
-                  ]}
-                  disabled={acct.type === "cash"}
+                  style={[styles.methodCard, ui.methodCard]}
                   onPress={() =>
                     router.replace({
                       pathname:
@@ -465,6 +459,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
+  },
+  totalAssetsCard: {
+    borderWidth: 1.5,
+    shadowColor: "#14B86A",
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
+  },
+  totalAssetsCardLight: {
+    backgroundColor: "#F1FBF5",
+    borderColor: "rgba(20, 184, 106, 0.28)",
+  },
+  totalAssetsCardDark: {
+    backgroundColor: "#113D2D",
+    borderColor: "rgba(20, 184, 106, 0.42)",
   },
   brandBubble: {
     width: 40,
