@@ -30,6 +30,11 @@ const SCHEMA_SPECS: TableSpec[] = [
         recoverable: true,
       },
       {
+        name: "is_default",
+        sql: "ALTER TABLE accounts ADD COLUMN is_default INTEGER NOT NULL DEFAULT false;",
+        recoverable: true,
+      },
+      {
         name: "deleted_at",
         sql: "ALTER TABLE accounts ADD COLUMN deleted_at TEXT;",
         recoverable: true,

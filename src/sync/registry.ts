@@ -88,6 +88,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       account_number_last4: row.accountNumberLast4 ?? null,
       color: row.color ?? null,
       icon: row.icon ?? null,
+      is_default: row.isDefault,
       is_hidden: row.isHidden,
     }),
     upsertLocal: async (row) => {
@@ -102,6 +103,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
         accountNumberLast4: (row.account_number_last4 as string | null) ?? null,
         color: (row.color as string | null) ?? null,
         icon: (row.icon as string | null) ?? null,
+        isDefault: Boolean(row.is_default),
         isHidden: Boolean(row.is_hidden),
         createdAt: String(row.created_at),
         updatedAt: String(row.updated_at),
@@ -121,6 +123,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
           accountNumberLast4: (row.account_number_last4 as string | null) ?? null,
           color: (row.color as string | null) ?? null,
           icon: (row.icon as string | null) ?? null,
+          isDefault: Boolean(row.is_default),
           isHidden: Boolean(row.is_hidden),
           updatedAt: String(row.updated_at),
           deletedAt: (row.deleted_at as string | null) ?? null,

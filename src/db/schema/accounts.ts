@@ -22,6 +22,7 @@ export const accounts = sqliteTable(
     accountNumberLast4: text("account_number_last4"),
     color: text("color"),
     icon: text("icon"),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
     isHidden: integer("is_hidden", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),

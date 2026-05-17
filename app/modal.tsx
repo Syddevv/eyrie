@@ -652,6 +652,10 @@ export default function AddTransactionModal() {
       todayRing: { borderColor: colors.primary },
       dayOutsideText: { color: isDark ? "#475569" : "#B2BCCB" },
       dropdownItemMuted: { color: colors.mutedForeground },
+      defaultPill: {
+        backgroundColor: isDark ? "rgba(96, 165, 250, 0.18)" : "#D9ECFF",
+      },
+      defaultPillText: { color: "#1495FF" },
     }),
     [colors, isDark],
   );
@@ -1135,14 +1139,25 @@ export default function AddTransactionModal() {
                     return null;
                   })()}
                   <View style={styles.selectFieldText}>
-                    <Text
-                      style={[styles.selectValue, ui.valueText]}
-                      numberOfLines={1}
-                    >
-                      {activePaymentMethod?.sublabel ??
-                        activePaymentMethod?.label ??
-                        "Cash"}
-                    </Text>
+                    <View style={styles.methodTitleRow}>
+                      <Text
+                        style={[styles.selectValue, ui.valueText]}
+                        numberOfLines={1}
+                      >
+                        {activePaymentMethod?.sublabel ??
+                          activePaymentMethod?.label ??
+                          "Cash"}
+                      </Text>
+                      {activePaymentMethod?.isDefault ? (
+                        <View style={[styles.defaultPill, ui.defaultPill]}>
+                          <Text
+                            style={[styles.defaultPillText, ui.defaultPillText]}
+                          >
+                            Default
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
                 <Feather name="chevron-down" size={18} color={ui.iconTint} />
@@ -1269,10 +1284,28 @@ export default function AddTransactionModal() {
                           })()}
 
                           <View style={styles.methodTextBlock}>
-                            <Text style={[styles.methodTitle, ui.valueText]}>
-                              {method.sublabel ??
-                                (method.isFallback ? "Cash" : "Active account")}
-                            </Text>
+                            <View style={styles.methodTitleRow}>
+                              <Text style={[styles.methodTitle, ui.valueText]}>
+                                {method.sublabel ??
+                                  (method.isFallback
+                                    ? "Cash"
+                                    : "Active account")}
+                              </Text>
+                              {method.isDefault ? (
+                                <View
+                                  style={[styles.defaultPill, ui.defaultPill]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.defaultPillText,
+                                      ui.defaultPillText,
+                                    ]}
+                                  >
+                                    Default
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
                             <Text
                               style={[
                                 styles.methodBalanceText,
@@ -1751,6 +1784,12 @@ const styles = StyleSheet.create({
   selectFieldText: {
     flex: 1,
   },
+  methodTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
   methodDropdown: {
     marginTop: 8,
     borderRadius: 18,
@@ -1821,6 +1860,20 @@ const styles = StyleSheet.create({
   },
   methodBalanceTextDanger: {
     color: "#DC2626",
+  },
+  defaultPill: {
+    height: 20,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  defaultPillText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.semibold,
   },
   inlineFieldsRow: {
     marginTop: 12,

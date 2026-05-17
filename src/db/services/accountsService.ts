@@ -1,5 +1,7 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
+import { db } from "../client";
+import { accounts } from "../schema";
 import { accountsRepository } from "../repositories/accountsRepository";
 import type { Account, NewAccount } from "../types";
 import { createId } from "../utils/ids";
@@ -49,6 +51,69 @@ function accountLabel(type: string) {
   }
 
   return "Card";
+}
+
+function compareAccountsForDisplay(
+  left: Pick<Account, "isDefault" | "updatedAt" | "createdAt" | "balance">,
+  right: Pick<Account, "isDefault" | "updatedAt" | "createdAt" | "balance">,
+) {
+  if (Boolean(left.isDefault) !== Boolean(right.isDefault)) {
+    return left.isDefault ? -1 : 1;
+  }
+
+  const updatedAtDelta =
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  if (updatedAtDelta !== 0) {
+    return updatedAtDelta;
+  }
+
+  const balanceDelta =
+    (Number(right.balance) || 0) - (Number(left.balance) || 0);
+  if (balanceDelta !== 0) {
+    return balanceDelta;
+  }
+
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}
+
+async function clearDuplicateDefaultsForUser(
+  userId: string,
+  rows: Account[],
+) {
+  const defaultAccounts = rows.filter((account) => account.isDefault);
+  if (defaultAccounts.length <= 1) {
+    return rows;
+  }
+
+  const [keepDefault, ...duplicateDefaults] = [...defaultAccounts].sort(
+    compareAccountsForDisplay,
+  );
+  const duplicateDefaultIds = duplicateDefaults.map((account) => account.id);
+  const timestamp = nowIso();
+
+  await db
+    .update(accounts)
+    .set(
+      prepareUpdateForSync({
+        isDefault: false,
+        updatedAt: timestamp,
+      }) as Partial<NewAccount>,
+    )
+    .where(inArray(accounts.id, duplicateDefaultIds));
+
+  for (const accountId of duplicateDefaultIds) {
+    await enqueueSync("accounts", accountId, "upsert", userId);
+  }
+
+  emitAccountsChanged();
+
+  return rows.map((account) =>
+    duplicateDefaultIds.includes(account.id)
+      ? { ...account, isDefault: false, updatedAt: timestamp }
+      : account.id === keepDefault.id
+        ? { ...account, isDefault: true }
+        : account,
+  );
 }
 
 function pickCanonicalCashAccount<
@@ -320,9 +385,76 @@ export class AccountsService {
     emitAccountsChanged();
   }
 
+  async setDefault(id: string, options?: AccountMutationOptions) {
+    const existing = await accountsRepository.findById(id);
+    if (!existing) {
+      return undefined;
+    }
+
+    const peerDefaultIds = (await accountsRepository.findAllByUser(existing.userId))
+      .filter((account) => account.id !== existing.id && account.isDefault)
+      .map((account) => account.id);
+
+    if (existing.isDefault && peerDefaultIds.length === 0) {
+      return existing;
+    }
+
+    const timestamp = nowIso();
+
+    await db.transaction(async (tx) => {
+      if (peerDefaultIds.length > 0) {
+        await tx
+          .update(accounts)
+          .set(
+            prepareUpdateForSync({
+              isDefault: false,
+              updatedAt: timestamp,
+            }) as Partial<NewAccount>,
+          )
+          .where(inArray(accounts.id, peerDefaultIds));
+      }
+
+      await tx
+        .update(accounts)
+        .set(
+          prepareUpdateForSync({
+            isDefault: true,
+            updatedAt: timestamp,
+          }) as Partial<NewAccount>,
+        )
+        .where(eq(accounts.id, existing.id));
+    });
+
+    const changedAccountIds = existing.isDefault
+      ? peerDefaultIds
+      : [...peerDefaultIds, existing.id];
+
+    for (const accountId of changedAccountIds) {
+      await enqueueSync("accounts", accountId, "upsert", existing.userId);
+    }
+
+    const updated = await accountsRepository.findById(id);
+    emitAccountsChanged();
+
+    if ((options?.notifySuccess ?? true) && updated) {
+      showSuccessToast({
+        title: `${accountLabel(updated.type)} set as default`,
+        message: `${updated.name} will appear first in account pickers.`,
+        dedupeKey: `account:default:${updated.id}:${updated.updatedAt}`,
+        source: "accounts-service",
+      });
+    }
+
+    return updated;
+  }
+
   async fetch(userId: string) {
     const rows = await accountsRepository.findAllByUser(userId);
     const deduped = dedupeCashAccountsForDisplay(rows);
+    const normalizedDefaults = await clearDuplicateDefaultsForUser(
+      userId,
+      deduped,
+    );
 
     if (deduped.length !== rows.length) {
       const cashRows = rows
@@ -337,7 +469,7 @@ export class AccountsService {
       });
     }
 
-    return deduped;
+    return [...normalizedDefaults].sort(compareAccountsForDisplay);
   }
 
   async fetchById(id: string) {

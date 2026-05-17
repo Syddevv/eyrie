@@ -301,9 +301,20 @@ export default function PaymentMethodsModal() {
                   />
 
                   <View style={styles.methodInfo}>
-                    <Text style={[styles.methodTitle, ui.methodTitle]}>
-                      {resolveBrandName(acct)}
-                    </Text>
+                    <View style={styles.methodTitleRow}>
+                      <Text style={[styles.methodTitle, ui.methodTitle]}>
+                        {resolveBrandName(acct)}
+                      </Text>
+                      {acct.isDefault ? (
+                        <View style={[styles.defaultPill, ui.defaultPill]}>
+                          <Text
+                            style={[styles.defaultPillText, ui.defaultPillText]}
+                          >
+                            Default
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Text style={[styles.methodBalance, ui.methodBalance]}>
                       {formatCurrency(acct.balance ?? 0, acct.currencyCode)}
                     </Text>
@@ -474,6 +485,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 10,
     gap: 4,
+  },
+  methodTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
   },
   methodTitle: {
     fontFamily: fontFamilies.sans,

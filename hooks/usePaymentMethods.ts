@@ -17,6 +17,7 @@ export type PaymentMethodOption = {
   currencyCode?: string;
   createdAt: string;
   updatedAt: string;
+  isDefault: boolean;
   isFallback: boolean;
 };
 
@@ -96,6 +97,10 @@ export function usePaymentMethods() {
     const visibleAccounts = accounts
       .filter((account) => !account.isHidden)
       .sort((left, right) => {
+        if (Boolean(left.isDefault) !== Boolean(right.isDefault)) {
+          return left.isDefault ? -1 : 1;
+        }
+
         const updatedAtDelta =
           new Date(right.updatedAt).getTime() -
           new Date(left.updatedAt).getTime();
@@ -127,6 +132,7 @@ export function usePaymentMethods() {
           currencyCode: undefined,
           createdAt: "",
           updatedAt: "",
+          isDefault: false,
           isFallback: true,
         },
       ];
@@ -166,6 +172,7 @@ export function usePaymentMethods() {
         currencyCode: account.currencyCode,
         createdAt: account.createdAt,
         updatedAt: account.updatedAt,
+        isDefault: Boolean(account.isDefault),
         isFallback: false,
       };
     });

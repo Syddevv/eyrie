@@ -3,10 +3,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
@@ -15,6 +17,7 @@ import Logo from "@/components/logo";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
+import { accountsService } from "@/src/db/services";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -62,6 +65,7 @@ export default function PaymentCardDetailsModal() {
     ? params.hideActions[0] === "1"
     : params.hideActions === "1";
   const account = accounts.find((a) => a.id === accountId);
+  const { isRunning: isSettingDefault, run: runSetDefault } = useAsyncAction();
   const brandTheme = account ? getBrandTheme(account) : defaultBrandTheme;
   const accountHolderLabel = account?.accountHolderName?.trim() || "Not set";
 
@@ -162,9 +166,23 @@ export default function PaymentCardDetailsModal() {
       statusPillText: { color: "#1495FF" },
       actionButton: { backgroundColor: "#1681DD" },
       actionText: { color: "#FFFFFF" },
+      secondaryButton: {
+        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7",
+      },
+      secondaryButtonText: { color: isDark ? "#F8FAFC" : "#111827" },
     }),
     [isDark],
   );
+
+  const handleSetDefault = () => {
+    if (!account?.id || account.isDefault || isSettingDefault) {
+      return;
+    }
+
+    void runSetDefault(async () => {
+      await accountsService.setDefault(account.id);
+    });
+  };
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
@@ -295,18 +313,40 @@ export default function PaymentCardDetailsModal() {
         </View>
 
         {!hideActions ? (
-          <Pressable
-            style={[styles.actionButton, ui.actionButton]}
-            onPress={() =>
-              router.replace({
-                pathname: "/edit-payment-card-modal",
-                params: { accountId: account?.id },
-              })
-            }
-          >
-            <Feather name="edit-2" size={16} color={ui.actionText.color} />
-            <Text style={[styles.actionText, ui.actionText]}>Edit Details</Text>
-          </Pressable>
+          <View style={styles.actionsRow}>
+            <Pressable
+              style={[styles.primaryButton, ui.actionButton]}
+              onPress={() =>
+                router.replace({
+                  pathname: "/edit-payment-card-modal",
+                  params: { accountId: account?.id },
+                })
+              }
+            >
+              <Feather name="edit-2" size={16} color={ui.actionText.color} />
+              <Text style={[styles.primaryButtonText, ui.actionText]}>
+                Edit Details
+              </Text>
+            </Pressable>
+            <LoadingActionButton
+              label={account?.isDefault ? "Default" : "Set as Default"}
+              loadingLabel="Saving..."
+              loading={isSettingDefault}
+              disabled={Boolean(account?.isDefault)}
+              onPress={handleSetDefault}
+              style={[
+                styles.secondaryButton,
+                ui.secondaryButton,
+                account?.isDefault && styles.secondaryButtonDisabled,
+              ]}
+              textStyle={[
+                styles.secondaryButtonText,
+                ui.secondaryButtonText,
+                account?.isDefault && styles.secondaryButtonTextDisabled,
+              ]}
+              spinnerColor={ui.secondaryButtonText.color}
+            />
+          </View>
         ) : null}
       </View>
     </View>
@@ -493,8 +533,13 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: fontWeights.medium,
   },
-  actionButton: {
+  actionsRow: {
     marginTop: 20,
+    flexDirection: "row",
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
     height: 44,
     borderRadius: 22,
     flexDirection: "row",
@@ -502,10 +547,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  actionText: {
+  primaryButtonText: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: fontWeights.bold,
+  },
+  secondaryButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.7,
+  },
+  secondaryButtonText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.medium,
+  },
+  secondaryButtonTextDisabled: {
+    opacity: 0.8,
   },
 });

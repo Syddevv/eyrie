@@ -351,6 +351,10 @@ export default function EditTransactionModal() {
       secondaryButtonText: { color: isDark ? "#F8FAFC" : "#111827" },
       primaryButton: { backgroundColor: "#1681DD" },
       primaryButtonText: { color: "#FFFFFF" },
+      defaultPill: {
+        backgroundColor: isDark ? "rgba(96, 165, 250, 0.18)" : "#D9ECFF",
+      },
+      defaultPillText: { color: "#1495FF" },
     }),
     [isDark],
   );
@@ -584,9 +588,20 @@ export default function EditTransactionModal() {
                   setShowMerchantOptions(false);
                 }}
               >
-                <Text style={[styles.fieldInput, ui.fieldText]}>
-                  {selectedAccount?.label ?? "Select account or wallet"}
-                </Text>
+                <View style={styles.accountFieldTextWrap}>
+                  <Text style={[styles.fieldInput, ui.fieldText]}>
+                    {selectedAccount?.label ?? "Select account or wallet"}
+                  </Text>
+                  {selectedAccount?.isDefault ? (
+                    <View style={[styles.defaultPill, ui.defaultPill]}>
+                      <Text
+                        style={[styles.defaultPillText, ui.defaultPillText]}
+                      >
+                        Default
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Feather
                   name={showAccountOptions ? "chevron-up" : "chevron-down"}
                   size={18}
@@ -674,17 +689,33 @@ export default function EditTransactionModal() {
                               ]}
                             />
                             <View style={styles.accountTextWrap}>
-                              <Text
-                                style={[
-                                  styles.categoryLabel,
-                                  ui.fieldText,
-                                  isDisabled && styles.disabledText,
-                                ]}
-                                numberOfLines={1}
-                                ellipsizeMode="tail"
-                              >
-                                {option.label}
-                              </Text>
+                              <View style={styles.accountTitleRow}>
+                                <Text
+                                  style={[
+                                    styles.categoryLabel,
+                                    ui.fieldText,
+                                    isDisabled && styles.disabledText,
+                                  ]}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  {option.label}
+                                </Text>
+                                {option.isDefault ? (
+                                  <View
+                                    style={[styles.defaultPill, ui.defaultPill]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.defaultPillText,
+                                        ui.defaultPillText,
+                                      ]}
+                                    >
+                                      Default
+                                    </Text>
+                                  </View>
+                                ) : null}
+                              </View>
                               <Text
                                 style={[
                                   styles.accountSubLabel,
@@ -1108,6 +1139,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  accountFieldTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   categoryList: {
     marginTop: 8,
     paddingVertical: 6,
@@ -1155,15 +1193,36 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     minWidth: 0,
   },
+  accountTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
   accountTextWrap: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
   },
   accountSubLabel: {
     marginTop: 2,
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
+  },
+  defaultPill: {
+    height: 20,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  defaultPillText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.semibold,
   },
   optionLogo: {
     marginRight: 2,
