@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, lte, ne } from "drizzle-orm";
+import { Platform } from "react-native";
 
 import {
   getMonthlyAnalytics,
@@ -50,6 +51,46 @@ function clampProgress(value: number) {
     return 0;
   }
   return Math.max(0, Math.min(100, value));
+}
+
+function formatSecurityChangeTimestamp(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "just now";
+  }
+
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(parsed);
+}
+
+function hasExpoDeviceNativeModule() {
+  const proxy = (globalThis as any)?.expo?.modules?.NativeModulesProxy;
+  return Boolean(proxy?.ExpoDevice);
+}
+
+function getSecurityDeviceLabel() {
+  let modelName: string | null = null;
+
+  if (hasExpoDeviceNativeModule()) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Device = require("expo-device") as { modelName?: string | null };
+      modelName = Device.modelName ?? null;
+    } catch {
+      modelName = null;
+    }
+  }
+
+  const platformName =
+    Platform.OS === "ios"
+      ? "iOS"
+      : Platform.OS === "android"
+        ? "Android"
+        : Platform.OS;
+
+  return modelName ? `${modelName} (${platformName})` : platformName;
 }
 
 async function persistCandidates(userId: string, candidates: NotificationCandidate[]) {
@@ -628,4 +669,27 @@ export async function processGoalStateNotificationEvent(input: {
       previousAmount: input.previousAmount,
     }),
   );
+}
+
+export async function processPasswordChangedNotificationEvent(input: {
+  userId: string;
+  changedAt?: string;
+}) {
+  const changedAt = input.changedAt ?? nowIso();
+  const deviceLabel = getSecurityDeviceLabel();
+
+  return persistCandidates(input.userId, [
+    buildNotificationCandidate({
+      type: "security_alert",
+      title: "Password changed successfully",
+      message: `Your password was changed on ${formatSecurityChangeTimestamp(changedAt)} from ${deviceLabel}. If you did not make this change, please secure your account immediately.`,
+      data: {
+        changedAt,
+        device: deviceLabel,
+        url: "/security-password-modal",
+      },
+      action_url: "/security-password-modal",
+      dedupe_key: `security:password-changed:${changedAt}`,
+    }),
+  ]);
 }

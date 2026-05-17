@@ -459,7 +459,8 @@ export default function AddCategoryModal() {
                 layout={LinearTransition.springify().damping(18).stiffness(180)}
                 style={styles.section}
               >
-                <View
+                <Animated.View
+                  layout={LinearTransition.springify().damping(18).stiffness(180)}
                   style={[
                     styles.overviewCard,
                     ui.overviewCard,
@@ -569,7 +570,7 @@ export default function AddCategoryModal() {
                         : "Your budgets are within available funds."}
                     </Text>
                   </View>
-                </View>
+                </Animated.View>
 
                 {planningOverview.status === "warning" ? (
                   <Animated.View

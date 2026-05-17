@@ -103,6 +103,12 @@ export const notificationMetadataMap: Record<
     category: "reminders",
     priority: "medium",
   },
+  security_alert: {
+    icon: "shield",
+    color: "#F97316",
+    category: "security",
+    priority: "high",
+  },
 };
 
 export function getNotificationMetadata(type: NotificationType) {
@@ -139,6 +145,7 @@ export const defaultNotificationPreferences = (
   monthly_reports: true,
   savings_tips: true,
   transaction_alerts: true,
+  security_alerts: true,
   push_enabled: true,
   push_token: null,
   push_token_platform: null,
@@ -206,6 +213,8 @@ export function shouldReceiveNotification(
     case "recurring_bill":
     case "wallet_low_balance":
       return preferences.transaction_alerts;
+    case "security_alert":
+      return preferences.security_alerts;
     case "achievement":
       return true;
     default:

@@ -19,6 +19,7 @@ import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   createPasswordForGoogleUser,
@@ -27,6 +28,7 @@ import {
   markPasswordEnabledForUser,
   updatePasswordForEmailUser,
 } from "@/services/password-management";
+import { processPasswordChangedNotificationEvent } from "@/services/notifications";
 import {
   validatePasswordConfirmation,
   validatePasswordStrength,
@@ -46,6 +48,8 @@ export default function SecurityPasswordModal() {
   const isDark = colorScheme === "dark";
   const authUser = useAuthStore((state) => state.user);
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
+  const { preferences, isLoading: isLoadingPreferences, updatePreference } =
+    useNotificationPreferences();
   const providerInfo = useMemo(() => getPasswordProviderInfo(authUser), [authUser]);
   const [hasLocalPasswordEnabled, setHasLocalPasswordEnabled] = useState(false);
   const isGooglePasswordCreation =
@@ -60,8 +64,17 @@ export default function SecurityPasswordModal() {
   const [securityAlertsEnabled, setSecurityAlertsEnabled] = useState(true);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingSecurityAlerts, setIsSavingSecurityAlerts] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isSavingSecurityAlerts) {
+      return;
+    }
+
+    setSecurityAlertsEnabled(preferences?.security_alerts ?? true);
+  }, [isSavingSecurityAlerts, preferences?.security_alerts]);
 
   useEffect(() => {
     let isMounted = true;
@@ -219,6 +232,8 @@ export default function SecurityPasswordModal() {
     setIsSubmitting(true);
 
     try {
+      const passwordChangedAt = new Date().toISOString();
+
       if (isGooglePasswordCreation) {
         await createPasswordForGoogleUser(newPassword);
         if (authUser?.id) {
@@ -235,6 +250,13 @@ export default function SecurityPasswordModal() {
           email,
           currentPassword,
           newPassword,
+        });
+      }
+
+      if (authUser?.id && securityAlertsEnabled) {
+        await processPasswordChangedNotificationEvent({
+          userId: authUser.id,
+          changedAt: passwordChangedAt,
         });
       }
 
@@ -260,6 +282,32 @@ export default function SecurityPasswordModal() {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleSecurityAlertsToggle(nextValue: boolean) {
+    if (!authUser?.id || isSavingSecurityAlerts) {
+      return;
+    }
+
+    const previousValue = securityAlertsEnabled;
+    setSecurityAlertsEnabled(nextValue);
+    setIsSavingSecurityAlerts(true);
+
+    try {
+      await updatePreference({
+        security_alerts: nextValue,
+      });
+    } catch (error) {
+      setSecurityAlertsEnabled(previousValue);
+      showSnackbar(
+        error instanceof Error
+          ? error.message
+          : "Unable to update security alerts.",
+        "error",
+      );
+    } finally {
+      setIsSavingSecurityAlerts(false);
     }
   }
 
@@ -310,7 +358,10 @@ export default function SecurityPasswordModal() {
 
               <Switch
                 value={securityAlertsEnabled}
-                onValueChange={setSecurityAlertsEnabled}
+                onValueChange={(nextValue) => {
+                  void handleSecurityAlertsToggle(nextValue);
+                }}
+                disabled={!authUser?.id || isLoadingPreferences || isSavingSecurityAlerts}
                 trackColor={{ false: ui.switchTrackOff, true: ui.switchTrackOn }}
                 thumbColor={ui.switchThumb}
                 ios_backgroundColor={ui.switchTrackOff}

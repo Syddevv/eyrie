@@ -23,7 +23,10 @@ function mapNotification(row: any): AppNotification {
 }
 
 function mapPreferences(row: any): NotificationPreferences {
-  return row as NotificationPreferences;
+  return {
+    ...row,
+    security_alerts: row?.security_alerts ?? true,
+  } as NotificationPreferences;
 }
 
 export async function ensureNotificationPreferences(userId: string) {

@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPES = [
   "wallet_low_balance",
   "achievement",
   "reminder",
+  "security_alert",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -25,7 +26,8 @@ export type NotificationCategory =
   | "wallets"
   | "tips"
   | "achievements"
-  | "reminders";
+  | "reminders"
+  | "security";
 
 export type NotificationPriority = "low" | "medium" | "high";
 
@@ -82,6 +84,7 @@ export type NotificationPreferences = {
   monthly_reports: boolean;
   savings_tips: boolean;
   transaction_alerts: boolean;
+  security_alerts: boolean;
   push_enabled: boolean;
   push_token: string | null;
   push_token_platform: string | null;
