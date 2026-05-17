@@ -1,6 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  View,
+} from "react-native";
 
 import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
@@ -26,6 +33,7 @@ type DeleteConfirmationModalProps = {
   iconColor?: string;
   iconBackgroundColor?: string;
   primaryButtonColor?: string;
+  primaryTextStyle?: StyleProp<TextStyle>;
   onCancel: () => void;
   onConfirm: () => void | Promise<void>;
 };
@@ -41,6 +49,7 @@ export function DeleteConfirmationModal({
   iconColor = "#FF5C73",
   iconBackgroundColor,
   primaryButtonColor = "#FF5C73",
+  primaryTextStyle,
   onCancel,
   onConfirm,
 }: DeleteConfirmationModalProps) {
@@ -140,7 +149,7 @@ export function DeleteConfirmationModal({
               { backgroundColor: primaryButtonColor },
               isBusy && styles.buttonDisabled,
             ]}
-            textStyle={styles.primaryText}
+            textStyle={[styles.primaryText, primaryTextStyle]}
             spinnerColor="#FFFFFF"
             onPress={handleConfirm}
           />

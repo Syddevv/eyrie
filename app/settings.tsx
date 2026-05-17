@@ -515,6 +515,7 @@ export default function SettingsScreen() {
           isDeleting={isSigningOut}
           confirmLabel="Sign Out"
           loadingLabel="Signing Out..."
+          primaryTextStyle={styles.signOutModalPrimaryText}
           iconName="log-out"
           iconColor="#FF2440"
           iconBackgroundColor={
@@ -736,6 +737,10 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: fontWeights.medium,
     color: "#FF2440",
+  },
+  signOutModalPrimaryText: {
+    fontSize: 14,
+    lineHeight: 18,
   },
   footerBrand: {
     marginTop: 38,

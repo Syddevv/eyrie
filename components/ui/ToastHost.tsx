@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   contentRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 12,
   },
   iconWrap: {
@@ -178,6 +178,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
     minWidth: 0,
+    justifyContent: "center",
   },
   title: {
     fontFamily: fontFamilies.sans,
@@ -192,6 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.regular,
   },
   dismissWrap: {
-    paddingTop: 3,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
