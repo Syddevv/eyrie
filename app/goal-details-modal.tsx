@@ -3,13 +3,22 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { GoalAvatar } from "@/components/goal-avatar";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useSavingsGoal } from "@/hooks/useSavingsGoals";
@@ -35,6 +44,7 @@ export default function GoalDetailsModal() {
   const [pendingDeleteContributionId, setPendingDeleteContributionId] =
     useState<string | null>(null);
   const [isDeletingContribution, setIsDeletingContribution] = useState(false);
+  const { isRunning: isArchiving, run: runArchiveToggle } = useAsyncAction();
   const contributionPlan = goal ? getGoalContributionPlan(goal) : null;
   const linkedWalletLabel = goal?.linkedWalletId
     ? (methods.find((method) => method.id === goal.linkedWalletId)?.label ??
@@ -129,13 +139,19 @@ export default function GoalDetailsModal() {
     }
   };
 
-  const handleArchiveToggle = () => {
-    const action = goal.isArchived
-      ? goalsService.restore(goal.id)
-      : goalsService.archive(goal.id);
-    void action.then(async () => {
+  const handleArchiveToggle = async () => {
+    await runArchiveToggle(async () => {
+      const action = goal.isArchived
+        ? goalsService.restore(goal.id)
+        : goalsService.archive(goal.id);
+      await action;
       await Haptics.selectionAsync();
       router.back();
+    }).catch((error) => {
+      Alert.alert(
+        goal.isArchived ? "Unable to restore goal" : "Unable to archive goal",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     });
   };
 
@@ -157,7 +173,11 @@ export default function GoalDetailsModal() {
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
-      <Pressable style={styles.backdrop} onPress={close} />
+      <Pressable
+        disabled={isArchiving}
+        style={styles.backdrop}
+        onPress={close}
+      />
 
       <View style={[styles.sheet, ui.sheet, shadows.floating]}>
         <View style={[styles.handle, ui.handle]} />
@@ -188,6 +208,7 @@ export default function GoalDetailsModal() {
           </View>
 
           <Pressable
+            disabled={isArchiving}
             style={[styles.closeButton, ui.closeButton]}
             onPress={close}
           >
@@ -400,6 +421,7 @@ export default function GoalDetailsModal() {
 
         <View style={styles.footerActions}>
           <Pressable
+            disabled={isArchiving}
             style={[styles.footerButton, ui.secondaryButton]}
             onPress={() =>
               router.replace({
@@ -411,20 +433,25 @@ export default function GoalDetailsModal() {
             <Feather name="edit-3" size={18} color={colors.foreground} />
             <Text style={[styles.footerButtonText, ui.title]}>Edit Goal</Text>
           </Pressable>
-          <Pressable
+          <LoadingActionButton
+            label={goal.isArchived ? "Restore" : "Archive"}
+            loadingLabel={goal.isArchived ? "Restoring..." : "Archiving..."}
+            loading={isArchiving}
+            haptic="default"
             style={[styles.footerButton, ui.archiveButton]}
-            onPress={handleArchiveToggle}
-          >
-            <Feather
-              name={goal.isArchived ? "archive" : "inbox"}
-              size={18}
-              color={colors.foreground}
-            />
-            <Text style={[styles.footerButtonText, ui.title]}>
-              {goal.isArchived ? "Restore" : "Archive"}
-            </Text>
-          </Pressable>
+            onPress={() => void handleArchiveToggle()}
+            textStyle={[styles.footerButtonText, ui.title]}
+            spinnerColor={colors.foreground}
+            leftAdornment={
+              <Feather
+                name={goal.isArchived ? "archive" : "inbox"}
+                size={18}
+                color={colors.foreground}
+              />
+            }
+          />
           <Pressable
+            disabled={isArchiving}
             style={[styles.footerButton, ui.destructiveButton]}
             onPress={() => setShowDeleteConfirm(true)}
           >

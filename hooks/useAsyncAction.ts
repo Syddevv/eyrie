@@ -1,5 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 export function useAsyncAction() {
   const [isRunning, setIsRunning] = useState(false);
   const isRunningRef = useRef(false);
@@ -13,6 +19,7 @@ export function useAsyncAction() {
     setIsRunning(true);
 
     try {
+      await waitForNextFrame();
       return await task();
     } finally {
       isRunningRef.current = false;

@@ -12,10 +12,12 @@ import {
   View,
 } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { showSuccessToast } from "@/store/useToastStore";
 import { accountsService } from "@/src/db/services";
 import { formatCurrency } from "@/hooks/use-dashboard";
@@ -122,7 +124,7 @@ export default function EditPaymentWalletModal() {
 
   const [balance, setBalance] = useState((account?.balance ?? 0).toString());
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isRunning: isSaving, run } = useAsyncAction();
 
   useEffect(() => {
     const showEvent =
@@ -195,8 +197,7 @@ export default function EditPaymentWalletModal() {
   const returnToDetails = async () => {
     if (!account) return;
 
-    setIsSaving(true);
-    try {
+    await run(async () => {
       const brandName = resolveBrandName(account);
 
       await accountsService.update(
@@ -218,11 +219,9 @@ export default function EditPaymentWalletModal() {
           source: "settings-edit-wallet",
         });
       }, 240);
-    } catch {
+    }).catch(() => {
       showSnackbar("Failed to update wallet");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   };
 
   return (
@@ -231,7 +230,11 @@ export default function EditPaymentWalletModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <Pressable
+          disabled={isSaving}
+          style={styles.backdrop}
+          onPress={() => router.back()}
+        />
 
         <View
           style={[
@@ -250,6 +253,7 @@ export default function EditPaymentWalletModal() {
               {account ? resolveBrandName(account) : "Edit Wallet"}
             </Text>
             <Pressable
+              disabled={isSaving}
               style={[styles.closeButton, ui.closeButton]}
               onPress={() => router.back()}
             >
@@ -258,6 +262,7 @@ export default function EditPaymentWalletModal() {
           </View>
 
           <Pressable
+            disabled={isSaving}
             style={styles.backRow}
             onPress={() =>
               router.replace({ pathname: "/payment-methods-modal" })
@@ -324,6 +329,7 @@ export default function EditPaymentWalletModal() {
 
           <View style={styles.actionsRow}>
             <Pressable
+              disabled={isSaving}
               style={[styles.secondaryButton, ui.secondaryButton]}
               onPress={() => router.back()}
             >
@@ -333,24 +339,27 @@ export default function EditPaymentWalletModal() {
                 Cancel
               </Text>
             </Pressable>
-            <Pressable
+            <LoadingActionButton
+              label="Save Changes"
+              loadingLabel="Saving..."
+              loading={isSaving}
+              haptic="default"
               style={[
                 styles.primaryButton,
                 ui.primaryButton,
                 isSaving && { opacity: 0.5 },
               ]}
-              disabled={isSaving}
-              onPress={returnToDetails}
-            >
-              <Feather
+              onPress={() => void returnToDetails()}
+              textStyle={[styles.primaryButtonText, ui.primaryButtonText]}
+              spinnerColor={ui.primaryButtonText.color}
+              leftAdornment={
+                <Feather
                 name="check"
                 size={16}
                 color={ui.primaryButtonText.color}
-              />
-              <Text style={[styles.primaryButtonText, ui.primaryButtonText]}>
-                Save Changes
-              </Text>
-            </Pressable>
+                />
+              }
+            />
           </View>
         </View>
       </View>

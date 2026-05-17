@@ -13,9 +13,11 @@ import {
   View,
 } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { showSuccessToast } from "@/store/useToastStore";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
@@ -144,6 +146,7 @@ export default function AddEWalletAccountModal() {
   const [balance, setBalance] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isConnectEnabled = Boolean(selectedWallet.name);
+  const { isRunning: isSaving, run } = useAsyncAction();
   const { user } = useCurrentUser();
   const { accounts } = useAccounts();
   const hasExistingWallet = useMemo(
@@ -233,7 +236,11 @@ export default function AddEWalletAccountModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <Pressable
+          disabled={isSaving}
+          style={styles.backdrop}
+          onPress={() => router.back()}
+        />
 
         <View
           style={[
@@ -250,6 +257,7 @@ export default function AddEWalletAccountModal() {
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>Add Wallet</Text>
             <Pressable
+              disabled={isSaving}
               style={[styles.closeButton, ui.closeButton]}
               onPress={() => router.back()}
             >
@@ -258,6 +266,7 @@ export default function AddEWalletAccountModal() {
           </View>
 
           <Pressable
+            disabled={isSaving}
             style={styles.backRow}
             onPress={() =>
               router.replace({
@@ -357,7 +366,11 @@ export default function AddEWalletAccountModal() {
             </Text>
           </View>
 
-          <Pressable
+          <LoadingActionButton
+            label={selectedWallet.buttonLabel}
+            loadingLabel="Adding..."
+            loading={isSaving}
+            haptic="default"
             style={[
               styles.connectButton,
               isConnectEnabled ? ui.button : ui.buttonDisabled,
@@ -376,7 +389,7 @@ export default function AddEWalletAccountModal() {
                 return;
               }
 
-              try {
+              await run(async () => {
                 const created = await accountsService.create(
                   {
                     userId: user?.id ?? "",
@@ -399,16 +412,15 @@ export default function AddEWalletAccountModal() {
                     source: "settings-add-wallet",
                   });
                 }, 240);
-              } catch {
+              }).catch(() => {
                 // ignore
                 return;
-              }
+              });
             }}
-          >
-            <Text style={[styles.connectButtonText, ui.buttonText]}>
-              {selectedWallet.buttonLabel}
-            </Text>
-          </Pressable>
+            disabled={!isConnectEnabled}
+            textStyle={[styles.connectButtonText, ui.buttonText]}
+            spinnerColor="#FFFFFF"
+          />
         </View>
       </View>
     </KeyboardAvoidingView>
