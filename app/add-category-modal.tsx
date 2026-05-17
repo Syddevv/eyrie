@@ -47,6 +47,10 @@ function sanitizeBudgetAmount(value: string) {
   return `${parts[0]}.${parts.slice(1).join("").slice(0, 2)}`;
 }
 
+function normalizeCategoryLabel(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
 export default function AddCategoryModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{ cycle?: string }>();
@@ -90,12 +94,28 @@ export default function AddCategoryModal() {
     [availableFunds, currentTotalBudgeted, proposedBudgetAmount],
   );
 
+  const activeBudgetCategoryKeys = useMemo(() => {
+    const keys = new Set<string>();
+
+    for (const category of expenseCategories) {
+      if (categoryIdsWithActiveBudget.has(category.id)) {
+        keys.add(normalizeCategoryLabel(category.label));
+      }
+    }
+
+    return keys;
+  }, [categoryIdsWithActiveBudget, expenseCategories]);
+
   const availableCategories = useMemo(
     () =>
       expenseCategories.filter(
-        (category) => !categoryIdsWithActiveBudget.has(category.id),
+        (category) =>
+          !categoryIdsWithActiveBudget.has(category.id) &&
+          !activeBudgetCategoryKeys.has(
+            normalizeCategoryLabel(category.label),
+          ),
       ),
-    [categoryIdsWithActiveBudget, expenseCategories],
+    [activeBudgetCategoryKeys, categoryIdsWithActiveBudget, expenseCategories],
   );
   const selectedCategory =
     availableCategories.find(
@@ -237,6 +257,19 @@ export default function AddCategoryModal() {
       Alert.alert(
         "Missing category",
         "Choose an expense category to create a budget.",
+      );
+      return;
+    }
+
+    if (
+      selectedCategory &&
+      activeBudgetCategoryKeys.has(
+        normalizeCategoryLabel(selectedCategory.label),
+      )
+    ) {
+      Alert.alert(
+        "Budget already exists",
+        "A similar budget category already exists for this cycle.",
       );
       return;
     }
