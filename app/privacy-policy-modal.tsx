@@ -1,13 +1,13 @@
-import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { useMemo } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { themeColors } from '@/constants/colors';
-import { radius, shadows } from '@/constants/theme';
-import { fontFamilies, fontWeights } from '@/constants/typography';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { themeColors } from "@/constants/colors";
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 type PolicySection = {
   id: number;
@@ -18,88 +18,84 @@ type PolicySection = {
 const policySections: readonly PolicySection[] = [
   {
     id: 1,
-    title: 'Information We Collect',
-    body:
-      'Eyrie collects financial data you input including expenses, income, budgets, and savings goals. We also collect basic account information such as your name, email, and payment methods for app functionality.',
+    title: "What Eyrie stores",
+    body: "Eyrie stores the information you add in the app, including your profile details, sign-in session, transactions, budgets, savings goals, categories, payment methods, notification preferences, and app settings.",
   },
   {
     id: 2,
-    title: 'How We Use Your Data',
-    body:
-      'Your data is used solely to provide expense tracking, budgeting insights, and financial analytics within the app. We do not sell your personal or financial information to third parties.',
+    title: "How we use it",
+    body: "We use this data to sign you in, show your balances and summaries, keep your budgets and goals up to date, manage your payment methods, and display your notifications and settings correctly.",
   },
   {
     id: 3,
-    title: 'Data Security',
-    body:
-      'All financial data is encrypted using industry-standard AES-256 encryption. Payment information is tokenized and stored securely. We employ multi-factor authentication and regular security audits.',
+    title: "Where data lives",
+    body: "Eyrie keeps a local SQLite database on your device for app data. When you sign in, the app can also use its backend sync layer to keep supported account data available for your account.",
   },
   {
     id: 4,
-    title: 'Data Storage',
-    body:
-      'Your data is stored on secure servers located in the Philippines and Singapore. You can request deletion of your data at any time through the app settings.',
+    title: "Sharing",
+    body: "We do not sell your data. We only use the services needed to run sign-in, local storage, and sync for the features you choose to use.",
   },
   {
     id: 5,
-    title: 'Third-Party Services',
-    body:
-      'We integrate with banking APIs and payment gateways to sync transactions. These partners are PCI-DSS compliant and adhere to strict data protection standards.',
+    title: "Your choices",
+    body: "You can update your profile, change your password, turn notifications on or off, and edit or delete your transactions, budgets, goals, categories, and payment methods inside the app.",
   },
   {
     id: 6,
-    title: 'Your Rights',
-    body:
-      'Under the Data Privacy Act of 2012, you have the right to access, correct, and delete your personal data. Contact our Data Protection Officer at privacy@eyrie.ph for any concerns.',
-  },
-  {
-    id: 7,
-    title: 'Updates to Policy',
-    body:
-      'We may update this policy periodically. You will be notified of significant changes via email or in-app notification. Continued use of Eyrie constitutes acceptance of the updated policy.',
+    title: "Contact and updates",
+    body: "If this policy changes, we will update it in the app. For questions about how Eyrie handles your data, contact support@eyrie.ph.",
   },
 ] as const;
 
 export default function PrivacyPolicyModal() {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
-  const isDark = colorScheme === 'dark';
+  const isDark = colorScheme === "dark";
 
   const ui = useMemo(
     () => ({
       overlay: {
-        backgroundColor: isDark ? 'rgba(2, 6, 23, 0.56)' : 'rgba(15, 23, 42, 0.32)',
+        backgroundColor: isDark
+          ? "rgba(2, 6, 23, 0.56)"
+          : "rgba(15, 23, 42, 0.32)",
       },
       sheet: {
-        backgroundColor: isDark ? '#111A27' : '#F4F8FC',
-        borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15, 23, 42, 0.05)',
+        backgroundColor: isDark ? "#111A27" : "#F4F8FC",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(15, 23, 42, 0.05)",
       },
       handle: {
-        backgroundColor: isDark ? '#526173' : '#C9D3DF',
+        backgroundColor: isDark ? "#526173" : "#C9D3DF",
       },
-      title: { color: isDark ? '#F8FAFC' : '#1A202C' },
+      title: { color: isDark ? "#F8FAFC" : "#1A202C" },
       closeButton: {
-        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.72)',
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(255,255,255,0.72)",
       },
-      closeIcon: { color: isDark ? '#D4DCE6' : '#202733' },
+      closeIcon: { color: isDark ? "#D4DCE6" : "#202733" },
       infoCard: {
-        backgroundColor: isDark ? 'rgba(96, 165, 250, 0.12)' : '#DCEEFE',
-        borderColor: isDark ? 'rgba(96, 165, 250, 0.22)' : '#B7D7FB',
+        backgroundColor: isDark ? "rgba(96, 165, 250, 0.12)" : "#DCEEFE",
+        borderColor: isDark ? "rgba(96, 165, 250, 0.22)" : "#B7D7FB",
       },
-      infoText: { color: isDark ? '#D6E8FF' : '#607185' },
-      updateText: { color: isDark ? '#D6E8FF' : '#465569' },
+      infoText: { color: isDark ? "#D6E8FF" : "#607185" },
+      updateText: { color: isDark ? "#D6E8FF" : "#465569" },
       sectionNumber: {
-        backgroundColor: isDark ? 'rgba(20, 149, 255, 0.18)' : '#D9ECFF',
+        backgroundColor: isDark ? "rgba(20, 149, 255, 0.18)" : "#D9ECFF",
       },
       sectionNumberText: { color: colors.primary },
-      sectionTitle: { color: isDark ? '#F8FAFC' : '#111827' },
-      sectionBody: { color: isDark ? '#B7C4D5' : '#5A687B' },
-      footerBorder: { borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : '#D8E0EA' },
-      footerText: { color: isDark ? '#D6E8FF' : '#5E6C80' },
+      sectionTitle: { color: isDark ? "#F8FAFC" : "#111827" },
+      sectionBody: { color: isDark ? "#B7C4D5" : "#5A687B" },
+      footerBorder: {
+        borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "#D8E0EA",
+      },
+      footerText: { color: isDark ? "#D6E8FF" : "#5E6C80" },
       footerLink: { color: colors.primary },
     }),
-    [colors.primary, isDark]
+    [colors.primary, isDark],
   );
 
   return (
@@ -111,7 +107,10 @@ export default function PrivacyPolicyModal() {
 
         <View style={styles.headerRow}>
           <Text style={[styles.title, ui.title]}>Privacy Policy</Text>
-          <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+          <Pressable
+            style={[styles.closeButton, ui.closeButton]}
+            onPress={() => router.back()}
+          >
             <Feather name="x" size={20} color={ui.closeIcon.color} />
           </Pressable>
         </View>
@@ -119,35 +118,52 @@ export default function PrivacyPolicyModal() {
         <ScrollView
           bounces={false}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}>
+          contentContainerStyle={styles.content}
+        >
           <View style={[styles.infoCard, ui.infoCard]}>
             <View style={styles.infoAvatarFrame}>
               <Image
                 contentFit="cover"
-                source={require('@/assets/images/Eyrie_Mascot_3.png')}
+                source={require("@/assets/images/Eyrie_Mascot_3.png")}
                 style={styles.infoAvatar}
               />
             </View>
-            <Text style={[styles.infoText, ui.infoText]}>Your privacy matters to us. Here&apos;s how we protect your data.</Text>
+            <Text style={[styles.infoText, ui.infoText]}>
+              This policy only covers the features and data handling that Eyrie
+              actually uses today.
+            </Text>
           </View>
 
-          <Text style={[styles.updatedText, ui.updateText]}>Last updated: May 1, 2026</Text>
+          <Text style={[styles.updatedText, ui.updateText]}>
+            Last updated: May 17, 2026
+          </Text>
 
           {policySections.map((section) => (
             <View key={section.id} style={styles.sectionBlock}>
               <View style={styles.sectionHeader}>
                 <View style={[styles.sectionNumber, ui.sectionNumber]}>
-                  <Text style={[styles.sectionNumberText, ui.sectionNumberText]}>{section.id}</Text>
+                  <Text
+                    style={[styles.sectionNumberText, ui.sectionNumberText]}
+                  >
+                    {section.id}
+                  </Text>
                 </View>
-                <Text style={[styles.sectionTitle, ui.sectionTitle]}>{section.title}</Text>
+                <Text style={[styles.sectionTitle, ui.sectionTitle]}>
+                  {section.title}
+                </Text>
               </View>
-              <Text style={[styles.sectionBody, ui.sectionBody]}>{section.body}</Text>
+              <Text style={[styles.sectionBody, ui.sectionBody]}>
+                {section.body}
+              </Text>
             </View>
           ))}
 
           <View style={[styles.footer, ui.footerBorder]}>
             <Text style={[styles.footerText, ui.footerText]}>
-              Questions? Email us at <Text style={[styles.footerLink, ui.footerLink]}>support@eyrie.ph</Text>
+              Questions? Email us at{" "}
+              <Text style={[styles.footerLink, ui.footerLink]}>
+                support@eyrie.ph
+              </Text>
             </Text>
           </View>
         </ScrollView>
@@ -159,7 +175,7 @@ export default function PrivacyPolicyModal() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -171,19 +187,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 10,
     paddingBottom: 12,
-    maxHeight: '86%',
+    maxHeight: "86%",
   },
   handle: {
-    alignSelf: 'center',
+    alignSelf: "center",
     width: 58,
     height: 6,
     borderRadius: radius.full,
     marginBottom: 16,
   },
   headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingBottom: 12,
   },
   title: {
@@ -196,8 +212,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     paddingTop: 18,
@@ -208,18 +224,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   infoAvatarFrame: {
     width: 40,
     height: 40,
     borderRadius: radius.full,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   infoAvatar: {
     width: 31,
@@ -244,16 +260,16 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   sectionNumber: {
     width: 22,
     height: 22,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionNumberText: {
     fontFamily: fontFamilies.sans,
@@ -280,14 +296,14 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingTop: 12,
     borderTopWidth: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   footerText: {
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.regular,
-    textAlign: 'center',
+    textAlign: "center",
   },
   footerLink: {
     fontWeight: fontWeights.medium,
