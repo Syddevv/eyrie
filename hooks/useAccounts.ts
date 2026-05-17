@@ -164,6 +164,10 @@ export function useAccounts() {
       });
     }
 
+    if (currentSnapshot.userId === userId && currentSnapshot.hasResolved) {
+      return;
+    }
+
     void loadAccounts(userId, currentSnapshot.userId !== userId);
   }, [isAuthReady, userId]);
 
@@ -178,21 +182,6 @@ export function useAccounts() {
 
     return () => off();
   }, [isAuthReady, userId]);
-
-  useEffect(() => {
-    if (!__DEV__) {
-      return;
-    }
-
-    console.log("[accounts:ui] snapshot", {
-      userId: snapshot.userId,
-      hasResolved: snapshot.hasResolved,
-      isInitialLoading: snapshot.isInitialLoading,
-      isRefreshing: snapshot.isRefreshing,
-      fromLocalRead: snapshot.fromLocalRead,
-      count: snapshot.accounts.length,
-    });
-  }, [snapshot]);
 
   return {
     accounts: snapshot.accounts,

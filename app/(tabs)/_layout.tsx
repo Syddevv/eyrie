@@ -9,6 +9,7 @@ export default function TabLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
       detachInactiveScreens={false}
       screenOptions={{
+        freezeOnBlur: true,
         headerShown: false,
       }}
     >

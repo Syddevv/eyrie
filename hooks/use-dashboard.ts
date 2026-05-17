@@ -1,6 +1,7 @@
 import { getMerchantPresetByName } from "@/constants/expense-merchants";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect } from "react";
+import { InteractionManager } from "react-native";
 import { create } from "zustand";
 
 import {
@@ -655,13 +656,19 @@ export function useDashboardBootstrap(userId?: string | null) {
     }
 
     const off = onAccountsChanged(() => {
-      void loadDashboard(userId, { force: true });
+      InteractionManager.runAfterInteractions(() => {
+        void loadDashboard(userId, { force: true });
+      });
     });
     const offGoals = onGoalsChanged(() => {
-      void loadDashboard(userId, { force: true });
+      InteractionManager.runAfterInteractions(() => {
+        void loadDashboard(userId, { force: true });
+      });
     });
     const offTransactions = onTransactionsChanged(() => {
-      void loadDashboard(userId, { force: true });
+      InteractionManager.runAfterInteractions(() => {
+        void loadDashboard(userId, { force: true });
+      });
     });
 
     return () => {
@@ -685,7 +692,13 @@ export function useDashboardBootstrap(userId?: string | null) {
         Date.now() - snapshot.lastLoadedAt > DASHBOARD_STALE_MS;
 
       if (shouldRefresh) {
-        void loadDashboard(userId, { force: snapshot.lastLoadedAt !== null });
+        const task = InteractionManager.runAfterInteractions(() => {
+          void loadDashboard(userId, { force: snapshot.lastLoadedAt !== null });
+        });
+
+        return () => {
+          task.cancel();
+        };
       }
 
       return undefined;

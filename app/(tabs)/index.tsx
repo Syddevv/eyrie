@@ -40,6 +40,7 @@ import {
   useRecentTransactions,
   useSpendingBreakdown,
 } from "@/hooks/use-dashboard";
+import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -574,20 +575,34 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const visibleAccounts = allAccounts.filter((account) => !account.isHidden);
-  const cardAccounts = visibleAccounts.filter(
-    (account) => account.type === "bank" || account.type === "credit",
+  const visibleAccounts = useMemo(
+    () => allAccounts.filter((account) => !account.isHidden),
+    [allAccounts],
   );
-  const walletAccounts = visibleAccounts.filter(
-    (account) => account.type === "ewallet" || account.type === "cash",
+  const cardAccounts = useMemo(
+    () =>
+      visibleAccounts.filter(
+        (account) => account.type === "bank" || account.type === "credit",
+      ),
+    [visibleAccounts],
+  );
+  const walletAccounts = useMemo(
+    () =>
+      visibleAccounts.filter(
+        (account) => account.type === "ewallet" || account.type === "cash",
+      ),
+    [visibleAccounts],
   );
   const showAccountsSkeleton = accountsInitialLoading && !accountsResolved;
   const showCardsEmptyState =
     accountsResolved && !accountsInitialLoading && cardAccounts.length === 0;
   const showWalletsEmptyState =
     accountsResolved && !accountsInitialLoading && walletAccounts.length === 0;
-  const visibleBudgets = activeBudgets.slice(0, 2);
-  const visibleRecentTransactions = recentTransactions.slice(0, 3);
+  const visibleBudgets = useMemo(() => activeBudgets.slice(0, 2), [activeBudgets]);
+  const visibleRecentTransactions = useMemo(
+    () => recentTransactions.slice(0, 3),
+    [recentTransactions],
+  );
 
   const resolveBrandName = (account: any) => {
     const nameLower = (account?.name || "").toLowerCase();
@@ -769,7 +784,10 @@ export default function HomeScreen() {
             <View style={styles.headerActions}>
               <Pressable
                 style={[styles.headerButton, pageStyles.topButton]}
-                onPress={() => router.push("/notifications")}
+                onPress={() => {
+                  void triggerNavigationHaptic();
+                  router.push("/notifications");
+                }}
               >
                 <Feather name="bell" size={18} color={colors.mutedForeground} />
                 {unreadNotificationCount > 0 ? (
@@ -781,7 +799,10 @@ export default function HomeScreen() {
                   styles.settingsButton,
                   { backgroundColor: colors.primary },
                 ]}
-                onPress={() => router.push("/settings")}
+                onPress={() => {
+                  void triggerNavigationHaptic();
+                  router.push("/settings");
+                }}
               >
                 <Feather
                   name="settings"
@@ -1649,6 +1670,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 16,
+    minHeight: 76,
   },
   scrollContent: {
     paddingHorizontal: 16,

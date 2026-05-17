@@ -131,13 +131,28 @@ export function useCurrentUser() {
   }, []);
 
   useEffect(() => {
+    if (!supabaseUser) {
+      publishSnapshot({
+        user: null,
+        isLoading: false,
+      });
+      return;
+    }
+
+    if (
+      currentSnapshot.user?.id === supabaseUser.id &&
+      !currentSnapshot.isLoading
+    ) {
+      return;
+    }
+
     refresh().catch(() => {
       publishSnapshot({
         user: currentSnapshot.user,
         isLoading: false,
       });
     });
-  }, [refresh]);
+  }, [refresh, supabaseUser]);
 
   return {
     user: snapshot.user,

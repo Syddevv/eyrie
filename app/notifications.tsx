@@ -31,6 +31,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification } from "@/services/notifications";
+import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -434,7 +435,10 @@ export default function NotificationsScreen() {
           <View style={styles.topRow}>
             <Pressable
               style={[styles.iconButton, pageStyles.iconButton]}
-              onPress={() => router.back()}
+              onPress={() => {
+                void triggerNavigationHaptic();
+                router.back();
+              }}
             >
               <Feather
                 name="chevron-left"

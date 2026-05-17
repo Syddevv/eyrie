@@ -18,6 +18,7 @@ import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 
 type NavVariant = "light" | "dark";
 type ActiveTab = "home" | "budget" | "goals" | "assistant" | "none";
@@ -191,11 +192,13 @@ export function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
       return;
     }
 
+    void triggerNavigationHaptic();
     navigation.navigate(targetRoute.name, targetRoute.params);
   };
 
   const handleAdd = () => {
     if (pathname !== "/modal") {
+      void triggerNavigationHaptic();
       router.push("/modal");
     }
   };
@@ -228,6 +231,7 @@ export function AppBottomNav({
             : "/assistant";
 
     if (pathname !== href) {
+      void triggerNavigationHaptic();
       router.replace(href);
     }
   };
@@ -239,6 +243,7 @@ export function AppBottomNav({
       onNavigate={navigate}
       onOpenAddTransaction={() => {
         if (pathname !== "/modal") {
+          void triggerNavigationHaptic();
           router.push("/modal");
         }
       }}
