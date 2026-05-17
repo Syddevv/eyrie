@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -47,6 +48,17 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+async function waitForPaint() {
+  await waitForNextFrame();
+  await waitForNextFrame();
+}
+
 function formatRelativeTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -87,6 +99,7 @@ function NotificationRow({
   onPress,
   onToggleRead,
   onDelete,
+  pendingAction,
 }: {
   item: AppNotification;
   titleColor: string;
@@ -96,10 +109,28 @@ function NotificationRow({
   onPress: () => void;
   onToggleRead: () => Promise<void>;
   onDelete: () => Promise<void>;
+  pendingAction: "toggleRead" | "delete" | null;
 }) {
   const swipeableRef = useRef<SwipeableMethods | null>(null);
+  const [localPendingAction, setLocalPendingAction] = useState<
+    "toggleRead" | "delete" | null
+  >(null);
+  const effectivePendingAction = localPendingAction ?? pendingAction;
+  const isBusy = effectivePendingAction !== null;
+
+  useEffect(() => {
+    if (!pendingAction) {
+      setLocalPendingAction(null);
+    }
+  }, [pendingAction]);
 
   const handleToggleRead = async (swipeable: SwipeableMethods) => {
+    if (isBusy) {
+      return;
+    }
+
+    setLocalPendingAction("toggleRead");
+
     try {
       await onToggleRead();
     } finally {
@@ -109,6 +140,12 @@ function NotificationRow({
   };
 
   const handleDelete = async (swipeable: SwipeableMethods) => {
+    if (isBusy) {
+      return;
+    }
+
+    setLocalPendingAction("delete");
+
     try {
       await onDelete();
     } finally {
@@ -124,10 +161,21 @@ function NotificationRow({
   ) => (
     <GestureHandlerPressable
       style={[styles.swipeAction, styles.swipeDelete]}
+      onPressIn={() => {
+        if (!isBusy) {
+          setLocalPendingAction("delete");
+        }
+      }}
       onPress={() => void handleDelete(swipeable)}
     >
-      <Feather name="trash-2" size={18} color="#FFFFFF" />
-      <Text style={styles.swipeActionText}>Delete</Text>
+      {effectivePendingAction === "delete" ? (
+        <ActivityIndicator color="#FFFFFF" size="small" />
+      ) : (
+        <>
+          <Feather name="trash-2" size={18} color="#FFFFFF" />
+          <Text style={styles.swipeActionText}>Delete</Text>
+        </>
+      )}
     </GestureHandlerPressable>
   );
 
@@ -138,16 +186,27 @@ function NotificationRow({
   ) => (
     <GestureHandlerPressable
       style={[styles.swipeAction, styles.swipeRead]}
+      onPressIn={() => {
+        if (!isBusy) {
+          setLocalPendingAction("toggleRead");
+        }
+      }}
       onPress={() => void handleToggleRead(swipeable)}
     >
-      <Feather
-        name={item.is_read ? "mail" : "check-circle"}
-        size={18}
-        color="#FFFFFF"
-      />
-      <Text style={styles.swipeActionText}>
-        {item.is_read ? "Mark unread" : "Mark read"}
-      </Text>
+      {effectivePendingAction === "toggleRead" ? (
+        <ActivityIndicator color="#FFFFFF" size="small" />
+      ) : (
+        <>
+          <Feather
+            name={item.is_read ? "mail" : "check-circle"}
+            size={18}
+            color="#FFFFFF"
+          />
+          <Text style={styles.swipeActionText}>
+            {item.is_read ? "Mark unread" : "Mark read"}
+          </Text>
+        </>
+      )}
     </GestureHandlerPressable>
   );
 
@@ -166,10 +225,12 @@ function NotificationRow({
           overshootRight={false}
         >
           <Pressable
+            disabled={isBusy}
             onPress={onPress}
             style={({ pressed }) => [
               styles.notificationCardInner,
-              pressed && styles.notificationCardPressed,
+              pressed && !isBusy && styles.notificationCardPressed,
+              isBusy && styles.notificationCardBusy,
             ]}
           >
             <View style={styles.notificationCardContent}>
@@ -248,6 +309,10 @@ export default function NotificationsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const [isMarkAllPending, setIsMarkAllPending] = useState(false);
+  const [pendingActionsById, setPendingActionsById] = useState<
+    Record<string, "toggleRead" | "delete">
+  >({});
   const { preferences, isLoading: isPreferencesLoading } =
     useNotificationPreferences();
   const notificationsEnabled = preferences?.notifications_enabled ?? false;
@@ -318,6 +383,50 @@ export default function NotificationsScreen() {
     await refresh();
   };
 
+  const handleMarkAllAsRead = async () => {
+    if (
+      isMarkAllPending ||
+      !notificationsEnabled ||
+      unreadCount === 0
+    ) {
+      return;
+    }
+
+    setIsMarkAllPending(true);
+    try {
+      await waitForPaint();
+      await markAllAsRead();
+    } finally {
+      setIsMarkAllPending(false);
+    }
+  };
+
+  const runNotificationAction = async (
+    notificationId: string,
+    action: "toggleRead" | "delete",
+    callback: () => Promise<void>,
+  ) => {
+    if (pendingActionsById[notificationId]) {
+      return;
+    }
+
+    setPendingActionsById((current) => ({
+      ...current,
+      [notificationId]: action,
+    }));
+
+    try {
+      await waitForPaint();
+      await callback();
+    } finally {
+      setPendingActionsById((current) => {
+        const next = { ...current };
+        delete next[notificationId];
+        return next;
+      });
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
@@ -348,11 +457,20 @@ export default function NotificationsScreen() {
             </View>
 
             <Pressable
-              style={[styles.iconButton, pageStyles.iconButton]}
-              disabled={!notificationsEnabled}
-              onPress={() => markAllAsRead().catch(() => undefined)}
+              style={[
+                styles.iconButton,
+                pageStyles.iconButton,
+                (!notificationsEnabled || unreadCount === 0) &&
+                  styles.iconButtonDisabled,
+              ]}
+              disabled={!notificationsEnabled || unreadCount === 0 || isMarkAllPending}
+              onPress={() => void handleMarkAllAsRead().catch(() => undefined)}
             >
-              <Feather name="check" size={20} color={colors.foreground} />
+              {isMarkAllPending ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <Feather name="check" size={20} color={colors.foreground} />
+              )}
             </Pressable>
           </View>
         </View>
@@ -473,7 +591,11 @@ export default function NotificationsScreen() {
                   item.is_read ? pageStyles.readCard : pageStyles.unreadCard
                 }
                 unreadDotStyle={pageStyles.unreadDot}
+                pendingAction={pendingActionsById[item.id] ?? null}
                 onPress={() => {
+                  if (pendingActionsById[item.id]) {
+                    return;
+                  }
                   if (!item.is_read) {
                     void toggleRead(item, true);
                   }
@@ -482,10 +604,14 @@ export default function NotificationsScreen() {
                   }
                 }}
                 onToggleRead={() => {
-                  return toggleRead(item, !item.is_read);
+                  return runNotificationAction(item.id, "toggleRead", () =>
+                    toggleRead(item, !item.is_read),
+                  );
                 }}
                 onDelete={() => {
-                  return deleteNotification(item);
+                  return runNotificationAction(item.id, "delete", () =>
+                    deleteNotification(item),
+                  );
                 }}
               />
             ))}
@@ -515,6 +641,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+  },
+  iconButtonDisabled: {
+    opacity: 0.45,
   },
   headerTextWrap: { flex: 1 },
   title: {
@@ -612,6 +741,9 @@ const styles = StyleSheet.create({
   },
   notificationCardPressed: {
     opacity: 0.92,
+  },
+  notificationCardBusy: {
+    opacity: 0.8,
   },
   notificationIconContainer: {
     width: 56,
