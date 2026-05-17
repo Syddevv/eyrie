@@ -1,8 +1,7 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Animated,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -224,7 +223,6 @@ export default function AddTransactionModal() {
     limit: number;
     status: "alreadyOver" | "willExceed";
   } | null>(null);
-  const merchantFade = useRef(new Animated.Value(0)).current;
   const merchantOptions = useMerchantsByCategory(selectedExpenseCategoryLabel);
   const categoryEditorInitialValue = useMemo(
     () => ({
@@ -414,20 +412,6 @@ export default function AddTransactionModal() {
       return paymentMethods[0]?.id ?? null;
     });
   }, [paymentMethods]);
-
-  useEffect(() => {
-    if (entryType !== "expense") {
-      merchantFade.setValue(0);
-      return;
-    }
-
-    merchantFade.setValue(0);
-    Animated.timing(merchantFade, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [entryType, merchantFade]);
 
   useEffect(() => {
     if (entryType !== "expense") {
@@ -970,22 +954,7 @@ export default function AddTransactionModal() {
             ) : null}
 
             {entryType === "expense" ? (
-              <Animated.View
-                style={[
-                  styles.section,
-                  {
-                    opacity: merchantFade,
-                    transform: [
-                      {
-                        translateY: merchantFade.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [8, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
+              <View style={styles.section}>
                 <Text style={[styles.fieldLabel, ui.fieldLabel]}>
                   Merchant (optional)
                 </Text>
@@ -1051,7 +1020,7 @@ export default function AddTransactionModal() {
                     Pick a category first to see suggested merchants.
                   </Text>
                 )}
-              </Animated.View>
+              </View>
             ) : entryType === "income" ? (
               <View style={styles.section}>
                 <Text style={[styles.fieldLabel, ui.fieldLabel]}>
