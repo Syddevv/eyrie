@@ -3,13 +3,16 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { LoadingActionButton } from '@/components/loading-action-button';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { publishCurrentUserUpdate, useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usersService } from '@/src/db/services';
 import { useAuthStore } from '@/store/useAuthStore';
+import { showToast } from '@/store/useToastStore';
 
 type CurrencyOption = {
   id: string;
@@ -39,7 +42,7 @@ export default function CurrencyModal() {
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
 
   const [selectedCurrency, setSelectedCurrency] = useState((user?.currency_code ?? 'PHP').toLowerCase());
-  const [isSaving, setIsSaving] = useState(false);
+  const { isRunning: isSaving, run } = useAsyncAction();
 
   useEffect(() => {
     setSelectedCurrency((user?.currency_code ?? 'PHP').toLowerCase());
@@ -83,14 +86,14 @@ export default function CurrencyModal() {
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
-      <Pressable style={styles.backdrop} onPress={() => router.back()} />
+      <Pressable disabled={isSaving} style={styles.backdrop} onPress={() => router.back()} />
 
       <View style={[styles.sheet, ui.sheet, shadows.floating]}>
         <View style={[styles.handle, ui.handle]} />
 
         <View style={styles.headerRow}>
           <Text style={[styles.title, ui.title]}>Currency</Text>
-          <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+          <Pressable disabled={isSaving} style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
             <Feather name="x" size={20} color={ui.closeIcon.color} />
           </Pressable>
         </View>
@@ -129,9 +132,14 @@ export default function CurrencyModal() {
           })}
         </ScrollView>
 
-        <Pressable
+        <LoadingActionButton
+          label="Save Currency"
+          loadingLabel="Saving..."
+          loading={isSaving}
           style={[styles.saveButton, ui.button, isSaving && styles.saveButtonDisabled]}
           disabled={isSaving}
+          textStyle={[styles.saveButtonText, ui.buttonText]}
+          spinnerColor="#FFFFFF"
           onPress={async () => {
             if (!user) {
               showSnackbar('User profile is still loading.', 'info');
@@ -141,25 +149,22 @@ export default function CurrencyModal() {
             const currency = currencyOptions.find((option) => option.id === selectedCurrency);
             const currencyCode = currency?.shortCode ?? 'PHP';
 
-            setIsSaving(true);
-
-            try {
+            await run(async () => {
               const updated = await usersService.updateCurrency(user.id, currencyCode);
               publishCurrentUserUpdate(updated);
               await refresh().catch(() => undefined);
-              showSnackbar(`Currency updated to ${currencyCode}.`, 'success');
               router.back();
-            } catch (error) {
+              showToast({
+                variant: 'success',
+                title: `Currency updated to ${currencyCode}.`,
+                source: 'currency-modal',
+              });
+            }).catch((error) => {
               const message = error instanceof Error ? error.message : 'Unable to update currency.';
               showSnackbar(message, 'error');
-            } finally {
-              setIsSaving(false);
-            }
-          }}>
-          <Text style={[styles.saveButtonText, ui.buttonText]}>
-            {isSaving ? 'Saving...' : 'Save Currency'}
-          </Text>
-        </Pressable>
+            });
+          }}
+        />
       </View>
     </View>
   );

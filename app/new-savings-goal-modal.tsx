@@ -19,10 +19,12 @@ import {
 } from "react-native";
 
 import { GoalAvatar } from "@/components/goal-avatar";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { GOAL_COLOR_PRESETS, GOAL_EMOJI_PRESETS, GOAL_ICON_PRESETS } from "@/constants/goal-presets";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
@@ -110,7 +112,7 @@ export default function NewSavingsGoalModal() {
   const [linkedWalletId, setLinkedWalletId] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isRunning: isSaving, run } = useAsyncAction();
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -204,8 +206,7 @@ export default function NewSavingsGoalModal() {
       return;
     }
 
-    setIsSaving(true);
-    try {
+    await run(async () => {
       await goalsService.create({
         userId: user.id,
         title: goalName.trim(),
@@ -220,11 +221,9 @@ export default function NewSavingsGoalModal() {
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-    } catch (error) {
+    }).catch((error) => {
       Alert.alert("Unable to create goal", error instanceof Error ? error.message : "Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   };
 
   return (
@@ -233,7 +232,7 @@ export default function NewSavingsGoalModal() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <Pressable disabled={isSaving} style={styles.backdrop} onPress={() => router.back()} />
 
         <View
           style={[
@@ -248,7 +247,7 @@ export default function NewSavingsGoalModal() {
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>New Savings Goal</Text>
-            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+            <Pressable disabled={isSaving} style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
               <Feather name="x" size={20} color={ui.muted.color} />
             </Pressable>
           </View>
@@ -428,12 +427,16 @@ export default function NewSavingsGoalModal() {
             </View>
           </ScrollView>
 
-          <Pressable
+          <LoadingActionButton
+            label="Create Goal"
+            loadingLabel="Creating..."
+            loading={isSaving}
             style={[styles.createButton, isCreateEnabled ? ui.primaryButton : ui.disabledButton]}
             onPress={() => void handleCreate()}
-            disabled={isSaving}>
-            <Text style={styles.createButtonText}>{isSaving ? "Creating..." : "Create Goal"}</Text>
-          </Pressable>
+            disabled={!isCreateEnabled}
+            textStyle={styles.createButtonText}
+            spinnerColor="#FFFFFF"
+          />
 
           {showCalendar ? (
             <View style={styles.calendarOverlay}>

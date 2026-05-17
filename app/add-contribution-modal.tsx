@@ -17,9 +17,11 @@ import {
 } from "react-native";
 
 import { GoalAvatar } from "@/components/goal-avatar";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useSavingsGoal } from "@/hooks/useSavingsGoals";
@@ -50,7 +52,7 @@ export default function AddContributionModal() {
   const [note, setNote] = useState("");
   const [walletId, setWalletId] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isRunning: isSaving, run } = useAsyncAction();
 
   useEffect(() => {
     if (goal?.linkedWalletId) {
@@ -176,8 +178,7 @@ export default function AddContributionModal() {
   };
 
   const submitContribution = async (allowOverdraft = false) => {
-    setIsSaving(true);
-    try {
+    await run(async () => {
       if (!goal) throw new Error("Goal not found");
       await goalsService.createContribution({
         goalId: goal.id,
@@ -192,14 +193,12 @@ export default function AddContributionModal() {
           : Haptics.NotificationFeedbackType.Warning,
       );
       returnToGoalDetails();
-    } catch (error) {
+    }).catch((error) => {
       Alert.alert(
         "Unable to add contribution",
         error instanceof Error ? error.message : "Please try again.",
       );
-    } finally {
-      setIsSaving(false);
-    }
+    });
   };
 
   const handleAdd = () => {
@@ -244,7 +243,7 @@ export default function AddContributionModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={closeContributionFlow} />
+        <Pressable disabled={isSaving} style={styles.backdrop} onPress={closeContributionFlow} />
         <View
           style={[
             styles.sheet,
@@ -284,6 +283,7 @@ export default function AddContributionModal() {
               </View>
             </View>
             <Pressable
+              disabled={isSaving}
               style={[styles.closeButton, ui.closeButton]}
               onPress={closeContributionFlow}
             >
@@ -519,29 +519,28 @@ export default function AddContributionModal() {
           </ScrollView>
 
           <View style={styles.footerActions}>
-            <Pressable
+            <LoadingActionButton
+              label="Cancel"
+              disabled={isSaving}
               style={[styles.footerButton, ui.secondaryButton]}
               onPress={closeContributionFlow}
-            >
-              <Text style={[styles.footerButtonText, ui.secondaryText]}>
-                Cancel
-              </Text>
-            </Pressable>
-            <Pressable
+              textStyle={[styles.footerButtonText, ui.secondaryText]}
+              spinnerColor={colors.foreground}
+            />
+            <LoadingActionButton
+              label={`Add ${formatCurrency(parsedAmount || 0)}`}
+              loadingLabel="Adding..."
+              loading={isSaving}
               style={[
                 styles.footerButton,
                 ui.primaryButton,
                 !isAddEnabled && ui.primaryButtonDisabled,
               ]}
               onPress={handleAdd}
-              disabled={isSaving || !isAddEnabled}
-            >
-              <Text style={[styles.footerButtonText, ui.primaryText]}>
-                {isSaving
-                  ? "Adding..."
-                  : `Add ${formatCurrency(parsedAmount || 0)}`}
-              </Text>
-            </Pressable>
+              disabled={!isAddEnabled}
+              textStyle={[styles.footerButtonText, ui.primaryText]}
+              spinnerColor="#FFFFFF"
+            />
           </View>
         </View>
       </View>

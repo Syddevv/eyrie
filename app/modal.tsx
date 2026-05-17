@@ -2,9 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -31,6 +29,7 @@ import { useMerchantsByCategory } from "@/hooks/useMerchantsByCategory";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useAccounts } from "@/hooks/useAccounts";
 import Logo from "@/components/logo";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
@@ -38,11 +37,10 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCreateExpense } from "@/hooks/useCreateExpense";
 import { useCreateIncome } from "@/hooks/useCreateIncome";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useBudgetWarning } from "@/hooks/useBudgetWarning";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { categoriesService } from "@/src/db/services";
 import { getBudgetProgress } from "@/src/db/queries/dashboard";
-import { FadeInDown } from "react-native-reanimated";
 
 type EntryType = "expense" | "income";
 
@@ -182,6 +180,8 @@ export default function AddTransactionModal() {
     useCreateExpense();
   const { create: createIncome, isLoading: isCreatingIncome } =
     useCreateIncome();
+  const { isRunning: isSubmittingTransaction, run: runSubmitTransaction } =
+    useAsyncAction();
 
   const { categories: expenseCategories, refresh: refreshExpenseCategories } =
     useExpenseCategories();
@@ -226,10 +226,6 @@ export default function AddTransactionModal() {
   } | null>(null);
   const merchantFade = useRef(new Animated.Value(0)).current;
   const merchantOptions = useMerchantsByCategory(selectedExpenseCategoryLabel);
-  const budgetWarning = useBudgetWarning(
-    entryType === "expense" ? selectedExpenseCategoryId : null,
-  );
-
   const categoryEditorInitialValue = useMemo(
     () => ({
       type: entryType,
@@ -485,6 +481,10 @@ export default function AddTransactionModal() {
   };
 
   const handleSaveTransaction = async () => {
+    if (isSubmittingTransaction || isCreatingExpense || isCreatingIncome) {
+      return;
+    }
+
     if (!isSaveEnabled) {
       showIncompleteFormAlert();
       return;
@@ -492,7 +492,11 @@ export default function AddTransactionModal() {
 
     setErrorMessage(null);
 
-    try {
+    await runSubmitTransaction(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
       if (entryType === "expense") {
         // Validate expense fields
         if (!selectedExpenseCategoryId) {
@@ -553,11 +557,11 @@ export default function AddTransactionModal() {
 
       // Success - close modal
       router.back();
-    } catch (error) {
+    }).catch((error) => {
       const message =
         error instanceof Error ? error.message : "An error occurred";
       setErrorMessage(message);
-    }
+    });
   };
 
   const ui = useMemo(
@@ -653,6 +657,8 @@ export default function AddTransactionModal() {
   );
 
   const saveLabel = entryType === "expense" ? "Save Expense" : "Save Income";
+  const isSavingTransaction =
+    isSubmittingTransaction || isCreatingExpense || isCreatingIncome;
   const title = entryType === "expense" ? "Add Expense" : "Add Income";
   const accountFieldLabel =
     entryType === "expense" ? "Payment Method" : "Receiving Account";
@@ -1355,31 +1361,27 @@ export default function AddTransactionModal() {
           </ScrollView>
 
           <View style={[styles.footer, ui.divider]}>
-            <Pressable
+            <LoadingActionButton
+              label={saveLabel}
+              loadingLabel={entryType === "income" ? "Saving income..." : "Saving expense..."}
+              loading={isSavingTransaction}
               style={[
                 styles.saveButton,
-                !isSaveEnabled || isCreatingExpense || isCreatingIncome
+                !isSaveEnabled || isSavingTransaction
                   ? ui.saveButtonDisabled
                   : ui.saveButton,
               ]}
               disabled={
                 !isSaveEnabled ||
+                isSubmittingTransaction ||
                 isCreatingExpense ||
                 isCreatingIncome ||
                 isExpenseSaveBlockedByInsufficientBalance
               }
               onPress={handleSaveTransaction}
-            >
-              {isCreatingExpense || isCreatingIncome ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#FFFFFF"
-                  style={styles.buttonSpinner}
-                />
-              ) : (
-                <Text style={styles.saveButtonText}>{saveLabel}</Text>
-              )}
-            </Pressable>
+              textStyle={styles.saveButtonText}
+              spinnerColor="#FFFFFF"
+            />
 
             {errorMessage ? (
               <Text
@@ -1948,9 +1950,6 @@ const styles = StyleSheet.create({
   },
   selectedDayText: {
     color: "#FFFFFF",
-  },
-  buttonSpinner: {
-    marginRight: 8,
   },
   errorMessage: {
     marginTop: 8,

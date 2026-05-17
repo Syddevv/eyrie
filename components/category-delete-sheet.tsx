@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CategoryAvatar } from "@/components/category-avatar";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import type { CategoryOption } from "@/hooks/useCategories";
@@ -61,7 +62,11 @@ export function CategoryDeleteSheet({
     <View
       style={[styles.overlay, { backgroundColor: getSurfaceOverlay(isDark) }]}
     >
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
+      <Pressable
+        disabled={isSubmitting}
+        style={StyleSheet.absoluteFillObject}
+        onPress={onCancel}
+      />
 
       <View style={[styles.card, getSheetSurface(isDark), shadows.floating]}>
         <View
@@ -104,8 +109,11 @@ export function CategoryDeleteSheet({
 
         <View style={styles.actionsColumn}>
           {category.isSystem ? (
-            <Pressable
-              disabled={isSubmitting}
+            <LoadingActionButton
+              label="Archive Category"
+              loadingLabel="Archiving..."
+              loading={isSubmitting}
+              haptic="destructive"
               style={[
                 styles.secondaryButton,
                 {
@@ -114,43 +122,41 @@ export function CategoryDeleteSheet({
                     : "#EEF2F7",
                 },
               ]}
+              textStyle={[
+                styles.secondaryButtonText,
+                { color: getTitleColor(isDark) },
+              ]}
+              spinnerColor={getTitleColor(isDark)}
               onPress={() => onConfirm({ mode: "archive" })}
-            >
-              <Text
-                style={[
-                  styles.secondaryButtonText,
-                  { color: getTitleColor(isDark) },
-                ]}
-              >
-                Archive Category
-              </Text>
-            </Pressable>
+            />
           ) : (
             <>
-              <Pressable
-                disabled={isSubmitting}
+              <LoadingActionButton
+                label="Archive Category"
+                loadingLabel="Archiving..."
+                loading={isSubmitting}
+                haptic="destructive"
                 style={[
                   styles.primaryButton,
                   isSubmitting && styles.disabledButton,
                 ]}
+                textStyle={styles.primaryButtonText}
+                spinnerColor="#FFFFFF"
                 onPress={() => onConfirm({ mode: "archive" })}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {isSubmitting ? "Working..." : "Archive Category"}
-                </Text>
-              </Pressable>
-              <Pressable
-                disabled={isSubmitting}
+              />
+              <LoadingActionButton
+                label="Delete Category"
+                loadingLabel="Deleting..."
+                loading={isSubmitting}
+                haptic="destructive"
                 style={[
                   styles.destructiveButton,
                   isSubmitting && styles.disabledButton,
                 ]}
+                textStyle={styles.primaryButtonText}
+                spinnerColor="#FFFFFF"
                 onPress={() => onConfirm({ mode: "delete" })}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {isSubmitting ? "Working..." : "Delete Category"}
-                </Text>
-              </Pressable>
+              />
             </>
           )}
         </View>

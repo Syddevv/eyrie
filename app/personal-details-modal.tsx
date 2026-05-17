@@ -16,14 +16,17 @@ import {
   View,
 } from 'react-native';
 
+import { LoadingActionButton } from '@/components/loading-action-button';
 import { themeColors } from '@/constants/colors';
 import { radius, shadows } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { publishCurrentUserUpdate, useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 import { usersService } from '@/src/db/services';
 import { useAuthStore } from '@/store/useAuthStore';
+import { showToast } from '@/store/useToastStore';
 
 function splitFullName(fullName?: string | null) {
   const parts = (fullName ?? '').trim().split(/\s+/).filter(Boolean);
@@ -52,7 +55,7 @@ export default function PersonalDetailsModal() {
   const [email, setEmail] = useState(user?.email ?? '');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
+  const { isRunning: isSaving, run } = useAsyncAction();
 
   useEffect(() => {
     const nextName = splitFullName(user?.full_name);
@@ -145,7 +148,7 @@ export default function PersonalDetailsModal() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       style={styles.keyboardWrap}>
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <Pressable disabled={isSaving} style={styles.backdrop} onPress={() => router.back()} />
 
         <View
           style={[
@@ -158,7 +161,7 @@ export default function PersonalDetailsModal() {
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>Personal Information</Text>
-            <Pressable style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
+            <Pressable disabled={isSaving} style={[styles.closeButton, ui.closeButton]} onPress={() => router.back()}>
               <Feather name="x" size={20} color={ui.closeIcon.color} />
             </Pressable>
           </View>
@@ -230,9 +233,14 @@ export default function PersonalDetailsModal() {
               </View>
             </View>
 
-            <Pressable
+            <LoadingActionButton
+              label="Save Changes"
+              loadingLabel="Saving..."
+              loading={isSaving}
               style={[styles.saveButton, ui.primaryButton, isSaving && styles.saveButtonDisabled]}
               disabled={isSaving}
+              textStyle={[styles.saveButtonText, ui.primaryButtonText]}
+              spinnerColor="#FFFFFF"
               onPress={async () => {
                 if (!user) {
                   showSnackbar('User profile is still loading.', 'info');
@@ -252,9 +260,7 @@ export default function PersonalDetailsModal() {
                   return;
                 }
 
-                setIsSaving(true);
-
-                try {
+                await run(async () => {
                   const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
 
                   const { error } = await supabase.auth.updateUser({
@@ -276,25 +282,20 @@ export default function PersonalDetailsModal() {
                   });
 
                   publishCurrentUserUpdate(updated);
-
-                  showSnackbar(
-                    emailChanged
+                  router.back();
+                  showToast({
+                    variant: 'success',
+                    title: emailChanged
                       ? 'Profile saved. Check your email to confirm the new address if required.'
                       : 'Profile updated.',
-                    'success',
-                  );
-                  router.back();
-                } catch (error) {
+                    source: 'personal-details-modal',
+                  });
+                }).catch((error) => {
                   const message = error instanceof Error ? error.message : 'Unable to update profile.';
                   showSnackbar(message, 'error');
-                } finally {
-                  setIsSaving(false);
-                }
-              }}>
-              <Text style={[styles.saveButtonText, ui.primaryButtonText]}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Text>
-            </Pressable>
+                });
+              }}
+            />
           </ScrollView>
         </View>
       </View>

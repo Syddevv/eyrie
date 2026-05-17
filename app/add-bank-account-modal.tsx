@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { BANKS } from "@/constants/banks";
 import { CARD_NETWORKS } from "@/constants/cardNetworks";
@@ -23,6 +24,7 @@ import { showSuccessToast } from "@/store/useToastStore";
 import { showIncompleteFormAlert } from "@/lib/utils/form-feedback";
 import { accountsService } from "@/src/db/services";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 function formatCardNumber(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 16);
@@ -77,6 +79,7 @@ export default function AddBankAccountModal() {
   const [cardholderName, setCardholderName] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const isAddEnabled = Boolean(selectedBank);
+  const { isRunning: isSaving, run } = useAsyncAction();
   const { user } = useCurrentUser();
   const { accounts } = useAccounts();
   const hasExistingBank = useMemo(
@@ -161,7 +164,7 @@ export default function AddBankAccountModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <Pressable disabled={isSaving} style={styles.backdrop} onPress={() => router.back()} />
 
         <View
           style={[
@@ -178,6 +181,7 @@ export default function AddBankAccountModal() {
           <View style={styles.headerRow}>
             <Text style={[styles.title, ui.title]}>Add Card</Text>
             <Pressable
+              disabled={isSaving}
               style={[styles.closeButton, ui.closeButton]}
               onPress={() => router.back()}
             >
@@ -298,7 +302,11 @@ export default function AddBankAccountModal() {
             </View>
           </View>
 
-          <Pressable
+          <LoadingActionButton
+            label="Add Card"
+            loadingLabel="Adding..."
+            loading={isSaving}
+            haptic="default"
             style={[
               styles.addButton,
               isAddEnabled ? ui.button : ui.buttonDisabled,
@@ -319,7 +327,7 @@ export default function AddBankAccountModal() {
 
               const last4 = cardNumber.replace(/\D/g, "").slice(-4) || null;
 
-              try {
+              await run(async () => {
                 const created = await accountsService.create(
                   {
                     userId: user?.id ?? "",
@@ -345,14 +353,15 @@ export default function AddBankAccountModal() {
                     source: "settings-add-card",
                   });
                 }, 240);
-              } catch {
+              }).catch(() => {
                 // ignore - global feedback handled elsewhere
                 return;
-              }
+              });
             }}
-          >
-            <Text style={[styles.addButtonText, ui.buttonText]}>Add Card</Text>
-          </Pressable>
+            disabled={!isAddEnabled}
+            textStyle={[styles.addButtonText, ui.buttonText]}
+            spinnerColor="#FFFFFF"
+          />
         </View>
       </View>
     </KeyboardAvoidingView>

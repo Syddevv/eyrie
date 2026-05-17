@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -467,8 +468,11 @@ export default function SettingsScreen() {
             ))}
           </View>
 
-          <Pressable
-            disabled={isSigningOut}
+          <LoadingActionButton
+            label="Sign Out"
+            loadingLabel="Signing Out..."
+            loading={isSigningOut}
+            haptic="destructive"
             onPress={() => {
               setShowSignOutConfirm(true);
             }}
@@ -477,12 +481,10 @@ export default function SettingsScreen() {
               pageStyles.signOutButton,
               isSigningOut && { opacity: 0.7 },
             ]}
-          >
-            <Feather name="log-out" size={18} color="#FF2440" />
-            <Text style={styles.signOutText}>
-              {isSigningOut ? "Signing Out..." : "Sign Out"}
-            </Text>
-          </Pressable>
+            textStyle={styles.signOutText}
+            spinnerColor="#FF2440"
+            leftAdornment={<Feather name="log-out" size={18} color="#FF2440" />}
+          />
 
           <View style={styles.footerBrand}>
             <View style={styles.footerAvatarFrame}>

@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -51,7 +52,11 @@ export function DeleteConfirmationModal({
 
   return (
     <View style={[styles.overlay, { backgroundColor: getSurfaceOverlay(isDark) }]}>
-      <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
+      <Pressable
+        disabled={isDeleting}
+        style={StyleSheet.absoluteFillObject}
+        onPress={onCancel}
+      />
 
       <View style={[styles.card, getSheetSurface(isDark), shadows.floating]}>
         <View style={[styles.handle, { backgroundColor: getHandleColor(isDark) }]} />
@@ -79,24 +84,31 @@ export function DeleteConfirmationModal({
         <Text style={[styles.message, { color: isDark ? "#9EA6B5" : "#5B78A2" }]}>{message}</Text>
 
         <View style={styles.actionsRow}>
-          <Pressable
+          <LoadingActionButton
             disabled={isDeleting}
-            style={[styles.secondaryButton, { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7" }]}
-            onPress={onCancel}>
-            <Text style={[styles.secondaryText, { color: getTitleColor(isDark) }]}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            disabled={isDeleting}
+            label="Cancel"
+            haptic="none"
+            style={[
+              styles.secondaryButton,
+              { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7" },
+            ]}
+            textStyle={[styles.secondaryText, { color: getTitleColor(isDark) }]}
+            onPress={onCancel}
+          />
+          <LoadingActionButton
+            label={confirmLabel}
+            loadingLabel={loadingLabel}
+            loading={isDeleting}
+            haptic="destructive"
             style={[
               styles.primaryButton,
               { backgroundColor: primaryButtonColor },
               isDeleting && styles.buttonDisabled,
             ]}
-            onPress={onConfirm}>
-            <Text style={styles.primaryText}>
-              {isDeleting ? loadingLabel : confirmLabel}
-            </Text>
-          </Pressable>
+            textStyle={styles.primaryText}
+            spinnerColor="#FFFFFF"
+            onPress={onConfirm}
+          />
         </View>
       </View>
     </View>
