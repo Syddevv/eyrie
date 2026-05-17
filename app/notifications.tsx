@@ -11,9 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  Pressable as GestureHandlerPressable,
-} from "react-native-gesture-handler";
+import { Pressable as GestureHandlerPressable } from "react-native-gesture-handler";
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -264,7 +262,6 @@ function NotificationRow({
                         opacity: item.is_read ? 0.7 : 1,
                       },
                     ]}
-                    numberOfLines={2}
                   >
                     {item.title}
                   </Text>
@@ -274,7 +271,6 @@ function NotificationRow({
                 </View>
 
                 <Text
-                  numberOfLines={2}
                   style={[
                     styles.notificationBody,
                     {
@@ -385,11 +381,7 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (
-      isMarkAllPending ||
-      !notificationsEnabled ||
-      unreadCount === 0
-    ) {
+    if (isMarkAllPending || !notificationsEnabled || unreadCount === 0) {
       return;
     }
 
@@ -467,7 +459,9 @@ export default function NotificationsScreen() {
                 (!notificationsEnabled || unreadCount === 0) &&
                   styles.iconButtonDisabled,
               ]}
-              disabled={!notificationsEnabled || unreadCount === 0 || isMarkAllPending}
+              disabled={
+                !notificationsEnabled || unreadCount === 0 || isMarkAllPending
+              }
               onPress={() => void handleMarkAllAsRead().catch(() => undefined)}
             >
               {isMarkAllPending ? (
@@ -505,8 +499,8 @@ export default function NotificationsScreen() {
                 {!notificationsEnabled && !isPreferencesLoading
                   ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
                   : preferences?.push_enabled
-                  ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
-                  : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
+                    ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
+                    : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
               </Text>
             </View>
           </View>
@@ -551,7 +545,11 @@ export default function NotificationsScreen() {
                   shadows.soft,
                 ]}
               >
-                <Feather name="bell-off" size={22} color={colors.mutedForeground} />
+                <Feather
+                  name="bell-off"
+                  size={22}
+                  color={colors.mutedForeground}
+                />
                 <Text style={[styles.emptyStateTitle, pageStyles.title]}>
                   Notifications are off
                 </Text>
@@ -586,39 +584,39 @@ export default function NotificationsScreen() {
 
             {notificationsEnabled &&
               notifications.map((item) => (
-              <NotificationRow
-                key={item.id}
-                item={item}
-                titleColor={pageStyles.titleText}
-                bodyColor={pageStyles.bodyText}
-                cardStyle={
-                  item.is_read ? pageStyles.readCard : pageStyles.unreadCard
-                }
-                unreadDotStyle={pageStyles.unreadDot}
-                pendingAction={pendingActionsById[item.id] ?? null}
-                onPress={() => {
-                  if (pendingActionsById[item.id]) {
-                    return;
+                <NotificationRow
+                  key={item.id}
+                  item={item}
+                  titleColor={pageStyles.titleText}
+                  bodyColor={pageStyles.bodyText}
+                  cardStyle={
+                    item.is_read ? pageStyles.readCard : pageStyles.unreadCard
                   }
-                  if (!item.is_read) {
-                    void toggleRead(item, true);
-                  }
-                  if (item.action_url) {
-                    router.push(item.action_url as any);
-                  }
-                }}
-                onToggleRead={() => {
-                  return runNotificationAction(item.id, "toggleRead", () =>
-                    toggleRead(item, !item.is_read),
-                  );
-                }}
-                onDelete={() => {
-                  return runNotificationAction(item.id, "delete", () =>
-                    deleteNotification(item),
-                  );
-                }}
-              />
-            ))}
+                  unreadDotStyle={pageStyles.unreadDot}
+                  pendingAction={pendingActionsById[item.id] ?? null}
+                  onPress={() => {
+                    if (pendingActionsById[item.id]) {
+                      return;
+                    }
+                    if (!item.is_read) {
+                      void toggleRead(item, true);
+                    }
+                    if (item.action_url) {
+                      router.push(item.action_url as any);
+                    }
+                  }}
+                  onToggleRead={() => {
+                    return runNotificationAction(item.id, "toggleRead", () =>
+                      toggleRead(item, !item.is_read),
+                    );
+                  }}
+                  onDelete={() => {
+                    return runNotificationAction(item.id, "delete", () =>
+                      deleteNotification(item),
+                    );
+                  }}
+                />
+              ))}
           </View>
         </ScrollView>
       </View>
