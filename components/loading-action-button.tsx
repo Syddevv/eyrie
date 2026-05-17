@@ -50,6 +50,18 @@ function pickMeasurementLabel(
   return loadingLabel.length > label.length ? loadingLabel : label;
 }
 
+function hasReservedLeadingSlot(
+  leftAdornment: ReactNode,
+  loadingLabel?: string,
+  loading?: boolean,
+) {
+  return Boolean(leftAdornment) || Boolean(loadingLabel) || loading;
+}
+
+function hasReservedTrailingSlot(rightAdornment: ReactNode) {
+  return Boolean(rightAdornment);
+}
+
 export function LoadingActionButton({
   label,
   loadingLabel,
@@ -74,6 +86,12 @@ export function LoadingActionButton({
     loadingLabel,
     preserveLabelWidth,
   );
+  const reserveLeadingSlot = hasReservedLeadingSlot(
+    leftAdornment,
+    loadingLabel,
+    loading,
+  );
+  const reserveTrailingSlot = hasReservedTrailingSlot(rightAdornment);
   const isDisabled = disabled || loading;
 
   const triggerHaptic = async () => {
@@ -107,42 +125,60 @@ export function LoadingActionButton({
             preserveLabelWidth ? styles.measurementVisible : styles.hidden,
           ]}
         >
-          <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
-            {leftAdornment ? (
+          <View
+            style={[
+              styles.slot,
+              {
+                width: reserveLeadingSlot ? slotSize : 0,
+                height: reserveLeadingSlot ? slotSize : 0,
+              },
+            ]}
+          >
+            {reserveLeadingSlot && leftAdornment ? (
               <View style={styles.slotContent}>{leftAdornment}</View>
             ) : null}
           </View>
-          <Text style={[styles.label, textStyle, styles.hidden]}>
-            {measurementLabel}
-          </Text>
-          <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
-            {rightAdornment ? (
+          <View style={styles.labelWrap}>
+            <Text style={[styles.label, textStyle, styles.hidden]}>
+              {measurementLabel}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.slot,
+              {
+                width: reserveTrailingSlot ? slotSize : 0,
+                height: reserveTrailingSlot ? slotSize : 0,
+              },
+            ]}
+          >
+            {reserveTrailingSlot && rightAdornment ? (
               <View style={styles.slotContent}>{rightAdornment}</View>
             ) : null}
           </View>
         </View>
 
         <View style={styles.overlayRow}>
-          <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
+          <View style={styles.cluster}>
             {loading ? (
-              <ActivityIndicator color={spinnerColor} size={indicatorSize} />
+              <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
+                {loading ? (
+                  <ActivityIndicator color={spinnerColor} size={indicatorSize} />
+                ) : null}
+              </View>
             ) : leftAdornment ? (
-              <View style={styles.slotContent}>{leftAdornment}</View>
+              <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
+                <View style={styles.slotContent}>{leftAdornment}</View>
+              </View>
             ) : null}
-          </View>
-          <Text numberOfLines={1} style={[styles.label, textStyle]}>
-            {resolvedLabel}
-          </Text>
-          <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
-            {loading ? (
-              <ActivityIndicator
-                color={spinnerColor}
-                size={indicatorSize}
-                style={styles.hidden}
-              />
-            ) : rightAdornment ? (
-              <View style={[styles.slotContent, loading && styles.hidden]}>
-                {rightAdornment}
+            <View style={styles.labelWrap}>
+              <Text numberOfLines={1} style={[styles.label, textStyle]}>
+                {resolvedLabel}
+              </Text>
+            </View>
+            {!loading && rightAdornment ? (
+              <View style={[styles.slot, { width: slotSize, height: slotSize }]}>
+                <View style={styles.slotContent}>{rightAdornment}</View>
               </View>
             ) : null}
           </View>
@@ -171,7 +207,10 @@ export function LoadingActionButton({
   },
   overlayRow: {
     ...StyleSheet.absoluteFillObject,
-    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cluster: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -180,10 +219,17 @@ export function LoadingActionButton({
   slot: {
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   slotContent: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  labelWrap: {
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 1,
   },
   hidden: {
     opacity: 0,

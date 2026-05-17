@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { LoadingActionButton } from "@/components/loading-action-button";
@@ -26,7 +27,7 @@ type DeleteConfirmationModalProps = {
   iconBackgroundColor?: string;
   primaryButtonColor?: string;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 };
 
 export function DeleteConfirmationModal({
@@ -45,6 +46,40 @@ export function DeleteConfirmationModal({
 }: DeleteConfirmationModalProps) {
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
+  const [isPendingConfirm, setIsPendingConfirm] = useState(false);
+  const isBusy = isDeleting || isPendingConfirm;
+
+  useEffect(() => {
+    if (!visible) {
+      setIsPendingConfirm(false);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (isDeleting) {
+      setIsPendingConfirm(false);
+    }
+  }, [isDeleting]);
+
+  const handleConfirm = () => {
+    if (isBusy) {
+      return;
+    }
+
+    setIsPendingConfirm(true);
+
+    requestAnimationFrame(() => {
+      Promise.resolve(onConfirm())
+        .catch(() => {
+          setIsPendingConfirm(false);
+        })
+        .finally(() => {
+          requestAnimationFrame(() => {
+            setIsPendingConfirm(false);
+          });
+        });
+    });
+  };
 
   if (!visible) {
     return null;
@@ -53,7 +88,7 @@ export function DeleteConfirmationModal({
   return (
     <View style={[styles.overlay, { backgroundColor: getSurfaceOverlay(isDark) }]}>
       <Pressable
-        disabled={isDeleting}
+        disabled={isBusy}
         style={StyleSheet.absoluteFillObject}
         onPress={onCancel}
       />
@@ -73,7 +108,7 @@ export function DeleteConfirmationModal({
             <Feather name={iconName} size={18} color={iconColor} />
           </View>
           <Pressable
-            disabled={isDeleting}
+            disabled={isBusy}
             style={[styles.closeButton, { backgroundColor: getBackdropButtonColor(isDark) }]}
             onPress={onCancel}>
             <Feather name="x" size={18} color={getTitleColor(isDark)} />
@@ -85,7 +120,7 @@ export function DeleteConfirmationModal({
 
         <View style={styles.actionsRow}>
           <LoadingActionButton
-            disabled={isDeleting}
+            disabled={isBusy}
             label="Cancel"
             haptic="none"
             style={[
@@ -98,16 +133,16 @@ export function DeleteConfirmationModal({
           <LoadingActionButton
             label={confirmLabel}
             loadingLabel={loadingLabel}
-            loading={isDeleting}
+            loading={isBusy}
             haptic="destructive"
             style={[
               styles.primaryButton,
               { backgroundColor: primaryButtonColor },
-              isDeleting && styles.buttonDisabled,
+              isBusy && styles.buttonDisabled,
             ]}
             textStyle={styles.primaryText}
             spinnerColor="#FFFFFF"
-            onPress={onConfirm}
+            onPress={handleConfirm}
           />
         </View>
       </View>
