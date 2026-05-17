@@ -233,10 +233,10 @@ export default function BudgetScreen() {
     setDraftBudgetValue("");
   };
 
-  // Hide the floating bottom nav while the edit sheet is open
+  // Hide the floating bottom nav while any screen-level modal sheet is open.
   const bottomNavVisible = useBottomNavStore((s) => s.visible);
   useEffect(() => {
-    if (editingBudget) {
+    if (editingBudget || budgetPendingDelete) {
       useBottomNavStore.getState().hide();
     } else {
       useBottomNavStore.getState().show();
@@ -245,7 +245,7 @@ export default function BudgetScreen() {
     return () => {
       useBottomNavStore.getState().show();
     };
-  }, [editingBudget]);
+  }, [budgetPendingDelete, editingBudget]);
 
   const saveEditingBudget = async () => {
     if (!editingBudget) {
