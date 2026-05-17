@@ -31,24 +31,46 @@ export function useNotificationBootstrap() {
       return;
     }
 
-    ensureNotificationPreferences(userId)
-      .then(() => registerPushToken(userId))
-      .catch(() => undefined);
+    let isActive = true;
+    let unsubscribe: (() => void) | undefined;
 
-    generatePeriodicNotifications(userId).catch(() => undefined);
+    void ensureNotificationPreferences(userId)
+      .then(async (preferences) => {
+        if (!isActive) {
+          return;
+        }
 
-    fetchUnreadNotificationCount(userId)
-      .then((count) => {
+        if (!preferences.notifications_enabled) {
+          setUnreadCount(0);
+          await syncNotificationBadge(0);
+          return;
+        }
+
+        await registerPushToken(userId).catch(() => undefined);
+        await generatePeriodicNotifications(userId).catch(() => undefined);
+
+        const count = await fetchUnreadNotificationCount(userId).catch(() => 0);
+        if (!isActive) {
+          return;
+        }
+
         setUnreadCount(count);
-        return syncNotificationBadge(count);
+        await syncNotificationBadge(count);
+
+        unsubscribe = subscribeToNotifications(userId, async () => {
+          const nextCount = await fetchUnreadNotificationCount(userId).catch(
+            () => 0,
+          );
+          setUnreadCount(nextCount);
+          await syncNotificationBadge(nextCount);
+        });
       })
       .catch(() => undefined);
 
-    return subscribeToNotifications(userId, async () => {
-      const count = await fetchUnreadNotificationCount(userId).catch(() => 0);
-      setUnreadCount(count);
-      await syncNotificationBadge(count);
-    });
+    return () => {
+      isActive = false;
+      unsubscribe?.();
+    };
   }, [setUnreadCount, userId]);
 }
 

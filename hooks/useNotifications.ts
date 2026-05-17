@@ -73,7 +73,7 @@ function mergeNotifications(
   );
 }
 
-export function useNotifications() {
+export function useNotifications(enabled = true) {
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -83,9 +83,11 @@ export function useNotifications() {
   const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
 
   const refresh = useCallback(async () => {
-    if (!userId) {
+    if (!userId || !enabled) {
       setNotifications([]);
+      setError(null);
       setUnreadCount(0);
+      await syncNotificationBadge(0);
       return;
     }
 
@@ -105,7 +107,7 @@ export function useNotifications() {
     } finally {
       setIsLoading(false);
     }
-  }, [setUnreadCount, userId]);
+  }, [enabled, setUnreadCount, userId]);
 
   const toggleRead = useCallback(
     async (notification: AppNotification, nextReadState: boolean) => {
@@ -191,7 +193,7 @@ export function useNotifications() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !enabled) {
       return;
     }
 
@@ -211,7 +213,7 @@ export function useNotifications() {
         })
         .catch(() => undefined);
     });
-  }, [setUnreadCount, userId]);
+  }, [enabled, setUnreadCount, userId]);
 
   const hasUnread = useMemo(() => unreadCount > 0, [unreadCount]);
 

@@ -248,6 +248,9 @@ export default function NotificationsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const { preferences, isLoading: isPreferencesLoading } =
+    useNotificationPreferences();
+  const notificationsEnabled = preferences?.notifications_enabled ?? false;
   const {
     notifications,
     unreadCount,
@@ -257,8 +260,7 @@ export default function NotificationsScreen() {
     markAllAsRead,
     toggleRead,
     deleteNotification,
-  } = useNotifications();
-  const { preferences } = useNotificationPreferences();
+  } = useNotifications(notificationsEnabled);
 
   const pageStyles = useMemo(
     () => ({
@@ -337,12 +339,17 @@ export default function NotificationsScreen() {
                 Notifications
               </Text>
               <Text style={[styles.subtitle, pageStyles.subtitle]}>
-                {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
+                {!notificationsEnabled && !isPreferencesLoading
+                  ? "Notifications turned off"
+                  : unreadCount > 0
+                    ? `${unreadCount} unread`
+                    : "All caught up"}
               </Text>
             </View>
 
             <Pressable
               style={[styles.iconButton, pageStyles.iconButton]}
+              disabled={!notificationsEnabled}
               onPress={() => markAllAsRead().catch(() => undefined)}
             >
               <Feather name="check" size={20} color={colors.foreground} />
@@ -373,14 +380,16 @@ export default function NotificationsScreen() {
                 Intelligent finance alerts
               </Text>
               <Text style={[styles.infoText, pageStyles.infoText]}>
-                {preferences?.push_enabled
+                {!notificationsEnabled && !isPreferencesLoading
+                  ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
+                  : preferences?.push_enabled
                   ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
                   : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
               </Text>
             </View>
           </View>
 
-          {!!notifications.length ? (
+          {notificationsEnabled && !!notifications.length ? (
             <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
               <Feather
                 name="move"
@@ -412,7 +421,29 @@ export default function NotificationsScreen() {
           ) : null}
 
           <View style={styles.cardsList}>
-            {!notifications.length && !isLoading && !error ? (
+            {!notificationsEnabled && !isPreferencesLoading ? (
+              <View
+                style={[
+                  styles.emptyStateCard,
+                  pageStyles.emptyCard,
+                  shadows.soft,
+                ]}
+              >
+                <Feather name="bell-off" size={22} color={colors.mutedForeground} />
+                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+                  Notifications are off
+                </Text>
+                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+                  Enable the notifications toggle in Settings to receive budget
+                  alerts, goal progress, and weekly insights here.
+                </Text>
+              </View>
+            ) : null}
+
+            {notificationsEnabled &&
+            !notifications.length &&
+            !isLoading &&
+            !error ? (
               <View
                 style={[
                   styles.emptyStateCard,
@@ -431,7 +462,8 @@ export default function NotificationsScreen() {
               </View>
             ) : null}
 
-            {notifications.map((item) => (
+            {notificationsEnabled &&
+              notifications.map((item) => (
               <NotificationRow
                 key={item.id}
                 item={item}

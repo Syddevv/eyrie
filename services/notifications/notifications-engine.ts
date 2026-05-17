@@ -13,6 +13,7 @@ import { ensureNotificationPreferences, upsertNotifications } from "./notificati
 import {
   buildNotificationCandidate,
   defaultNotificationPreferences,
+  shouldReceiveNotification,
   shouldNotifyViaPush,
   toCreateNotificationInput,
 } from "./notifications-metadata";
@@ -59,13 +60,20 @@ async function persistCandidates(userId: string, candidates: NotificationCandida
   const preferences = await ensureNotificationPreferences(userId).catch(() =>
     defaultNotificationPreferences(userId),
   );
+  const eligibleCandidates = candidates.filter((candidate) =>
+    shouldReceiveNotification(candidate, preferences),
+  );
+
+  if (!eligibleCandidates.length) {
+    return [] as AppNotification[];
+  }
 
   let inserted: AppNotification[] = [];
 
   try {
-    inserted = await upsertNotifications(userId, candidates);
+    inserted = await upsertNotifications(userId, eligibleCandidates);
   } catch {
-    inserted = candidates.map((candidate, index) => {
+    inserted = eligibleCandidates.map((candidate, index) => {
       const payload = toCreateNotificationInput(userId, candidate);
       return {
         id: `local-${payload.dedupe_key}-${index}`,
@@ -475,21 +483,9 @@ async function buildPeriodicCandidates(userId: string) {
 
 export async function generatePeriodicNotifications(userId: string) {
   const preferences = await ensureNotificationPreferences(userId);
-  const candidates = (await buildPeriodicCandidates(userId)).filter((candidate) => {
-    if (!preferences.notifications_enabled) {
-      return false;
-    }
-    if (candidate.type === "weekly_report") {
-      return preferences.weekly_reports;
-    }
-    if (candidate.type === "monthly_report") {
-      return preferences.monthly_reports;
-    }
-    if (candidate.type === "savings_tip") {
-      return preferences.savings_tips;
-    }
-    return true;
-  });
+  const candidates = (await buildPeriodicCandidates(userId)).filter((candidate) =>
+    shouldReceiveNotification(candidate, preferences),
+  );
 
   return persistCandidates(userId, candidates);
 }

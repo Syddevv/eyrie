@@ -168,7 +168,21 @@ export function shouldNotifyViaPush(
   notification: Pick<AppNotification, "type" | "priority">,
   preferences: NotificationPreferences,
 ) {
-  if (!preferences.notifications_enabled || !preferences.push_enabled) {
+  if (
+    !shouldReceiveNotification(notification, preferences) ||
+    !preferences.push_enabled
+  ) {
+    return false;
+  }
+
+  return shouldReceiveNotification(notification, preferences);
+}
+
+export function shouldReceiveNotification(
+  notification: Pick<AppNotification, "type" | "priority">,
+  preferences: NotificationPreferences,
+) {
+  if (!preferences.notifications_enabled) {
     return false;
   }
 
