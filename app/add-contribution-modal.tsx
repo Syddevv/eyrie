@@ -243,7 +243,11 @@ export default function AddContributionModal() {
       style={styles.keyboardWrap}
     >
       <View style={[styles.overlay, ui.overlay]}>
-        <Pressable disabled={isSaving} style={styles.backdrop} onPress={closeContributionFlow} />
+        <Pressable
+          disabled={isSaving}
+          style={styles.backdrop}
+          onPress={closeContributionFlow}
+        />
         <View
           style={[
             styles.sheet,
@@ -260,13 +264,8 @@ export default function AddContributionModal() {
 
           <View style={styles.headerRow}>
             <View style={styles.headerIdentity}>
-              <View
-                style={[
-                  styles.headerIconWrap,
-                  { backgroundColor: `${goal.color ?? "#1495FF"}22` },
-                ]}
-              >
-                <GoalAvatar goal={goal} size={24} />
+              <View style={styles.headerIconWrap}>
+                <GoalAvatar goal={goal} size={32} />
               </View>
               <View>
                 <Text style={[styles.headerTitle, ui.title]}>{goal.title}</Text>

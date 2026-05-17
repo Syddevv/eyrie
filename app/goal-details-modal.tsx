@@ -184,13 +184,8 @@ export default function GoalDetailsModal() {
 
         <View style={styles.headerRow}>
           <View style={styles.headerIdentity}>
-            <View
-              style={[
-                styles.headerIconWrap,
-                { backgroundColor: `${goal.color ?? "#1495FF"}22` },
-              ]}
-            >
-              <GoalAvatar goal={goal} size={24} />
+            <View style={styles.headerIconWrap}>
+              <GoalAvatar goal={goal} size={36} />
             </View>
             <View style={styles.headerText}>
               <Text style={[styles.headerTitle, ui.title]}>{goal.title}</Text>

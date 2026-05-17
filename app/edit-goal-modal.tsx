@@ -20,7 +20,6 @@ import {
 
 import { GoalAvatar } from "@/components/goal-avatar";
 import {
-  GOAL_COLOR_PRESETS,
   GOAL_EMOJI_PRESETS,
   GOAL_ICON_PRESETS,
 } from "@/constants/goal-presets";
@@ -135,7 +134,6 @@ export default function EditGoalModal() {
   const [iconName, setIconName] = useState<string | null>(GOAL_ICON_PRESETS[0]);
   const [emoji, setEmoji] = useState<string | null>(GOAL_EMOJI_PRESETS[0]);
   const [iconImageUri, setIconImageUri] = useState<string | null>(null);
-  const [color, setColor] = useState<string>(GOAL_COLOR_PRESETS[0]);
   const [linkedWalletId, setLinkedWalletId] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -157,7 +155,6 @@ export default function EditGoalModal() {
     setIconName(goal.iconName ?? GOAL_ICON_PRESETS[0]);
     setEmoji(goal.emoji ?? GOAL_EMOJI_PRESETS[0]);
     setIconImageUri(goal.iconImageUri ?? null);
-    setColor(goal.color ?? GOAL_COLOR_PRESETS[0]);
     setLinkedWalletId(goal.linkedWalletId ?? null);
   }, [goal]);
 
@@ -285,7 +282,7 @@ export default function EditGoalModal() {
         iconName: iconType === "vector" ? iconName : null,
         iconImageUri: iconType === "uploaded_image" ? iconImageUri : null,
         emoji: iconType === "emoji" ? emoji : null,
-        color,
+        color: goalColor,
         linkedWalletId,
       });
       await Haptics.selectionAsync();
@@ -309,6 +306,7 @@ export default function EditGoalModal() {
     windowHeight * 0.88,
     Math.max(320, windowHeight - keyboardHeight - 18),
   );
+  const goalColor = goal.color ?? colors.primary;
 
   return (
     <KeyboardAvoidingView
@@ -357,15 +355,16 @@ export default function EditGoalModal() {
                 isKeyboardOpen && styles.previewCardCompact,
               ]}
             >
-              <View
-                style={[
-                  styles.previewIconWrap,
-                  { backgroundColor: `${color}22` },
-                ]}
-              >
+              <View style={styles.previewIconWrap}>
                 <GoalAvatar
-                  goal={{ iconType, iconName, iconImageUri, emoji, color }}
-                  size={26}
+                  goal={{
+                    iconType,
+                    iconName,
+                    iconImageUri,
+                    emoji,
+                    color: goalColor,
+                  }}
+                  size={34}
                 />
               </View>
               <View style={styles.previewText}>
@@ -499,7 +498,7 @@ export default function EditGoalModal() {
                       <MaterialCommunityIcons
                         name={item}
                         size={20}
-                        color={color}
+                        color={goalColor}
                       />
                     </Pressable>
                   ))}
@@ -567,25 +566,6 @@ export default function EditGoalModal() {
                 </Pressable>
               </View>
             ) : null}
-
-            <View
-              style={[styles.section, isKeyboardOpen && styles.sectionCompact]}
-            >
-              <Text style={[styles.fieldLabel, ui.title]}>Accent color</Text>
-              <View style={styles.colorGrid}>
-                {GOAL_COLOR_PRESETS.map((item) => (
-                  <Pressable
-                    key={item}
-                    style={[
-                      styles.colorSwatch,
-                      { backgroundColor: item },
-                      color === item && styles.colorSwatchSelected,
-                    ]}
-                    onPress={() => setColor(item)}
-                  />
-                ))}
-              </View>
-            </View>
 
             <View
               style={[styles.section, isKeyboardOpen && styles.sectionCompact]}

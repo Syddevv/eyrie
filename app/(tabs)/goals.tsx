@@ -26,9 +26,9 @@ import {
 } from "@/src/lib/goals";
 
 const suggestedGoals = [
-  { title: "House Fund", iconName: "home", color: "#1495FF" },
+  { title: "House Fund", iconName: "home-outline", color: "#1495FF" },
   { title: "Christmas", iconName: "gift-outline", color: "#E11D48" },
-  { title: "Travel", iconName: "airplane", color: "#7E7CFF" },
+  { title: "Travel", iconName: "airplane-outline", color: "#7E7CFF" },
 ] as const;
 
 function withOpacity(hex: string, opacity: number) {
@@ -321,10 +321,10 @@ export default function GoalsScreen() {
                       <View
                         style={[
                           styles.goalIconWrap,
-                          { backgroundColor: `${goal.color ?? "#1495FF"}22` },
+                          styles.goalIconWrapNeutral,
                         ]}
                       >
-                        <GoalAvatar goal={goal} size={22} />
+                        <GoalAvatar goal={goal} size={44} />
                       </View>
                       <View style={styles.goalTextBlock}>
                         <Text style={[styles.goalTitle, pageStyles.title]}>
@@ -453,10 +453,10 @@ export default function GoalsScreen() {
                       <View
                         style={[
                           styles.archiveIconWrap,
-                          { backgroundColor: `${goal.color ?? "#1495FF"}22` },
+                          styles.archiveIconWrapNeutral,
                         ]}
                       >
-                        <GoalAvatar goal={goal} size={18} />
+                        <GoalAvatar goal={goal} size={34} />
                       </View>
                       <View style={styles.archiveTextBlock}>
                         <Text
@@ -563,13 +563,13 @@ export default function GoalsScreen() {
                   <View
                     style={[
                       styles.suggestedIconWrap,
-                      { backgroundColor: item.color },
+                      styles.suggestedIconWrapNeutral,
                     ]}
                   >
                     <Ionicons
-                      name="sparkles-outline"
-                      size={18}
-                      color="#FFFFFF"
+                      name={item.iconName}
+                      size={22}
+                      color={item.color}
                     />
                   </View>
                   <Text style={[styles.suggestedChipText, pageStyles.title]}>
@@ -580,7 +580,6 @@ export default function GoalsScreen() {
             </ScrollView>
           </View>
         </ScrollView>
-
       </View>
     </SafeAreaView>
   );
@@ -729,6 +728,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+  },
+  goalIconWrapNeutral: {
+    backgroundColor: "transparent",
   },
   goalTextBlock: { flex: 1 },
   goalTitle: {
@@ -896,6 +898,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  archiveIconWrapNeutral: {
+    backgroundColor: "transparent",
+  },
   archiveTextBlock: { flex: 1 },
   archiveGoalTitle: {
     fontFamily: fontFamilies.sans,
@@ -942,6 +947,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+  },
+  suggestedIconWrapNeutral: {
+    backgroundColor: "transparent",
   },
   suggestedChipText: {
     fontFamily: fontFamilies.sans,
