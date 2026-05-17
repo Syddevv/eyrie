@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -95,6 +95,8 @@ export default function SettingsScreen() {
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
   const [isThemeSaving, setIsThemeSaving] = useState(false);
+  const [isNotificationSaving, setIsNotificationSaving] = useState(false);
+  const [notificationToggleValue, setNotificationToggleValue] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const {
     preferences,
@@ -103,6 +105,15 @@ export default function SettingsScreen() {
   } = useNotificationPreferences();
 
   const isDark = colorScheme === "dark";
+
+  useEffect(() => {
+    if (isNotificationSaving) {
+      return;
+    }
+
+    setNotificationToggleValue(preferences?.notifications_enabled ?? false);
+  }, [isNotificationSaving, preferences?.notifications_enabled]);
+
   const dynamicAccountItems = useMemo(
     () =>
       accountItems.map((item) => {
@@ -366,10 +377,20 @@ export default function SettingsScreen() {
                 </Text>
               </View>
               <Switch
-                value={preferences?.notifications_enabled ?? false}
-                disabled={isNotificationPrefsLoading}
+                value={notificationToggleValue}
+                disabled={isNotificationPrefsLoading || isNotificationSaving}
                 onValueChange={(enabled) => {
-                  void updatePreference({ notifications_enabled: enabled });
+                  setNotificationToggleValue(enabled);
+                  setIsNotificationSaving(true);
+                  updatePreference({ notifications_enabled: enabled })
+                    .catch(() => {
+                      setNotificationToggleValue(
+                        preferences?.notifications_enabled ?? false,
+                      );
+                    })
+                    .finally(() => {
+                      setIsNotificationSaving(false);
+                    });
                 }}
                 trackColor={{
                   false: pageStyles.switchTrackOff,
