@@ -502,7 +502,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
-  const { user: currentUser } = useCurrentUser();
+  const {
+    user: currentUser,
+    isLoading: isCurrentUserLoading,
+  } = useCurrentUser();
   const summary = useDashboardSummary();
   const recentTransactions = useRecentTransactions();
   const activeBudgets = useBudgetProgress();
@@ -517,8 +520,10 @@ export default function HomeScreen() {
   } = useAccounts();
   const [showCardsSwipeHint, setShowCardsSwipeHint] = useState(true);
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
-  const [showTotalBalance, setShowTotalBalance] = useState(true);
-  const [showCardBalances, setShowCardBalances] = useState(true);
+  const [showTotalBalance, setShowTotalBalance] = useState(false);
+  const [showCardBalances, setShowCardBalances] = useState(false);
+  const [hasHydratedVisibilityPrefs, setHasHydratedVisibilityPrefs] =
+    useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const unreadNotificationCount = useNotificationStore(
     (state) => state.unreadCount,
@@ -531,7 +536,12 @@ export default function HomeScreen() {
 
     AsyncStorage.getItem(BALANCE_VISIBILITY_STORAGE_KEY)
       .then((stored) => {
-        if (!stored || !isMounted) {
+        if (!isMounted) {
+          return;
+        }
+
+        if (!stored) {
+          setHasHydratedVisibilityPrefs(true);
           return;
         }
 
@@ -547,8 +557,16 @@ export default function HomeScreen() {
         if (typeof parsed.showCardBalances === "boolean") {
           setShowCardBalances(parsed.showCardBalances);
         }
+
+        setHasHydratedVisibilityPrefs(true);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!isMounted) {
+          return;
+        }
+
+        setHasHydratedVisibilityPrefs(true);
+      });
 
     return () => {
       isMounted = false;
@@ -556,6 +574,10 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    if (!hasHydratedVisibilityPrefs) {
+      return;
+    }
+
     AsyncStorage.setItem(
       BALANCE_VISIBILITY_STORAGE_KEY,
       JSON.stringify({
@@ -563,7 +585,7 @@ export default function HomeScreen() {
         showCardBalances,
       }),
     ).catch(() => undefined);
-  }, [showCardBalances, showTotalBalance]);
+  }, [hasHydratedVisibilityPrefs, showCardBalances, showTotalBalance]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -676,6 +698,11 @@ export default function HomeScreen() {
   const totalBalanceValue = summary?.totalBalance ?? totalBalanceIncludingCash;
   const hiddenMoneyValue = "••••••";
   const hiddenCardDigits = "••••";
+  const isSensitiveUiReady = hasHydratedVisibilityPrefs;
+  const shouldRevealTotalBalance = isSensitiveUiReady && showTotalBalance;
+  const shouldRevealCardBalances = isSensitiveUiReady && showCardBalances;
+  const shouldShowHeaderSkeleton =
+    isCurrentUserLoading && !currentUser?.first_name;
   const greetingText = useMemo(
     () => getGreetingForHour(currentTime.getHours()),
     [currentTime],
@@ -762,22 +789,56 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <View style={styles.flex}>
         <View style={styles.headerBlock}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              <View style={styles.avatarFrame}>
+            <View style={styles.headerRow}>
+              <View style={styles.headerLeft}>
+                <View style={styles.avatarFrame}>
                 <Image
                   contentFit="cover"
                   source={require("@/assets/images/Eyrie_Mascot_1.png")}
                   style={styles.avatar}
                 />
               </View>
-              <View>
-                <Text style={[styles.greeting, pageStyles.mutedText]}>
-                  {greetingText}
-                </Text>
-                <Text style={[styles.userName, { color: colors.foreground }]}>
-                  {currentUser?.first_name ?? "You"}
-                </Text>
+              <View style={styles.headerCopy}>
+                {shouldShowHeaderSkeleton ? (
+                  <View style={styles.headerSkeletonWrap}>
+                    <View
+                      style={[
+                        styles.headerSkeletonLine,
+                        styles.headerSkeletonGreeting,
+                        {
+                          backgroundColor: withOpacity(
+                            colors.mutedForeground,
+                            colorScheme === "light" ? 0.14 : 0.22,
+                          ),
+                        },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.headerSkeletonLine,
+                        styles.headerSkeletonName,
+                        {
+                          backgroundColor: withOpacity(
+                            colors.foreground,
+                            colorScheme === "light" ? 0.1 : 0.18,
+                          ),
+                        },
+                      ]}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <Text style={[styles.greeting, pageStyles.mutedText]}>
+                      {greetingText}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.userName, { color: colors.foreground }]}
+                    >
+                      {currentUser?.first_name ?? "You"}
+                    </Text>
+                  </>
+                )}
               </View>
             </View>
 
@@ -872,9 +933,12 @@ export default function HomeScreen() {
                 <Text style={[styles.balanceLabel, pageStyles.mutedText]}>
                   Total Balance
                 </Text>
-                <Pressable onPress={() => setShowTotalBalance((value) => !value)}>
+                <Pressable
+                  disabled={!isSensitiveUiReady}
+                  onPress={() => setShowTotalBalance((value) => !value)}
+                >
                   <Feather
-                    name={showTotalBalance ? "eye" : "eye-off"}
+                    name={shouldRevealTotalBalance ? "eye" : "eye-off"}
                     size={16}
                     color={colors.mutedForeground}
                   />
@@ -898,7 +962,7 @@ export default function HomeScreen() {
               <Text
                 style={[styles.balanceAmount, { color: colors.foreground }]}
               >
-                {!showTotalBalance
+                {!shouldRevealTotalBalance
                   ? hiddenMoneyValue
                   : isLoading && !summary
                     ? "---"
@@ -928,7 +992,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.incomeAmount}>
-                  {showTotalBalance
+                  {shouldRevealTotalBalance
                     ? summary
                       ? formatCurrency(summary.totalIncome)
                       : "---"
@@ -948,7 +1012,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Text style={styles.expenseAmount}>
-                  {showTotalBalance
+                  {shouldRevealTotalBalance
                     ? summary
                       ? formatCurrency(summary.totalExpenses)
                       : "---"
@@ -980,15 +1044,16 @@ export default function HomeScreen() {
             </View>
             <Pressable
               style={styles.hideRow}
+              disabled={!isSensitiveUiReady}
               onPress={() => setShowCardBalances((value) => !value)}
             >
               <Feather
-                name={showCardBalances ? "eye" : "eye-off"}
+                name={shouldRevealCardBalances ? "eye" : "eye-off"}
                 size={16}
                 color={colors.mutedForeground}
               />
               <Text style={[styles.hideText, pageStyles.mutedText]}>
-                {showCardBalances ? "Hide" : "Show"}
+                {shouldRevealCardBalances ? "Hide" : "Show"}
               </Text>
             </Pressable>
           </View>
@@ -1095,7 +1160,7 @@ export default function HomeScreen() {
                               { color: brandTheme.text },
                             ]}
                           >
-                            {showCardBalances
+                            {shouldRevealCardBalances
                               ? formatCurrency(
                                   acct.balance ?? 0,
                                   acct.currencyCode,
@@ -1104,12 +1169,12 @@ export default function HomeScreen() {
                           </Text>
                           <View style={styles.cardBottomRow}>
                             <Text
-                              style={[
-                                styles.cardDigits,
-                                { color: withOpacity(brandTheme.text, 0.78) },
-                              ]}
-                            >
-                              {showCardBalances
+                            style={[
+                              styles.cardDigits,
+                              { color: withOpacity(brandTheme.text, 0.78) },
+                            ]}
+                          >
+                              {shouldRevealCardBalances
                                 ? `•••• ${acct.accountNumberLast4 ?? ""}`
                                 : hiddenCardDigits}
                             </Text>
@@ -1335,7 +1400,7 @@ export default function HomeScreen() {
                               { color: brandTheme.text },
                             ]}
                           >
-                            {showCardBalances
+                            {shouldRevealCardBalances
                               ? formatCurrency(
                                   acct.balance ?? 0,
                                   acct.currencyCode,
@@ -1687,6 +1752,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  headerCopy: {
+    minHeight: 46,
+    justifyContent: "center",
+    minWidth: 132,
+    maxWidth: HOME_CONTENT_WIDTH - 120,
+  },
   avatarFrame: {
     width: 44,
     height: 44,
@@ -1707,6 +1778,22 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 15,
     lineHeight: 20,
+  },
+  headerSkeletonWrap: {
+    minHeight: 46,
+    justifyContent: "center",
+    gap: 6,
+  },
+  headerSkeletonLine: {
+    borderRadius: radius.full,
+  },
+  headerSkeletonGreeting: {
+    width: 108,
+    height: 14,
+  },
+  headerSkeletonName: {
+    width: 128,
+    height: 22,
   },
   userName: {
     fontFamily: fontFamilies.sans,
