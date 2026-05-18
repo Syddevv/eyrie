@@ -1,11 +1,39 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { Text, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
+import {
+  Text,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 
 import type { CategoryOption } from "@/hooks/useCategories";
 
+const FEATHER_CATEGORY_ICONS = new Set([
+  "coffee",
+  "bookmark",
+  "gift",
+  "home",
+  "heart",
+  "zap",
+]);
+
+const LEGACY_CATEGORY_ICON_ALIASES: Record<string, string> = {
+  bag: "shopping-bag",
+  "shopping-cart": "cart-outline",
+  "laptop-outline": "laptop",
+};
+
+function resolveCategoryIconName(iconName: string) {
+  return LEGACY_CATEGORY_ICON_ALIASES[iconName] ?? iconName;
+}
+
 type CategoryAvatarProps = {
-  category: Pick<CategoryOption, "iconType" | "iconName" | "iconImageUri" | "emoji" | "color">;
+  category: Pick<
+    CategoryOption,
+    "iconType" | "iconName" | "iconImageUri" | "emoji" | "color"
+  >;
   size?: number;
   containerStyle?: StyleProp<ViewStyle>;
   emojiStyle?: StyleProp<TextStyle>;
@@ -45,7 +73,8 @@ export function CategoryAvatar({
             justifyContent: "center",
           },
           containerStyle,
-        ]}>
+        ]}
+      >
         <Text
           style={[
             {
@@ -53,24 +82,18 @@ export function CategoryAvatar({
               lineHeight: size,
             },
             emojiStyle,
-          ]}>
+          ]}
+        >
           {category.emoji}
         </Text>
       </View>
     );
   }
 
-  const iconName = category.iconName ?? "shape-outline";
-  const isFeatherIcon = [
-    "coffee",
-    "bookmark",
-    "gift",
-    "home",
-    "heart",
-    "laptop",
-    "shopping-bag",
-    "zap",
-  ].includes(iconName);
+  const iconName = resolveCategoryIconName(
+    category.iconName ?? "shape-outline",
+  );
+  const isFeatherIcon = FEATHER_CATEGORY_ICONS.has(iconName);
 
   return isFeatherIcon ? (
     <Feather
@@ -81,7 +104,9 @@ export function CategoryAvatar({
     />
   ) : (
     <MaterialCommunityIcons
-      name={iconName as React.ComponentProps<typeof MaterialCommunityIcons>["name"]}
+      name={
+        iconName as React.ComponentProps<typeof MaterialCommunityIcons>["name"]
+      }
       size={size}
       color={category.color}
       style={containerStyle}
