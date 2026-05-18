@@ -7,6 +7,7 @@ import { memo, useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +15,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { themeColors } from "@/constants/colors";
@@ -35,6 +36,7 @@ import {
   useDashboardBootstrap,
   useDashboardError,
   useDashboardLoading,
+  useDashboardStatus,
   useDashboardSummary,
   useGoalsProgress,
   useRecentTransactions,
@@ -205,6 +207,184 @@ const AccountsSectionSkeleton = memo(function AccountsSectionSkeleton({
     </>
   );
 });
+
+const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
+  colors,
+  colorScheme,
+  mutedTextColor,
+}: {
+  colors: ThemePalette;
+  colorScheme: "light" | "dark";
+  mutedTextColor: string;
+}) {
+  const isLight = colorScheme === "light";
+  const line = withOpacity(colors.foreground, isLight ? 0.08 : 0.14);
+  const lineSoft = withOpacity(colors.foreground, isLight ? 0.05 : 0.1);
+  const surface = colors.card;
+  const border = withOpacity(colors.border, isLight ? 0.88 : 0.96);
+
+  return (
+    <>
+      <View style={styles.startupSkeletonStack}>
+        <View style={[styles.startupInsightSkeleton, { backgroundColor: "#37D3C2" }]}>
+          <View
+            style={[
+              styles.startupInsightGlow,
+              { backgroundColor: withOpacity("#FFFFFF", 0.12) },
+            ]}
+          />
+          <View style={styles.startupInsightCopy}>
+            <View style={[styles.startupPillSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.18) }]} />
+            <View style={[styles.startupInsightHeadlineSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.26) }]} />
+            <View style={[styles.startupInsightBodySkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.22) }]} />
+            <View style={[styles.startupInsightBodyShortSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.22) }]} />
+            <View style={[styles.startupInsightButtonSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.82) }]} />
+          </View>
+          <View
+            style={[
+              styles.startupInsightMascotSkeleton,
+              { backgroundColor: withOpacity("#FFFFFF", 0.12) },
+            ]}
+          />
+        </View>
+
+        <View
+          style={[
+            styles.balanceCard,
+            styles.startupBalanceSkeleton,
+            { backgroundColor: surface, borderColor: border },
+            shadows.card,
+          ]}
+        >
+          <View style={styles.balanceTopRow}>
+            <View style={styles.startupBalanceLabelWrap}>
+              <View style={[styles.startupLabelSkeleton, { backgroundColor: line }]} />
+              <View style={[styles.startupEyeSkeleton, { backgroundColor: lineSoft }]} />
+            </View>
+            <View
+              style={[
+                styles.growthPill,
+                styles.startupGrowthSkeleton,
+                { backgroundColor: isLight ? "#EEF8F3" : withOpacity("#16B76D", 0.18) },
+              ]}
+            />
+          </View>
+          <View style={styles.balanceAmountBlock}>
+            <View style={[styles.startupCurrencySkeleton, { backgroundColor: withOpacity(colors.primary, 0.7) }]} />
+            <View style={[styles.startupAmountSkeleton, { backgroundColor: line }]} />
+          </View>
+          <View
+            style={[
+              styles.balanceMetaChip,
+              pageStylesFromSkeleton(colors, colorScheme).sectionHintChip,
+            ]}
+          >
+            <View style={[styles.startupMetaIconSkeleton, { backgroundColor: lineSoft }]} />
+            <View style={[styles.startupMetaTextSkeleton, { backgroundColor: lineSoft }]} />
+          </View>
+          <View style={styles.metricsRow}>
+            {[0, 1].map((item) => (
+              <View
+                key={`metric-skeleton-${item}`}
+                style={[
+                  styles.metricBlock,
+                  styles.startupMetricSkeleton,
+                  {
+                    backgroundColor:
+                      colorScheme === "light"
+                        ? "#F7F9FC"
+                        : withOpacity(colors.secondary, 0.44),
+                    borderColor: withOpacity(colors.border, 0.78),
+                  },
+                ]}
+              >
+                <View style={styles.metricLabelRow}>
+                  <View style={[styles.startupMetricDotSkeleton, { backgroundColor: item === 0 ? "#14B86A" : "#F05454" }]} />
+                  <View style={[styles.startupMetricLabelSkeleton, { backgroundColor: lineSoft }]} />
+                </View>
+                <View style={[styles.startupMetricAmountSkeleton, { backgroundColor: line }]} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <View style={[styles.startupSectionTitleSkeleton, { backgroundColor: line }]} />
+            <View
+              style={[
+                styles.sectionHintChip,
+                pageStylesFromSkeleton(colors, colorScheme).sectionHintChip,
+                styles.startupSectionHintSkeleton,
+              ]}
+            >
+              <View style={[styles.startupMetaIconSkeleton, { backgroundColor: lineSoft }]} />
+              <View style={[styles.startupSectionHintTextSkeleton, { backgroundColor: lineSoft }]} />
+            </View>
+          </View>
+          <View style={styles.hideRow}>
+            <View style={[styles.startupEyeSkeleton, { backgroundColor: lineSoft }]} />
+            <View style={[styles.startupHideTextSkeleton, { backgroundColor: lineSoft }]} />
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cardsRow}
+        >
+          <AccountsSectionSkeleton colors={colors} colorScheme={colorScheme} />
+        </ScrollView>
+
+        <View style={[styles.sectionHeader, styles.walletsHeader]}>
+          <View style={[styles.startupSectionTitleSkeleton, { backgroundColor: line }]} />
+        </View>
+
+        <ScrollView
+          horizontal
+          scrollEnabled={false}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cardsRow}
+        >
+          <AccountsSectionSkeleton colors={colors} colorScheme={colorScheme} />
+        </ScrollView>
+
+        <View style={styles.startupFooterBlocks}>
+          <View
+            style={[
+              styles.startupFooterBlock,
+              { backgroundColor: surface, borderColor: border },
+              shadows.soft,
+            ]}
+          />
+          <View
+            style={[
+              styles.startupFooterBlock,
+              { backgroundColor: surface, borderColor: border },
+              shadows.soft,
+            ]}
+          />
+        </View>
+      </View>
+      <Text style={[styles.startupLoadingCaption, { color: mutedTextColor }]}>
+        Loading your dashboard…
+      </Text>
+    </>
+  );
+});
+
+function pageStylesFromSkeleton(colors: ThemePalette, colorScheme: "light" | "dark") {
+  return {
+    sectionHintChip: {
+      backgroundColor:
+        colorScheme === "light"
+          ? "rgba(255,255,255,0.78)"
+          : withOpacity(colors.secondary, 0.36),
+      borderColor: withOpacity(colors.border, 0.72),
+    },
+  };
+}
 
 const EmptyStateIllustration = memo(function EmptyStateIllustration({
   variant,
@@ -500,6 +680,7 @@ const PremiumEmptyState = memo(function PremiumEmptyState({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const {
@@ -511,6 +692,7 @@ export default function HomeScreen() {
   const activeBudgets = useBudgetProgress();
   const spendingBreakdown = useSpendingBreakdown();
   const goalsProgress = useGoalsProgress();
+  const dashboardStatus = useDashboardStatus();
   const isLoading = useDashboardLoading();
   const error = useDashboardError();
   const {
@@ -701,8 +883,19 @@ export default function HomeScreen() {
   const isSensitiveUiReady = hasHydratedVisibilityPrefs;
   const shouldRevealTotalBalance = isSensitiveUiReady && showTotalBalance;
   const shouldRevealCardBalances = isSensitiveUiReady && showCardBalances;
-  const shouldShowHeaderSkeleton =
-    isCurrentUserLoading && !currentUser?.first_name;
+  const hasResolvedSafeAreaTop = Platform.OS === "android" || insets.top > 0;
+  const hasDashboardHydrated =
+    !!currentUser?.id &&
+    dashboardStatus.activeUserId === currentUser.id &&
+    (dashboardStatus.lastLoadedAt !== null || dashboardStatus.error !== null);
+  const isHomeStartupReady =
+    hasResolvedSafeAreaTop &&
+    isSensitiveUiReady &&
+    !isCurrentUserLoading &&
+    !!currentUser &&
+    accountsResolved &&
+    hasDashboardHydrated;
+  const shouldShowHeaderSkeleton = !isHomeStartupReady;
   const greetingText = useMemo(
     () => getGreetingForHour(currentTime.getHours()),
     [currentTime],
@@ -786,12 +979,23 @@ export default function HomeScreen() {
   }, [error, goalsProgress, isLoading, spendingBreakdown, summary]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={[styles.safeArea, pageStyles.background]}
+    >
       <View style={styles.flex}>
-        <View style={styles.headerBlock}>
-            <View style={styles.headerRow}>
-              <View style={styles.headerLeft}>
-                <View style={styles.avatarFrame}>
+        <View
+          style={[
+            styles.headerBlock,
+            {
+              paddingTop: insets.top + 10,
+              minHeight: insets.top + 76,
+            },
+          ]}
+        >
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <View style={styles.avatarFrame}>
                 <Image
                   contentFit="cover"
                   source={require("@/assets/images/Eyrie_Mascot_1.png")}
@@ -879,6 +1083,14 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {!isHomeStartupReady ? (
+            <HomeStartupSkeleton
+              colors={colors}
+              colorScheme={colorScheme}
+              mutedTextColor={pageStyles.mutedText.color}
+            />
+          ) : (
+            <>
           <LinearGradient
             colors={pageStyles.insightGradient}
             start={{ x: 0, y: 0 }}
@@ -1717,6 +1929,8 @@ export default function HomeScreen() {
               />
             )}
           </View>
+            </>
+          )}
         </ScrollView>
 
       </View>
@@ -1741,6 +1955,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 184,
+  },
+  startupSkeletonStack: {
+    gap: 20,
   },
   headerRow: {
     flexDirection: "row",
@@ -2175,6 +2392,159 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  startupInsightSkeleton: {
+    marginTop: 4,
+    minHeight: 196,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    overflow: "hidden",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  startupInsightGlow: {
+    position: "absolute",
+    top: 18,
+    left: 22,
+    width: 54,
+    height: 54,
+    borderRadius: radius.full,
+  },
+  startupInsightCopy: {
+    flex: 1,
+    gap: 12,
+    paddingRight: 16,
+  },
+  startupPillSkeleton: {
+    width: 134,
+    height: 18,
+    borderRadius: radius.full,
+    marginTop: 6,
+  },
+  startupInsightHeadlineSkeleton: {
+    width: "78%",
+    height: 26,
+    borderRadius: 12,
+  },
+  startupInsightBodySkeleton: {
+    width: "92%",
+    height: 18,
+    borderRadius: 10,
+  },
+  startupInsightBodyShortSkeleton: {
+    width: "72%",
+    height: 18,
+    borderRadius: 10,
+  },
+  startupInsightButtonSkeleton: {
+    width: 116,
+    height: 54,
+    borderRadius: 22,
+    marginTop: "auto",
+  },
+  startupInsightMascotSkeleton: {
+    width: 128,
+    height: 128,
+    borderRadius: 42,
+    alignSelf: "center",
+  },
+  startupBalanceSkeleton: {
+    minHeight: 328,
+  },
+  startupBalanceLabelWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  startupLabelSkeleton: {
+    width: 136,
+    height: 18,
+    borderRadius: 10,
+  },
+  startupEyeSkeleton: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.full,
+  },
+  startupGrowthSkeleton: {
+    width: 150,
+    minHeight: 78,
+  },
+  startupCurrencySkeleton: {
+    width: 26,
+    height: 42,
+    borderRadius: 10,
+  },
+  startupAmountSkeleton: {
+    width: 188,
+    height: 30,
+    borderRadius: 12,
+  },
+  startupMetaIconSkeleton: {
+    width: 11,
+    height: 11,
+    borderRadius: radius.full,
+  },
+  startupMetaTextSkeleton: {
+    width: 104,
+    height: 14,
+    borderRadius: 8,
+  },
+  startupMetricSkeleton: {
+    minHeight: 128,
+  },
+  startupMetricDotSkeleton: {
+    width: 13,
+    height: 13,
+    borderRadius: radius.full,
+  },
+  startupMetricLabelSkeleton: {
+    width: 62,
+    height: 14,
+    borderRadius: 8,
+  },
+  startupMetricAmountSkeleton: {
+    width: 110,
+    height: 18,
+    borderRadius: 9,
+    marginTop: 22,
+    alignSelf: "center",
+  },
+  startupSectionTitleSkeleton: {
+    width: 98,
+    height: 22,
+    borderRadius: 10,
+  },
+  startupSectionHintSkeleton: {
+    marginTop: 10,
+  },
+  startupSectionHintTextSkeleton: {
+    width: 118,
+    height: 14,
+    borderRadius: 8,
+  },
+  startupHideTextSkeleton: {
+    width: 42,
+    height: 14,
+    borderRadius: 8,
+  },
+  startupFooterBlocks: {
+    gap: 16,
+    marginTop: 8,
+  },
+  startupFooterBlock: {
+    minHeight: 148,
+    borderRadius: 26,
+    borderWidth: 1,
+  },
+  startupLoadingCaption: {
+    marginTop: 18,
+    marginBottom: 12,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
   },
   accountSkeletonLineTertiary: {
     width: "34%",
