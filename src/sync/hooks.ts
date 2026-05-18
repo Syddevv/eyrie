@@ -6,6 +6,7 @@ import { useSyncStore } from "./store";
 
 export function useSyncStatus() {
   const isOnline = useSyncStore((state) => state.isOnline);
+  const networkReady = useSyncStore((state) => state.networkReady);
   const isSyncing = useSyncStore((state) => state.isSyncing);
   const uiState = useSyncStore((state) => state.uiState);
   const pendingCount = useSyncStore((state) => state.pendingCount);
@@ -15,9 +16,12 @@ export function useSyncStatus() {
   const lastErrorKind = useSyncStore((state) => state.lastErrorKind);
   const isRestoring = useSyncStore((state) => state.isRestoring);
   const lastRunReason = useSyncStore((state) => state.lastRunReason);
+  const hasStartedSync = useSyncStore((state) => state.hasStartedSync);
+  const hasCompletedSync = useSyncStore((state) => state.hasCompletedSync);
 
   return {
     isOnline,
+    networkReady,
     isSyncing,
     uiState,
     pendingCount,
@@ -27,6 +31,8 @@ export function useSyncStatus() {
     lastErrorKind,
     isRestoring,
     lastRunReason,
+    hasStartedSync,
+    hasCompletedSync,
   } as const;
 }
 

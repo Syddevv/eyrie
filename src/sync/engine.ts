@@ -304,6 +304,7 @@ export async function runSync(input?: {
   activeRun = (async () => {
     const startedAt = nowIso();
     useSyncStore.getState().setOnline(true);
+    useSyncStore.getState().markSyncStarted();
     const syncStore = useSyncStore.getState();
     useSyncStore.getState().setSyncing({
       isSyncing: true,
@@ -392,6 +393,7 @@ export async function runSync(input?: {
             : message,
       } satisfies SyncRunResult;
     } finally {
+      useSyncStore.getState().markSyncCompleted();
       useSyncStore.getState().setSyncing({ isSyncing: false, reason });
       activeRun = null;
     }

@@ -34,15 +34,26 @@ async function getNetInfoModule(): Promise<NetInfoModule | null> {
 
 function useSyncTriggers() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const isAuthReady = useAuthStore((state) => state.isReady);
   const setOnline = useSyncStore((state) => state.setOnline);
+  const setNetworkReady = useSyncStore((state) => state.setNetworkReady);
+  const networkReady = useSyncStore((state) => state.networkReady);
   const reset = useSyncStore((state) => state.reset);
   const setHydrationReady = useSyncStore((state) => state.setHydrationReady);
   const previousUserId = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!isAuthReady) {
+      return;
+    }
+
     if (!userId) {
       previousUserId.current = null;
       reset();
+      return;
+    }
+
+    if (!networkReady) {
       return;
     }
 
@@ -112,12 +123,14 @@ function useSyncTriggers() {
     return () => {
       cancelled = true;
     };
-  }, [reset, setHydrationReady, userId]);
+  }, [isAuthReady, networkReady, reset, setHydrationReady, userId]);
 
   useEffect(() => {
     let isMounted = true;
     let previousConnection: boolean | null = null;
     let unsubscribe = () => {};
+
+    setNetworkReady(false);
 
     void (async () => {
       const netInfo = await getNetInfoModule();
@@ -128,6 +141,7 @@ function useSyncTriggers() {
 
       if (!netInfo) {
         setOnline(true);
+        setNetworkReady(true);
         return;
       }
 
@@ -141,6 +155,7 @@ function useSyncTriggers() {
         const wasOnline = previousConnection;
         previousConnection = isOnline;
         setOnline(isOnline);
+        setNetworkReady(true);
 
         if (userId && isOnline && wasOnline === false) {
           void runSync({ userId, reason: "reconnect", force: true });
@@ -156,6 +171,7 @@ function useSyncTriggers() {
           }
 
           setOnline(true);
+          setNetworkReady(true);
         });
 
       unsubscribe = netInfo.addEventListener((state) => {
@@ -167,11 +183,11 @@ function useSyncTriggers() {
       isMounted = false;
       unsubscribe();
     };
-  }, [setOnline, userId]);
+  }, [setNetworkReady, setOnline, userId]);
 
   useEffect(() => {
     function onAppStateChange(state: AppStateStatus) {
-      if (state === "active" && userId) {
+      if (state === "active" && userId && isAuthReady && networkReady) {
         void runSync({ userId, reason: "foreground" });
       }
     }
@@ -180,17 +196,18 @@ function useSyncTriggers() {
     return () => {
       subscription.remove();
     };
-  }, [userId]);
+  }, [isAuthReady, networkReady, userId]);
 }
 
 export function SyncProvider({ children }: PropsWithChildren) {
   const isOnline = useSyncStore((state) => state.isOnline);
+  const networkReady = useSyncStore((state) => state.networkReady);
   const userId = useAuthStore((state) => state.user?.id ?? null);
 
   useSyncTriggers();
 
   useEffect(() => {
-    if (!userId || isOnline) {
+    if (!userId || isOnline || !networkReady) {
       return;
     }
 
@@ -205,7 +222,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
     return () => {
       clearInterval(interval);
     };
-  }, [isOnline, userId]);
+  }, [isOnline, networkReady, userId]);
 
   return <>{children}</>;
 }

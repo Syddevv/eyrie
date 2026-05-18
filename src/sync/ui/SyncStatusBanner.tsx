@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { themeColors } from "@/constants/colors";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useManualSync, useSyncStatus } from "../hooks";
 
 type BannerKind = "offline" | "error";
@@ -21,10 +22,15 @@ export function SyncStatusBanner() {
   const colors = themeColors[colorScheme];
   const {
     isOnline,
+    networkReady,
     lastError,
     uiState,
     isRestoring,
+    hasStartedSync,
+    hasCompletedSync,
   } = useSyncStatus();
+  const isAuthReady = useAuthStore((state) => state.isReady);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const { syncNow } = useManualSync();
 
   const [banner, setBanner] = useState<{
@@ -41,6 +47,7 @@ export function SyncStatusBanner() {
     uiState,
     lastError,
   });
+  const lastBannerKey = useRef<string | null>(null);
 
   const errorTone = useMemo(
     () =>
@@ -53,7 +60,7 @@ export function SyncStatusBanner() {
   );
 
   useEffect(() => {
-    if (isRestoring) {
+    if (!isAuthReady || !userId || !networkReady || isRestoring) {
       setBanner(null);
       previous.current = {
         isOnline,
@@ -66,8 +73,18 @@ export function SyncStatusBanner() {
     const wentOffline =
       previous.current.isOnline && !isOnline && uiState === "offline";
 
-    if (uiState === "schema_error" || uiState === "failed") {
-      setBanner({
+    let nextBanner: {
+      kind: BannerKind;
+      title: string;
+      subtitle: string;
+    } | null = null;
+
+    if (
+      hasStartedSync &&
+      hasCompletedSync &&
+      (uiState === "schema_error" || uiState === "failed")
+    ) {
+      nextBanner = {
         kind: "error",
         title:
           uiState === "schema_error"
@@ -75,22 +92,25 @@ export function SyncStatusBanner() {
             : "Sync needs attention",
         subtitle:
           lastError ?? "A local sync issue needs manual review.",
-      });
-    } else if (!isOnline || uiState === "offline" || wentOffline) {
-      setBanner({
+      };
+    } else if (hasCompletedSync && (!isOnline || uiState === "offline" || wentOffline)) {
+      nextBanner = {
         kind: "offline",
         title: "Offline mode",
         subtitle:
           "Changes will sync automatically when your connection returns.",
-      });
-    } else if (uiState === "retrying" && lastError) {
-      setBanner({
-        kind: "error",
-        title: "Sync will retry",
-        subtitle: lastError,
-      });
+      };
     } else {
-      setBanner(null);
+      nextBanner = null;
+    }
+
+    const nextKey = nextBanner
+      ? `${nextBanner.kind}:${nextBanner.title}:${nextBanner.subtitle}`
+      : null;
+
+    if (nextKey !== lastBannerKey.current) {
+      lastBannerKey.current = nextKey;
+      setBanner(nextBanner);
     }
 
     previous.current = {
@@ -100,11 +120,16 @@ export function SyncStatusBanner() {
     };
   }, [
     isOnline,
+    isAuthReady,
     isRestoring,
     lastError,
+    networkReady,
+    hasCompletedSync,
+    hasStartedSync,
     opacity,
     translateY,
     uiState,
+    userId,
   ]);
 
   useEffect(() => {

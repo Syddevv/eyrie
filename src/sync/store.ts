@@ -5,6 +5,7 @@ import type { SyncErrorKind } from "./errors";
 
 type SyncStoreState = {
   isOnline: boolean;
+  networkReady: boolean;
   isSyncing: boolean;
   uiState: SyncUiState;
   lastSyncedAt: string | null;
@@ -15,12 +16,17 @@ type SyncStoreState = {
   failedCount: number;
   isRestoring: boolean;
   hydrationReady: boolean;
+  hasStartedSync: boolean;
+  hasCompletedSync: boolean;
   setOnline: (isOnline: boolean) => void;
+  setNetworkReady: (networkReady: boolean) => void;
   setSyncing: (input: {
     isSyncing: boolean;
     reason?: SyncRunReason | null;
     uiState?: SyncUiState;
   }) => void;
+  markSyncStarted: () => void;
+  markSyncCompleted: () => void;
   setUiState: (input: {
     uiState: SyncUiState;
     lastError?: string | null;
@@ -41,6 +47,7 @@ type SyncStoreState = {
 
 const INITIAL_STATE = {
   isOnline: true,
+  networkReady: false,
   isSyncing: false,
   uiState: "idle" as SyncUiState,
   lastSyncedAt: null,
@@ -51,11 +58,14 @@ const INITIAL_STATE = {
   failedCount: 0,
   isRestoring: false,
   hydrationReady: false,
+  hasStartedSync: false,
+  hasCompletedSync: false,
 };
 
 export const useSyncStore = create<SyncStoreState>((set) => ({
   ...INITIAL_STATE,
   setOnline: (isOnline) => set({ isOnline }),
+  setNetworkReady: (networkReady) => set({ networkReady }),
   setSyncing: ({ isSyncing, reason, uiState }) =>
     set((state) => ({
       isSyncing,
@@ -70,6 +80,14 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
       lastError: isSyncing ? null : state.lastError,
       lastErrorKind: isSyncing ? null : state.lastErrorKind,
     })),
+  markSyncStarted: () =>
+    set({
+      hasStartedSync: true,
+    }),
+  markSyncCompleted: () =>
+    set({
+      hasCompletedSync: true,
+    }),
   setUiState: ({ uiState, lastError, lastErrorKind, isOnline }) =>
     set((state) => ({
       uiState,
