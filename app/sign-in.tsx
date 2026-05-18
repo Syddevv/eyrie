@@ -21,6 +21,7 @@ import { radius, shadows, spacing } from '@/constants/theme';
 import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { openForgotPasswordFlow } from '@/services/password-reset';
 import { signInWithEmailPassword, signInWithGoogle } from '@/services/auth';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -167,6 +168,14 @@ export default function SignInScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    try {
+      await openForgotPasswordFlow(email.trim().toLowerCase());
+    } catch {
+      // Global feedback is handled by the auth service/store.
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
       <KeyboardAvoidingView
@@ -211,7 +220,7 @@ export default function SignInScreen() {
               />
             </View>
 
-            <Pressable style={styles.forgotWrap}>
+            <Pressable onPress={handleForgotPassword} style={styles.forgotWrap}>
               <Text style={[styles.forgotText, pageStyles.linkText]}>Forgot password?</Text>
             </Pressable>
 

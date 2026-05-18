@@ -11,6 +11,7 @@ import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
 import { useUserActivityTracker } from "@/hooks/useUserActivityTracker";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { useAuthStore } from "@/store/useAuthStore";
 import { DatabaseProvider } from "@/src/db/DatabaseProvider";
 import { SyncProvider, SyncStatusBanner } from "@/src/sync";
 
@@ -255,6 +256,12 @@ function AppShell() {
   );
 }
 
+function GlobalToastLayer() {
+  const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
+
+  return <ToastHost disabled={passwordResetPhase === "email"} />;
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme() ?? "light";
 
@@ -265,7 +272,7 @@ export default function RootLayout() {
           <AuthProvider>
             <SyncProvider>
               <AppShell />
-              <ToastHost />
+              <GlobalToastLayer />
               <SyncStatusBanner />
             </SyncProvider>
           </AuthProvider>

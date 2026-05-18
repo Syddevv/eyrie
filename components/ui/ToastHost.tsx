@@ -19,11 +19,20 @@ import {
   type ToastVariant,
 } from "@/store/useToastStore";
 
-function getVariantStyles(colorScheme: "light" | "dark", variant: ToastVariant) {
+function getVariantStyles(
+  colorScheme: "light" | "dark",
+  variant: ToastVariant,
+) {
   if (variant === "success") {
     return {
-      backgroundColor: colorScheme === "dark" ? "rgba(12, 30, 24, 0.96)" : "rgba(248, 255, 251, 0.96)",
-      borderColor: colorScheme === "dark" ? "rgba(41, 181, 118, 0.34)" : "rgba(33, 182, 115, 0.18)",
+      backgroundColor:
+        colorScheme === "dark"
+          ? "rgba(12, 30, 24, 0.96)"
+          : "rgba(248, 255, 251, 0.96)",
+      borderColor:
+        colorScheme === "dark"
+          ? "rgba(41, 181, 118, 0.34)"
+          : "rgba(33, 182, 115, 0.18)",
       accentColor: "#18B46A",
       icon: "check-circle" as const,
     };
@@ -31,16 +40,28 @@ function getVariantStyles(colorScheme: "light" | "dark", variant: ToastVariant) 
 
   if (variant === "error") {
     return {
-      backgroundColor: colorScheme === "dark" ? "rgba(39, 20, 24, 0.96)" : "rgba(255, 248, 249, 0.96)",
-      borderColor: colorScheme === "dark" ? "rgba(255, 99, 132, 0.34)" : "rgba(255, 99, 132, 0.18)",
+      backgroundColor:
+        colorScheme === "dark"
+          ? "rgba(39, 20, 24, 0.96)"
+          : "rgba(255, 248, 249, 0.96)",
+      borderColor:
+        colorScheme === "dark"
+          ? "rgba(255, 99, 132, 0.34)"
+          : "rgba(255, 99, 132, 0.18)",
       accentColor: "#FF5C73",
       icon: "alert-circle" as const,
     };
   }
 
   return {
-    backgroundColor: colorScheme === "dark" ? "rgba(13, 25, 39, 0.96)" : "rgba(248, 252, 255, 0.96)",
-    borderColor: colorScheme === "dark" ? "rgba(96, 165, 250, 0.28)" : "rgba(96, 165, 250, 0.16)",
+    backgroundColor:
+      colorScheme === "dark"
+        ? "rgba(13, 25, 39, 0.96)"
+        : "rgba(248, 252, 255, 0.96)",
+    borderColor:
+      colorScheme === "dark"
+        ? "rgba(96, 165, 250, 0.28)"
+        : "rgba(96, 165, 250, 0.16)",
     accentColor: "#1495FF",
     icon: "info" as const,
   };
@@ -95,7 +116,10 @@ function ToastCard({ toast, index }: { toast: ToastRecord; index: number }) {
           </View>
 
           <View style={styles.copyBlock}>
-            <Text numberOfLines={1} style={[styles.title, { color: colors.foreground }]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: colors.foreground }]}
+            >
               {toast.title}
             </Text>
             {toast.message ? (
@@ -117,11 +141,11 @@ function ToastCard({ toast, index }: { toast: ToastRecord; index: number }) {
   );
 }
 
-export function ToastHost() {
+export function ToastHost({ disabled = false }: { disabled?: boolean }) {
   const toasts = useToastStore((state) => state.toasts);
   const visibleToasts = toasts.slice(-3).reverse();
 
-  if (!visibleToasts.length) {
+  if (disabled || !visibleToasts.length) {
     return null;
   }
 
@@ -142,7 +166,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 60,
+    zIndex: 9999,
     paddingTop: 6,
     paddingHorizontal: 14,
   },

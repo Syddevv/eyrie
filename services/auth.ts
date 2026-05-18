@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import type { Session } from "@supabase/supabase-js";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -50,7 +50,10 @@ function getGoogleErrorMessage(error: unknown) {
   return error.message;
 }
 
-async function createSessionFromRedirectUrl(url: string) {
+export async function createSessionFromRedirectUrlForClient(
+  client: SupabaseClient,
+  url: string,
+) {
   const { params, errorCode } = QueryParams.getQueryParams(url);
 
   if (errorCode) {
@@ -68,7 +71,7 @@ async function createSessionFromRedirectUrl(url: string) {
   // In that case there is no authorization code to exchange, so we restore the session from
   // the returned tokens instead of requiring a PKCE code.
   if (accessToken && refreshToken) {
-    const { data, error } = await supabase.auth.setSession({
+    const { data, error } = await client.auth.setSession({
       access_token: accessToken,
       refresh_token: refreshToken,
     });
@@ -87,13 +90,24 @@ async function createSessionFromRedirectUrl(url: string) {
     return null;
   }
 
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  const { data, error } = await client.auth.exchangeCodeForSession(code);
 
   if (error) {
     throw error;
   }
 
   return data.session ?? null;
+}
+
+export async function createSessionFromRedirectUrl(url: string) {
+  return createSessionFromRedirectUrlForClient(supabase, url);
+}
+
+export function getAuthRedirectTypeFromUrl(url: string) {
+  const { params } = QueryParams.getQueryParams(url);
+  const type = Array.isArray(params.type) ? params.type[0] : params.type;
+
+  return typeof type === "string" ? type : null;
 }
 
 function getSignInErrorMessage(error: unknown) {

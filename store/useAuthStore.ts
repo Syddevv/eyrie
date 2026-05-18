@@ -5,6 +5,7 @@ import { showToast } from "@/store/useToastStore";
 export type AuthMode = "sign-in" | "sign-up";
 export type SnackbarTone = "success" | "error" | "info";
 export type OtpStatus = "idle" | "error" | "success";
+export type PasswordResetPhase = "idle" | "email" | "code" | "password";
 
 export type OtpModalState = {
   visible: boolean;
@@ -12,6 +13,14 @@ export type OtpModalState = {
   mode: AuthMode;
   fullName?: string;
   resendAvailableAt: number;
+  status: OtpStatus;
+};
+
+export type PasswordResetFlowState = {
+  phase: PasswordResetPhase;
+  email: string;
+  resendAvailableAt: number;
+  attempts: number;
   status: OtpStatus;
 };
 
@@ -27,7 +36,11 @@ type AuthStoreState = {
   isVerifyingOtp: boolean;
   isGoogleLoading: boolean;
   isSigningOut: boolean;
+  isSendingPasswordReset: boolean;
+  isVerifyingPasswordResetCode: boolean;
+  isUpdatingPasswordReset: boolean;
   otpModal: OtpModalState;
+  passwordResetFlow: PasswordResetFlowState;
   setSession: (session: Session | null) => void;
   setReady: (isReady: boolean) => void;
   setSigningIn: (value: boolean) => void;
@@ -36,10 +49,25 @@ type AuthStoreState = {
   setVerifyingOtp: (value: boolean) => void;
   setGoogleLoading: (value: boolean) => void;
   setSigningOut: (value: boolean) => void;
+  setSendingPasswordReset: (value: boolean) => void;
+  setVerifyingPasswordResetCode: (value: boolean) => void;
+  setUpdatingPasswordReset: (value: boolean) => void;
   openOtpModal: (payload: Omit<OtpModalState, "visible" | "status">) => void;
   closeOtpModal: () => void;
   setOtpModalStatus: (status: OtpStatus) => void;
   setOtpResendAvailableAt: (timestamp: number) => void;
+  setPasswordResetFlow: (payload: PasswordResetFlowState) => void;
+  openPasswordResetEmailModal: (email?: string) => void;
+  openPasswordResetCodeModal: (payload: {
+    email: string;
+    resendAvailableAt: number;
+    attempts?: number;
+  }) => void;
+  openPasswordResetPasswordModal: (payload?: { email?: string }) => void;
+  closePasswordResetFlow: () => void;
+  setPasswordResetStatus: (status: OtpStatus) => void;
+  setPasswordResetResendAvailableAt: (timestamp: number) => void;
+  setPasswordResetAttempts: (attempts: number) => void;
   showSnackbar: (message: string, tone?: SnackbarTone) => void;
 };
 
@@ -48,6 +76,14 @@ const initialOtpModal: OtpModalState = {
   email: "",
   mode: "sign-in",
   resendAvailableAt: 0,
+  status: "idle",
+};
+
+const initialPasswordResetFlow: PasswordResetFlowState = {
+  phase: "idle",
+  email: "",
+  resendAvailableAt: 0,
+  attempts: 0,
   status: "idle",
 };
 
@@ -62,7 +98,11 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   isVerifyingOtp: false,
   isGoogleLoading: false,
   isSigningOut: false,
+  isSendingPasswordReset: false,
+  isVerifyingPasswordResetCode: false,
+  isUpdatingPasswordReset: false,
   otpModal: initialOtpModal,
+  passwordResetFlow: initialPasswordResetFlow,
   setSession: (session) =>
     set({
       session,
@@ -77,6 +117,10 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
   setVerifyingOtp: (value) => set({ isVerifyingOtp: value }),
   setGoogleLoading: (value) => set({ isGoogleLoading: value }),
   setSigningOut: (value) => set({ isSigningOut: value }),
+  setSendingPasswordReset: (value) => set({ isSendingPasswordReset: value }),
+  setVerifyingPasswordResetCode: (value) =>
+    set({ isVerifyingPasswordResetCode: value }),
+  setUpdatingPasswordReset: (value) => set({ isUpdatingPasswordReset: value }),
   openOtpModal: (payload) =>
     set({
       otpModal: {
@@ -103,6 +147,66 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       otpModal: {
         ...state.otpModal,
         resendAvailableAt: timestamp,
+      },
+    })),
+  setPasswordResetFlow: (payload) =>
+    set({
+      passwordResetFlow: payload,
+    }),
+  openPasswordResetEmailModal: (email = "") =>
+    set({
+      passwordResetFlow: {
+        ...initialPasswordResetFlow,
+        phase: "email",
+        email,
+      },
+    }),
+  openPasswordResetCodeModal: (payload) =>
+    set({
+      passwordResetFlow: {
+        phase: "code",
+        email: payload.email,
+        resendAvailableAt: payload.resendAvailableAt,
+        attempts: payload.attempts ?? 0,
+        status: "idle",
+      },
+    }),
+  openPasswordResetPasswordModal: (payload) =>
+    set((state) => ({
+      passwordResetFlow: {
+        phase: "password",
+        email: payload?.email ?? state.passwordResetFlow.email,
+        resendAvailableAt: state.passwordResetFlow.resendAvailableAt,
+        attempts: state.passwordResetFlow.attempts,
+        status: "idle",
+      },
+    })),
+  closePasswordResetFlow: () =>
+    set({
+      passwordResetFlow: initialPasswordResetFlow,
+      isSendingPasswordReset: false,
+      isVerifyingPasswordResetCode: false,
+      isUpdatingPasswordReset: false,
+    }),
+  setPasswordResetStatus: (status) =>
+    set((state) => ({
+      passwordResetFlow: {
+        ...state.passwordResetFlow,
+        status,
+      },
+    })),
+  setPasswordResetResendAvailableAt: (timestamp) =>
+    set((state) => ({
+      passwordResetFlow: {
+        ...state.passwordResetFlow,
+        resendAvailableAt: timestamp,
+      },
+    })),
+  setPasswordResetAttempts: (attempts) =>
+    set((state) => ({
+      passwordResetFlow: {
+        ...state.passwordResetFlow,
+        attempts,
       },
     })),
   showSnackbar: (message, tone = "info") =>

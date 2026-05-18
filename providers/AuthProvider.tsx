@@ -1,13 +1,22 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import * as Linking from "expo-linking";
 import { useRootNavigationState, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 
+import { CreateNewPasswordModal } from "@/components/auth/CreateNewPasswordModal";
+import { ForgotPasswordEmailModal } from "@/components/auth/ForgotPasswordEmailModal";
 import { OtpVerificationModal } from "@/components/auth/OtpVerificationModal";
+import { PasswordResetCodeModal } from "@/components/auth/PasswordResetCodeModal";
 import { themeColors } from "@/constants/colors";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getHasCompletedOnboarding } from "@/lib/onboarding-storage";
 import { supabase } from "@/lib/supabase";
+import {
+  beginPasswordResetFromRecoveryUrl,
+  clearPasswordResetFlow,
+  hydratePasswordResetFlow,
+} from "@/services/password-reset";
 import { useAuthStore } from "@/store/useAuthStore";
 
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -29,7 +38,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const router = useRouter();
   const segments = useSegments();
   const navigationState = useRootNavigationState();
-  const colorScheme = useColorScheme() ?? "light";
   const isReady = useAuthStore((state) => state.isReady);
   const user = useAuthStore((state) => state.user);
   const hasCompletedOnboarding = useAuthStore(
@@ -42,6 +50,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     (state) => state.setHasCompletedOnboarding,
   );
   const closeOtpModal = useAuthStore((state) => state.closeOtpModal);
+  const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
 
   useEffect(() => {
     let isMounted = true;
@@ -69,7 +78,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [setHasCompletedOnboarding]);
 
   useEffect(() => {
     let isMounted = true;
@@ -99,6 +108,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (event === "SIGNED_OUT") {
         closeOtpModal();
+        void clearPasswordResetFlow();
       }
     });
 
@@ -107,6 +117,47 @@ export function AuthProvider({ children }: PropsWithChildren) {
       subscription.unsubscribe();
     };
   }, [closeOtpModal, setReady, setSession]);
+
+  useEffect(() => {
+    void hydratePasswordResetFlow();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function handleIncomingUrl(url: string | null) {
+      if (!url) {
+        return;
+      }
+
+      try {
+        await beginPasswordResetFromRecoveryUrl(url);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to complete the password reset link.";
+        useAuthStore.getState().showSnackbar(message, "error");
+      }
+    }
+
+    void Linking.getInitialURL().then((url) => {
+      void handleIncomingUrl(url);
+    });
+
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      void handleIncomingUrl(url);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isReady || !isOnboardingReady) {
@@ -126,6 +177,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const currentRoot = segments[0];
     const isAuthRoute = currentRoot === "sign-in" || currentRoot === "sign-up";
     const isOnboardingRoute = currentRoot === "onboarding";
+
+    if (passwordResetPhase !== "idle") {
+      if (!isAuthRoute && !isOnboardingRoute) {
+        router.replace("/sign-in");
+      }
+      return;
+    }
 
     if (!hasCompletedOnboarding) {
       if (!isOnboardingRoute) {
@@ -156,6 +214,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     router,
     segments,
     user,
+    passwordResetPhase,
   ]);
 
   if (!isReady || !isOnboardingReady) {
@@ -166,6 +225,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     <>
       {children}
       <OtpVerificationModal />
+      <ForgotPasswordEmailModal />
+      <PasswordResetCodeModal />
+      <CreateNewPasswordModal />
     </>
   );
 }
