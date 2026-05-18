@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "../client";
 import { users } from "../schema";
@@ -9,7 +9,18 @@ export class UsersRepository {
   }
 
   async findByEmail(email: string) {
-    return db.query.users.findFirst({ where: and(eq(users.email, email), isNull(users.deletedAt)) });
+    const normalizedEmail = email.trim().toLowerCase();
+    const [match] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          sql`lower(trim(${users.email})) = ${normalizedEmail}`,
+          isNull(users.deletedAt),
+        ),
+      )
+      .limit(1);
+    return match ?? null;
   }
 
   async create(input: {

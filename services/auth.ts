@@ -10,6 +10,21 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { accountsService } from "@/src/db/services";
 
+const EXISTING_ACCOUNT_ERROR_MESSAGE =
+  "This email is already associated with an existing account.";
+const EXISTING_GOOGLE_ACCOUNT_ERROR_MESSAGE =
+  "This email is already associated with an existing account. Continue with Google instead.";
+
+type EmailRegistrationStatus = {
+  normalized_email: string;
+  exists_in_auth: boolean;
+  exists_in_users: boolean;
+  matching_user_id: string | null;
+  has_google: boolean;
+  has_email: boolean;
+  recommended_provider: string | null;
+};
+
 WebBrowser.maybeCompleteAuthSession();
 
 function normalizeEmail(email: string) {
@@ -47,7 +62,71 @@ function getGoogleErrorMessage(error: unknown) {
     return "Google sign-in is not enabled in Supabase. Enable the Google provider in Authentication > Providers.";
   }
 
+  if (
+    lower.includes("duplicate_email_google_only") ||
+    lower.includes("continue with google instead")
+  ) {
+    return EXISTING_GOOGLE_ACCOUNT_ERROR_MESSAGE;
+  }
+
+  if (
+    lower.includes("duplicate_email_account_exists") ||
+    lower.includes("already associated with an existing account")
+  ) {
+    return EXISTING_ACCOUNT_ERROR_MESSAGE;
+  }
+
   return error.message;
+}
+
+function getExistingAccountMessage(
+  status: Pick<EmailRegistrationStatus, "has_google" | "has_email" | "recommended_provider">,
+) {
+  if (status.recommended_provider === "google") {
+    return EXISTING_GOOGLE_ACCOUNT_ERROR_MESSAGE;
+  }
+
+  if (status.has_google && !status.has_email) {
+    return EXISTING_GOOGLE_ACCOUNT_ERROR_MESSAGE;
+  }
+
+  return EXISTING_ACCOUNT_ERROR_MESSAGE;
+}
+
+async function getEmailRegistrationStatus(
+  email: string,
+): Promise<EmailRegistrationStatus | null> {
+  const normalizedEmail = normalizeEmail(email);
+
+  const { data, error } = await supabase.rpc("get_email_registration_status", {
+    target_email: normalizedEmail,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  if (Array.isArray(data)) {
+    return (data[0] ?? null) as EmailRegistrationStatus | null;
+  }
+
+  return data as EmailRegistrationStatus;
+}
+
+async function assertEmailAvailableForRegistration(email: string) {
+  const status = await getEmailRegistrationStatus(email);
+
+  if (!status) {
+    return;
+  }
+
+  if (status.exists_in_auth || status.exists_in_users) {
+    throw new Error(getExistingAccountMessage(status));
+  }
 }
 
 export async function createSessionFromRedirectUrlForClient(
@@ -137,6 +216,20 @@ function getSignUpErrorMessage(error: unknown) {
 
   if (lower.includes("user already registered")) {
     return "An account with that email already exists. Sign in instead.";
+  }
+
+  if (
+    lower.includes("duplicate_email_google_only") ||
+    lower.includes("continue with google instead")
+  ) {
+    return EXISTING_GOOGLE_ACCOUNT_ERROR_MESSAGE;
+  }
+
+  if (
+    lower.includes("duplicate_email_account_exists") ||
+    lower.includes("already associated with an existing account")
+  ) {
+    return EXISTING_ACCOUNT_ERROR_MESSAGE;
   }
 
   if (lower.includes("password")) {
@@ -257,6 +350,8 @@ export async function signUpWithEmailPassword({
   store.setSigningUp(true);
 
   try {
+    await assertEmailAvailableForRegistration(normalizedEmail);
+
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,

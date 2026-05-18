@@ -20,6 +20,13 @@ type LocalUser = {
   updatedAt: string;
 };
 
+const LOCAL_DUPLICATE_EMAIL_ERROR =
+  "This email is already associated with an existing account.";
+
+function normalizeEmail(email?: string | null) {
+  return email?.trim().toLowerCase() || null;
+}
+
 function getLocalDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -55,9 +62,16 @@ export class UsersService {
       (metadata.full_name as string) ?? (metadata.fullName as string) ?? null;
     const avatarUrl =
       (metadata.avatar_url as string) ?? (metadata.avatarUrl as string) ?? null;
-    const email = supabaseUser.email ?? null;
+    const email = normalizeEmail(supabaseUser.email ?? null);
 
     const existing = await usersRepository.findById(id);
+    const existingByEmail = email
+      ? await usersRepository.findByEmail(email)
+      : null;
+
+    if (existingByEmail && existingByEmail.id !== id) {
+      throw new Error(LOCAL_DUPLICATE_EMAIL_ERROR);
+    }
 
     if (!existing) {
       const created = await usersRepository.create({
@@ -107,6 +121,17 @@ export class UsersService {
       avatarUrl?: string | null;
     },
   ) {
+    const normalizedEmail =
+      "email" in input ? normalizeEmail(input.email ?? null) : undefined;
+
+    if (normalizedEmail) {
+      const existingByEmail = await usersRepository.findByEmail(normalizedEmail);
+
+      if (existingByEmail && existingByEmail.id !== id) {
+        throw new Error(LOCAL_DUPLICATE_EMAIL_ERROR);
+      }
+    }
+
     const updates: Partial<LocalUser> = {
       updatedAt: nowIso(),
     };
@@ -116,7 +141,7 @@ export class UsersService {
     }
 
     if ("email" in input) {
-      updates.email = input.email?.trim().toLowerCase() || null;
+      updates.email = normalizedEmail ?? null;
     }
 
     if ("avatarUrl" in input) {
