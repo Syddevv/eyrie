@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { Asset } from "expo-asset";
+import * as Haptics from "expo-haptics";
 import { MotiView } from "moti";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -263,12 +264,14 @@ export default function Onboarding() {
   }, []);
 
   const complete = useCallback(async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await persistOnboardingCompletion();
     setOnboardingCompleted(true);
     router.replace("/sign-up");
   }, [router, setOnboardingCompleted]);
 
   const skip = useCallback(() => {
+    void Haptics.selectionAsync().catch(() => undefined);
     void complete();
   }, [complete]);
 
@@ -286,6 +289,7 @@ export default function Onboarding() {
 
   const next = useCallback(() => {
     if (index < slides.length - 1) {
+      void Haptics.selectionAsync().catch(() => undefined);
       goToIndex(index + 1);
       return;
     }
