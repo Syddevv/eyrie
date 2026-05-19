@@ -44,6 +44,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     (state) => state.hasCompletedOnboarding,
   );
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
+  const [isAuthStateValidating, setIsAuthStateValidating] = useState(true);
   const setSession = useAuthStore((state) => state.setSession);
   const setReady = useAuthStore((state) => state.setReady);
   const setHasCompletedOnboarding = useAuthStore(
@@ -83,7 +84,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data, error }) => {
+    const reconcileSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
       if (!isMounted) {
         return;
       }
@@ -95,21 +98,52 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       setReady(true);
-    });
+      setIsAuthStateValidating(false);
+    };
+
+    void reconcileSession();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         closeOtpModal();
+        setIsAuthStateValidating(true);
+        void supabase.auth
+          .getSession()
+          .then(({ data, error }) => {
+            if (!isMounted) {
+              return;
+            }
+
+            if (error) {
+              setSession(session ?? null);
+            } else {
+              setSession(data.session ?? session ?? null);
+            }
+
+            setIsAuthStateValidating(false);
+          })
+          .catch(() => {
+            if (!isMounted) {
+              return;
+            }
+
+            setSession(session ?? null);
+            setIsAuthStateValidating(false);
+          });
+        return;
       }
 
       if (event === "SIGNED_OUT") {
+        setSession(null);
+        setIsAuthStateValidating(false);
         closeOtpModal();
         void clearPasswordResetFlow();
+        return;
       }
+
+      setSession(session);
     });
 
     return () => {
@@ -160,17 +194,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!isReady || !isOnboardingReady) {
+    if (!isReady || !isOnboardingReady || isAuthStateValidating) {
       return;
     }
 
     SplashScreen.hideAsync().catch(() => {
       // Ignore repeated hide attempts during dev reloads.
     });
-  }, [isOnboardingReady, isReady]);
+  }, [isAuthStateValidating, isOnboardingReady, isReady]);
 
   useEffect(() => {
-    if (!isReady || !isOnboardingReady || !navigationState?.key) {
+    if (
+      !isReady ||
+      !isOnboardingReady ||
+      isAuthStateValidating ||
+      !navigationState?.key
+    ) {
       return;
     }
 
@@ -208,6 +247,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [
     hasCompletedOnboarding,
+    isAuthStateValidating,
     isOnboardingReady,
     isReady,
     navigationState?.key,
