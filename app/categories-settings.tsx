@@ -1,8 +1,11 @@
 import { Feather } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  InteractionManager,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,7 +14,7 @@ import {
   Keyboard,
 } from "react-native";
 import Animated, { FadeInUp, LinearTransition } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -34,14 +37,22 @@ import { categoriesService } from "@/src/db/services";
 
 type FilterType = "all" | "expense" | "income";
 
+const HEADER_HORIZONTAL_PADDING = 14;
+const HEADER_TOP_PADDING = 12;
+const HEADER_CONTENT_MIN_HEIGHT = 94;
+const SEARCH_FIELD_HEIGHT = 50;
+const SEGMENT_HEIGHT = 40;
+
 export default function CategoriesSettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
-  const { user } = useCurrentUser();
+  const { user, isLoading: isCurrentUserLoading } = useCurrentUser();
   const { categories, isLoading, refresh } = useManagedCategories(true);
   const showSnackbar = useAuthStore((s) => s.showSnackbar);
+  const [iconFontLoaded, iconFontError] = useFonts(Feather.font);
 
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
@@ -53,6 +64,17 @@ export default function CategoriesSettingsScreen() {
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [isUnarchivingId, setIsUnarchivingId] = useState<string | null>(null);
+  const [hasSettledNavigation, setHasSettledNavigation] = useState(false);
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setHasSettledNavigation(true);
+    });
+
+    return () => {
+      task.cancel();
+    };
+  }, []);
 
   const ui = useMemo(
     () => ({
@@ -100,8 +122,32 @@ export default function CategoriesSettingsScreen() {
         color: isDark ? "#CBD5E1" : "#475569",
       },
       fab: { backgroundColor: colors.primary },
+      skeletonLine: isDark
+        ? "rgba(148, 163, 184, 0.22)"
+        : "rgba(148, 163, 184, 0.16)",
+      skeletonLineStrong: isDark
+        ? "rgba(148, 163, 184, 0.28)"
+        : "rgba(148, 163, 184, 0.2)",
     }),
     [colors, isDark],
+  );
+
+  const hasResolvedSafeAreaTop = Platform.OS === "android" || insets.top > 0;
+  const hasHeaderAssetsReady = iconFontLoaded || iconFontError !== null;
+  const isInitialCategoriesLoading = isLoading && categories.length === 0;
+  const shouldShowStartupSkeleton =
+    !hasResolvedSafeAreaTop ||
+    !hasHeaderAssetsReady ||
+    !hasSettledNavigation ||
+    isCurrentUserLoading ||
+    isInitialCategoriesLoading;
+
+  const headerBlockStyle = useMemo(
+    () => ({
+      paddingTop: insets.top + HEADER_TOP_PADDING,
+      minHeight: insets.top + HEADER_TOP_PADDING + HEADER_CONTENT_MIN_HEIGHT,
+    }),
+    [insets.top],
   );
 
   const visibleCategories = useMemo(() => {
@@ -239,39 +285,111 @@ export default function CategoriesSettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, ui.background]}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={[styles.safeArea, ui.background]}
+    >
       <View style={styles.flex}>
-        <View style={styles.headerRow}>
-          <Pressable
-            style={[styles.iconButton, ui.fieldSurface]}
-            onPress={() => router.back()}
-          >
-            <Feather name="chevron-left" size={20} color={colors.foreground} />
-          </Pressable>
-          <View style={styles.headerTextBlock}>
-            <Text style={[styles.title, ui.title]}>Categories</Text>
-            <Text style={[styles.subtitle, ui.subtitle]}>
-              Manage the categories used in transactions, budgets, analytics,
-              and insights.
-            </Text>
+        <View style={[styles.headerBlock, headerBlockStyle]}>
+          <View style={styles.headerRow}>
+            {hasHeaderAssetsReady ? (
+              <Pressable
+                style={[styles.iconButton, ui.fieldSurface]}
+                onPress={() => router.back()}
+              >
+                <Feather
+                  name="chevron-left"
+                  size={20}
+                  color={colors.foreground}
+                />
+              </Pressable>
+            ) : (
+              <View style={[styles.iconButton, ui.fieldSurface]} />
+            )}
+            <View style={styles.headerTextBlock}>
+              {shouldShowStartupSkeleton ? (
+                <View style={styles.headerSkeletonWrap}>
+                  <View
+                    style={[
+                      styles.headerSkeletonLine,
+                      styles.headerSkeletonTitle,
+                      { backgroundColor: ui.skeletonLineStrong },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.headerSkeletonLine,
+                      styles.headerSkeletonSubtitlePrimary,
+                      { backgroundColor: ui.skeletonLine },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.headerSkeletonLine,
+                      styles.headerSkeletonSubtitleSecondary,
+                      { backgroundColor: ui.skeletonLine },
+                    ]}
+                  />
+                </View>
+              ) : (
+                <>
+                  <Text style={[styles.title, ui.title]}>Categories</Text>
+                  <Text style={[styles.subtitle, ui.subtitle]}>
+                    Manage the categories used in transactions, budgets,
+                    analytics, and insights.
+                  </Text>
+                </>
+              )}
+            </View>
           </View>
         </View>
 
-        <View style={[styles.searchField, ui.fieldSurface]}>
-          <Feather name="search" size={18} color={ui.subtitle.color} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search categories"
-            placeholderTextColor={ui.subtitle.color}
-            selectionColor={colors.primary}
-            style={[styles.searchInput, ui.title]}
-          />
-        </View>
+        {shouldShowStartupSkeleton ? (
+          <View style={[styles.searchField, ui.fieldSurface]}>
+            <View
+              style={[
+                styles.searchSkeletonIcon,
+                { backgroundColor: ui.skeletonLine },
+              ]}
+            />
+            <View
+              style={[
+                styles.searchSkeletonText,
+                { backgroundColor: ui.skeletonLineStrong },
+              ]}
+            />
+          </View>
+        ) : (
+          <View style={[styles.searchField, ui.fieldSurface]}>
+            <Feather name="search" size={18} color={ui.subtitle.color} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search categories"
+              placeholderTextColor={ui.subtitle.color}
+              selectionColor={colors.primary}
+              style={[styles.searchInput, ui.title]}
+            />
+          </View>
+        )}
 
         <View style={styles.segmentedRow}>
           {(["all", "expense", "income"] as const).map((value) => {
             const isSelected = filterType === value;
+
+            if (shouldShowStartupSkeleton) {
+              return (
+                <View key={value} style={[styles.segment, ui.pillSurface]}>
+                  <View
+                    style={[
+                      styles.segmentSkeletonText,
+                      { backgroundColor: ui.skeletonLineStrong },
+                    ]}
+                  />
+                </View>
+              );
+            }
+
             return (
               <Pressable
                 key={value}
@@ -303,6 +421,80 @@ export default function CategoriesSettingsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {shouldShowStartupSkeleton ? (
+            <View style={styles.skeletonList}>
+              <View
+                style={[
+                  styles.sectionTitleSkeleton,
+                  { backgroundColor: ui.skeletonLineStrong },
+                ]}
+              />
+              {[0, 1, 2, 3].map((index) => (
+                <View
+                  key={`category-skeleton-${index}`}
+                  style={[styles.categoryCard, ui.card, shadows.soft]}
+                >
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.cardIdentity}>
+                      <View
+                        style={[
+                          styles.iconWrap,
+                          { backgroundColor: ui.skeletonLine },
+                        ]}
+                      />
+                      <View style={styles.cardTextBlock}>
+                        <View
+                          style={[
+                            styles.cardTitleSkeleton,
+                            { backgroundColor: ui.skeletonLineStrong },
+                          ]}
+                        />
+                        <View
+                          style={[
+                            styles.cardMetaSkeleton,
+                            { backgroundColor: ui.skeletonLine },
+                          ]}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.cardActions}>
+                      <View
+                        style={[
+                          styles.actionButton,
+                          ui.fieldSurface,
+                          styles.actionButtonSkeleton,
+                        ]}
+                      />
+                      <View
+                        style={[
+                          styles.actionButton,
+                          ui.fieldSurface,
+                          styles.actionButtonSkeleton,
+                        ]}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.badgesRow}>
+                    <View
+                      style={[
+                        styles.badgeSkeleton,
+                        { backgroundColor: ui.skeletonLine },
+                      ]}
+                    />
+                    <View
+                      style={[
+                        styles.badgeSkeletonSecondary,
+                        { backgroundColor: ui.skeletonLine },
+                      ]}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <>
           {archivedCategories.length ? (
             <View style={styles.archivedSection}>
               <Text style={[styles.archivedSectionTitle, ui.title]}>
@@ -493,6 +685,8 @@ export default function CategoriesSettingsScreen() {
               </Text>
             </View>
           ) : null}
+            </>
+          )}
         </ScrollView>
 
         <Pressable
@@ -578,9 +772,10 @@ export default function CategoriesSettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
+  headerBlock: {
+    paddingHorizontal: HEADER_HORIZONTAL_PADDING,
+  },
   headerRow: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
     flexDirection: "row",
     gap: 12,
     alignItems: "flex-start",
@@ -595,6 +790,27 @@ const styles = StyleSheet.create({
   },
   headerTextBlock: {
     flex: 1,
+    minHeight: HEADER_CONTENT_MIN_HEIGHT,
+  },
+  headerSkeletonWrap: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 8,
+  },
+  headerSkeletonLine: {
+    borderRadius: radius.full,
+  },
+  headerSkeletonTitle: {
+    width: "44%",
+    height: 26,
+  },
+  headerSkeletonSubtitlePrimary: {
+    width: "92%",
+    height: 16,
+  },
+  headerSkeletonSubtitleSecondary: {
+    width: "72%",
+    height: 16,
   },
   title: {
     fontFamily: fontFamilies.sans,
@@ -610,14 +826,24 @@ const styles = StyleSheet.create({
   },
   searchField: {
     marginTop: 18,
-    marginHorizontal: 14,
-    minHeight: 50,
+    marginHorizontal: HEADER_HORIZONTAL_PADDING,
+    height: SEARCH_FIELD_HEIGHT,
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  searchSkeletonIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.full,
+  },
+  searchSkeletonText: {
+    width: "56%",
+    height: 18,
+    borderRadius: radius.full,
   },
   searchInput: {
     flex: 1,
@@ -628,18 +854,23 @@ const styles = StyleSheet.create({
   },
   segmentedRow: {
     marginTop: 14,
-    marginHorizontal: 14,
+    marginHorizontal: HEADER_HORIZONTAL_PADDING,
     paddingBottom: 14,
     flexDirection: "row",
     gap: 10,
   },
   segment: {
     flex: 1,
-    minHeight: 40,
+    height: SEGMENT_HEIGHT,
     borderRadius: 20,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  segmentSkeletonText: {
+    width: "42%",
+    height: 16,
+    borderRadius: radius.full,
   },
   segmentText: {
     fontFamily: fontFamilies.sans,
@@ -648,10 +879,21 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.bold,
   },
   scrollContent: {
-    paddingHorizontal: 14,
+    paddingHorizontal: HEADER_HORIZONTAL_PADDING,
     paddingTop: 16,
     paddingBottom: 140,
     gap: 12,
+  },
+  skeletonList: {
+    gap: 12,
+  },
+  sectionTitleSkeleton: {
+    width: 168,
+    height: 18,
+    borderRadius: radius.full,
+    marginTop: 20,
+    marginBottom: 12,
+    marginHorizontal: 2,
   },
   categoryCard: {
     borderRadius: 26,
@@ -693,6 +935,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  cardTitleSkeleton: {
+    width: "78%",
+    height: 18,
+    borderRadius: radius.full,
+  },
+  cardMetaSkeleton: {
+    width: "46%",
+    height: 14,
+    borderRadius: radius.full,
+    marginTop: 8,
+  },
   cardActions: {
     flexDirection: "row",
     gap: 10,
@@ -705,11 +958,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  actionButtonSkeleton: {
+    opacity: 0.9,
+  },
   badgesRow: {
     marginTop: 14,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+  },
+  badgeSkeleton: {
+    width: 92,
+    height: 28,
+    borderRadius: radius.full,
+  },
+  badgeSkeletonSecondary: {
+    width: 126,
+    height: 28,
+    borderRadius: radius.full,
   },
   badge: {
     minHeight: 28,
