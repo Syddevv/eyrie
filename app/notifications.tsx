@@ -7,6 +7,8 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   StyleSheet,
   Text,
   View,
@@ -26,10 +28,12 @@ import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification } from "@/services/notifications";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
+import { useNotificationStore } from "@/store/useNotificationStore";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -303,6 +307,8 @@ function NotificationRow({
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const hasRestoredScrollRef = useRef(false);
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
@@ -317,12 +323,50 @@ export default function NotificationsScreen() {
     notifications,
     unreadCount,
     isLoading,
+    isRefreshing,
+    hasHydrated,
+    hasCachedData,
     error,
     refresh,
     markAllAsRead,
     toggleRead,
     deleteNotification,
   } = useNotifications(notificationsEnabled);
+  const { user } = useCurrentUser();
+  const userId = user?.id ?? null;
+  const scrollOffset = useNotificationStore((state) =>
+    userId ? (state.getCacheForUser(userId)?.scrollOffset ?? 0) : 0,
+  );
+  const setScrollOffsetForUser = useNotificationStore(
+    (state) => state.setScrollOffsetForUser,
+  );
+
+  useEffect(() => {
+    if (!userId || hasRestoredScrollRef.current || scrollOffset <= 0) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({
+        y: scrollOffset,
+        animated: false,
+      });
+      hasRestoredScrollRef.current = true;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [scrollOffset, userId]);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!userId) {
+      return;
+    }
+
+    setScrollOffsetForUser(userId, event.nativeEvent.contentOffset.y);
+  };
+
+  const shouldShowBlockingLoadingState =
+    notificationsEnabled && isLoading && !hasCachedData && !hasHydrated;
 
   const pageStyles = useMemo(
     () => ({
@@ -377,7 +421,7 @@ export default function NotificationsScreen() {
   );
 
   const handleRefresh = async () => {
-    await refresh();
+    await refresh({ force: true });
   };
 
   const handleMarkAllAsRead = async () => {
@@ -474,11 +518,14 @@ export default function NotificationsScreen() {
         </View>
 
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
-              refreshing={isLoading}
+              refreshing={isRefreshing}
               onRefresh={() => void handleRefresh()}
             />
           }
@@ -560,9 +607,27 @@ export default function NotificationsScreen() {
               </View>
             ) : null}
 
+            {shouldShowBlockingLoadingState ? (
+              <View
+                style={[
+                  styles.emptyStateCard,
+                  pageStyles.emptyCard,
+                  shadows.soft,
+                ]}
+              >
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+                  Loading notifications...
+                </Text>
+                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+                  Pulling your latest alerts and reminders.
+                </Text>
+              </View>
+            ) : null}
+
             {notificationsEnabled &&
             !notifications.length &&
-            !isLoading &&
+            !shouldShowBlockingLoadingState &&
             !error ? (
               <View
                 style={[

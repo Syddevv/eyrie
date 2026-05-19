@@ -9,10 +9,13 @@ import {
   markNotificationRead,
   softDeleteNotification,
   subscribeToNotifications,
+  syncNotificationBadge,
   type AppNotification,
 } from "@/services/notifications";
-import { syncNotificationBadge } from "@/services/notifications";
 import { useNotificationStore } from "@/store/useNotificationStore";
+
+const NOTIFICATIONS_STALE_MS = 60_000;
+const inflightRefreshes = new Map<string, Promise<void>>();
 
 function normalizeNotificationsError(error: unknown) {
   const fallback = "Notifications are temporarily unavailable.";
@@ -73,46 +76,133 @@ function mergeNotifications(
   );
 }
 
+function hasFreshNotificationCache(lastFetchedAt: number | null) {
+  return (
+    typeof lastFetchedAt === "number" &&
+    Date.now() - lastFetchedAt < NOTIFICATIONS_STALE_MS
+  );
+}
+
 export function useNotifications(enabled = true) {
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const unreadCount = useNotificationStore((state) => state.unreadCount);
   const setUnreadCount = useNotificationStore((state) => state.setUnreadCount);
+  const cache = useNotificationStore((state) =>
+    userId ? (state.cacheByUserId[userId] ?? null) : null,
+  );
+  const getCacheForUser = useNotificationStore((state) => state.getCacheForUser);
+  const setCacheForUser = useNotificationStore((state) => state.setCacheForUser);
+  const patchNotificationsForUser = useNotificationStore(
+    (state) => state.patchNotificationsForUser,
+  );
+  const patchUnreadCountForUser = useNotificationStore(
+    (state) => state.patchUnreadCountForUser,
+  );
+  const clearCacheForUser = useNotificationStore((state) => state.clearCacheForUser);
+  const notifications = cache?.notifications ?? [];
+  const hasCachedData = notifications.length > 0;
+  const hasHydrated = cache?.hasHydrated ?? false;
 
-  const refresh = useCallback(async () => {
-    if (!userId || !enabled) {
-      setNotifications([]);
-      setError(null);
-      setUnreadCount(0);
-      await syncNotificationBadge(0);
-      return;
-    }
+  const refresh = useCallback(
+    async ({
+      force = false,
+      silent = false,
+    }: {
+      force?: boolean;
+      silent?: boolean;
+    } = {}) => {
+      if (!userId || !enabled) {
+        if (userId) {
+          clearCacheForUser(userId);
+        } else {
+          setUnreadCount(0);
+        }
+        setError(null);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        await syncNotificationBadge(0);
+        return;
+      }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      await generatePeriodicNotifications(userId).catch(() => undefined);
-      const [rows, count] = await Promise.all([
-        fetchNotifications(userId),
-        fetchUnreadNotificationCount(userId),
-      ]);
-      setNotifications(rows);
-      setUnreadCount(count);
-      await syncNotificationBadge(count);
-    } catch (refreshError) {
-      setError(normalizeNotificationsError(refreshError));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [enabled, setUnreadCount, userId]);
+      const currentCache = getCacheForUser(userId);
+      const shouldUseBlockingLoader =
+        !silent &&
+        !currentCache?.hasHydrated &&
+        !currentCache?.notifications.length;
+      const isFresh = hasFreshNotificationCache(currentCache?.lastFetchedAt ?? null);
+
+      if (!force && !silent && currentCache?.hasHydrated && isFresh) {
+        return;
+      }
+
+      const inflightKey = `${userId}:${enabled ? "on" : "off"}`;
+      const existingRequest = inflightRefreshes.get(inflightKey);
+      if (existingRequest) {
+        return existingRequest;
+      }
+
+      if (shouldUseBlockingLoader) {
+        setIsLoading(true);
+      } else if (!silent) {
+        setIsRefreshing(true);
+      }
+
+      if (!silent) {
+        setError(null);
+      }
+
+      const request = (async () => {
+        try {
+          await generatePeriodicNotifications(userId).catch(() => undefined);
+          const [rows, count] = await Promise.all([
+            fetchNotifications(userId),
+            fetchUnreadNotificationCount(userId),
+          ]);
+
+          setCacheForUser(userId, {
+            notifications: rows,
+            unreadCount: count,
+            lastFetchedAt: Date.now(),
+            hasHydrated: true,
+          });
+          await syncNotificationBadge(count);
+          setError(null);
+        } catch (refreshError) {
+          if (!currentCache?.notifications.length) {
+            setError(normalizeNotificationsError(refreshError));
+          }
+        } finally {
+          setIsLoading(false);
+          setIsRefreshing(false);
+          inflightRefreshes.delete(inflightKey);
+        }
+      })();
+
+      inflightRefreshes.set(inflightKey, request);
+      return request;
+    },
+    [
+      clearCacheForUser,
+      enabled,
+      getCacheForUser,
+      setCacheForUser,
+      setUnreadCount,
+      userId,
+    ],
+  );
 
   const toggleRead = useCallback(
     async (notification: AppNotification, nextReadState: boolean) => {
-      const previous = notifications;
-      const updatedLocal = notifications.map((item) =>
+      if (!userId) {
+        return;
+      }
+
+      const previous = getCacheForUser(userId)?.notifications ?? [];
+      const updatedLocal = previous.map((item) =>
         item.id === notification.id
           ? {
               ...item,
@@ -123,21 +213,25 @@ export function useNotifications(enabled = true) {
       );
 
       const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
-      setNotifications(updatedLocal);
-      setUnreadCount(nextUnreadCount);
+      setCacheForUser(userId, {
+        notifications: updatedLocal,
+        unreadCount: nextUnreadCount,
+      });
       await syncNotificationBadge(nextUnreadCount);
 
       try {
         await markNotificationRead(notification.id, nextReadState);
       } catch (toggleError) {
-        setNotifications(previous);
         const restoredCount = previous.filter((item) => !item.is_read).length;
-        setUnreadCount(restoredCount);
+        setCacheForUser(userId, {
+          notifications: previous,
+          unreadCount: restoredCount,
+        });
         await syncNotificationBadge(restoredCount);
         throw toggleError;
       }
     },
-    [notifications, setUnreadCount],
+    [getCacheForUser, setCacheForUser, userId],
   );
 
   const markAllAsRead = useCallback(async () => {
@@ -145,52 +239,80 @@ export function useNotifications(enabled = true) {
       return;
     }
 
-    const previous = notifications;
-    const updatedLocal = notifications.map((item) => ({
+    const previous = getCacheForUser(userId)?.notifications ?? [];
+    const updatedLocal = previous.map((item) => ({
       ...item,
       is_read: true,
       read_at: item.read_at ?? new Date().toISOString(),
     }));
-    setNotifications(updatedLocal);
-    setUnreadCount(0);
+
+    setCacheForUser(userId, {
+      notifications: updatedLocal,
+      unreadCount: 0,
+    });
     await syncNotificationBadge(0);
 
     try {
       await markAllNotificationsRead(userId);
     } catch (markError) {
-      setNotifications(previous);
       const restoredCount = previous.filter((item) => !item.is_read).length;
-      setUnreadCount(restoredCount);
+      setCacheForUser(userId, {
+        notifications: previous,
+        unreadCount: restoredCount,
+      });
       await syncNotificationBadge(restoredCount);
       throw markError;
     }
-  }, [notifications, setUnreadCount, userId]);
+  }, [getCacheForUser, setCacheForUser, userId]);
 
   const deleteNotification = useCallback(
     async (notification: AppNotification) => {
-      const previous = notifications;
-      const updatedLocal = notifications.filter((item) => item.id !== notification.id);
+      if (!userId) {
+        return;
+      }
+
+      const previous = getCacheForUser(userId)?.notifications ?? [];
+      const updatedLocal = previous.filter((item) => item.id !== notification.id);
       const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
-      setNotifications(updatedLocal);
-      setUnreadCount(nextUnreadCount);
+
+      setCacheForUser(userId, {
+        notifications: updatedLocal,
+        unreadCount: nextUnreadCount,
+      });
       await syncNotificationBadge(nextUnreadCount);
 
       try {
         await softDeleteNotification(notification.id);
       } catch (deleteError) {
-        setNotifications(previous);
         const restoredCount = previous.filter((item) => !item.is_read).length;
-        setUnreadCount(restoredCount);
+        setCacheForUser(userId, {
+          notifications: previous,
+          unreadCount: restoredCount,
+        });
         await syncNotificationBadge(restoredCount);
         throw deleteError;
       }
     },
-    [notifications, setUnreadCount],
+    [getCacheForUser, setCacheForUser, userId],
   );
 
   useEffect(() => {
-    refresh().catch(() => undefined);
-  }, [refresh]);
+    if (!userId || !enabled) {
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setError(null);
+      return;
+    }
+
+    const currentCache = getCacheForUser(userId);
+    const shouldHydrate = !currentCache?.hasHydrated;
+    const isFresh = hasFreshNotificationCache(currentCache?.lastFetchedAt ?? null);
+
+    void refresh({
+      force: shouldHydrate || !isFresh,
+      silent: !shouldHydrate && !!currentCache?.notifications.length,
+    }).catch(() => undefined);
+  }, [enabled, getCacheForUser, refresh, userId]);
 
   useEffect(() => {
     if (!userId || !enabled) {
@@ -199,21 +321,33 @@ export function useNotifications(enabled = true) {
 
     return subscribeToNotifications(userId, (event) => {
       if (event.eventType === "DELETE" && event.old) {
-        setNotifications((current) =>
+        patchNotificationsForUser(userId, (current) =>
           current.filter((item) => item.id !== event.old.id),
         );
       } else if (event.new && !event.new.deleted_at) {
-        setNotifications((current) => mergeNotifications(current, event.new!));
+        patchNotificationsForUser(userId, (current) =>
+          mergeNotifications(current, event.new!),
+        );
       }
 
       void fetchUnreadNotificationCount(userId)
         .then((count) => {
-          setUnreadCount(count);
+          patchUnreadCountForUser(userId, count);
           return syncNotificationBadge(count);
         })
         .catch(() => undefined);
     });
-  }, [enabled, setUnreadCount, userId]);
+  }, [enabled, patchNotificationsForUser, patchUnreadCountForUser, userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const cachedUnreadCount = getCacheForUser(userId)?.unreadCount ?? 0;
+    setUnreadCount(cachedUnreadCount);
+  }, [getCacheForUser, setUnreadCount, userId]);
 
   const hasUnread = useMemo(() => unreadCount > 0, [unreadCount]);
 
@@ -222,6 +356,9 @@ export function useNotifications(enabled = true) {
     unreadCount,
     hasUnread,
     isLoading,
+    isRefreshing,
+    hasHydrated,
+    hasCachedData,
     error,
     refresh,
     markAllAsRead,
