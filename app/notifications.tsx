@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -309,6 +309,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView | null>(null);
   const hasRestoredScrollRef = useRef(false);
+  const currentScrollOffsetRef = useRef(0);
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
@@ -334,35 +335,61 @@ export default function NotificationsScreen() {
   } = useNotifications(notificationsEnabled);
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
-  const scrollOffset = useNotificationStore((state) =>
-    userId ? (state.getCacheForUser(userId)?.scrollOffset ?? 0) : 0,
-  );
   const setScrollOffsetForUser = useNotificationStore(
     (state) => state.setScrollOffsetForUser,
   );
+  const initialScrollOffsetRef = useRef(
+    userId
+      ? (useNotificationStore.getState().getCacheForUser(userId)?.scrollOffset ?? 0)
+      : 0,
+  );
 
   useEffect(() => {
-    if (!userId || hasRestoredScrollRef.current || scrollOffset <= 0) {
+    currentScrollOffsetRef.current = initialScrollOffsetRef.current;
+  }, []);
+
+  const persistScrollOffset = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+
+    setScrollOffsetForUser(userId, currentScrollOffsetRef.current);
+  }, [setScrollOffsetForUser, userId]);
+
+  const scheduleScrollOffsetPersist = useCallback(() => {
+    requestAnimationFrame(() => {
+      persistScrollOffset();
+    });
+  }, [persistScrollOffset]);
+
+  useEffect(() => {
+    if (
+      !userId ||
+      hasRestoredScrollRef.current ||
+      initialScrollOffsetRef.current <= 0
+    ) {
       return;
     }
 
     const frame = requestAnimationFrame(() => {
       scrollViewRef.current?.scrollTo({
-        y: scrollOffset,
+        y: initialScrollOffsetRef.current,
         animated: false,
       });
       hasRestoredScrollRef.current = true;
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [scrollOffset, userId]);
+  }, [userId]);
+
+  useEffect(() => {
+    return () => {
+      scheduleScrollOffsetPersist();
+    };
+  }, [scheduleScrollOffsetPersist]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!userId) {
-      return;
-    }
-
-    setScrollOffsetForUser(userId, event.nativeEvent.contentOffset.y);
+    currentScrollOffsetRef.current = event.nativeEvent.contentOffset.y;
   };
 
   const shouldShowBlockingLoadingState =
@@ -472,8 +499,8 @@ export default function NotificationsScreen() {
             <Pressable
               style={[styles.iconButton, pageStyles.iconButton]}
               onPress={() => {
-                void triggerNavigationHaptic();
                 router.back();
+                void triggerNavigationHaptic();
               }}
             >
               <Feather
@@ -523,6 +550,8 @@ export default function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          onScrollEndDrag={scheduleScrollOffsetPersist}
+          onMomentumScrollEnd={scheduleScrollOffsetPersist}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
