@@ -39,6 +39,7 @@ export type NotificationData = {
   transactionId?: string;
   accountId?: string;
   merchantId?: string | null;
+  merchantName?: string | null;
   url?: string;
   progress?: number;
   amount?: number;

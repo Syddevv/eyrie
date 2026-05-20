@@ -1,9 +1,10 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
+import MerchantLogo from "@/components/merchant-logo";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -21,6 +22,7 @@ import {
   useTransaction,
 } from "@/hooks/useTransactions";
 import { transactionsService } from "@/src/db/services";
+import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 export default function TransactionDetailsModal() {
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function TransactionDetailsModal() {
   const { transaction, isLoading } = useTransaction(transactionId);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const hasMerchantLogo = Boolean(getMerchantLogo(transaction?.merchant));
 
   const ui = useMemo(
     () => ({
@@ -93,29 +96,6 @@ export default function TransactionDetailsModal() {
     }
   };
 
-  const transactionIcon =
-    transaction?.iconLibrary === "material" ? (
-      <MaterialCommunityIcons
-        name={
-          transaction.iconName as React.ComponentProps<
-            typeof MaterialCommunityIcons
-          >["name"]
-        }
-        size={22}
-        color={transaction.iconColor}
-      />
-    ) : (
-      <Feather
-        name={
-          (transaction?.iconName ?? "circle") as React.ComponentProps<
-            typeof Feather
-          >["name"]
-        }
-        size={20}
-        color={transaction?.iconColor ?? "#94A3B8"}
-      />
-    );
-
   return (
     <View style={[styles.overlay, ui.overlay]}>
       <Pressable style={styles.backdrop} onPress={() => router.back()} />
@@ -129,14 +109,24 @@ export default function TransactionDetailsModal() {
               styles.iconWrap,
               {
                 backgroundColor: transaction
-                  ? isDark
-                    ? transaction.iconBackgroundDark
-                    : transaction.iconBackgroundLight
+                  ? hasMerchantLogo
+                    ? "transparent"
+                    : isDark
+                      ? transaction.iconBackgroundDark
+                      : transaction.iconBackgroundLight
                   : getMutedSurface(isDark),
               },
             ]}
           >
-            {transactionIcon}
+            <MerchantLogo
+              merchant={transaction?.merchant}
+              size={48}
+              fallbackIcon={{
+                library: transaction?.iconLibrary,
+                name: transaction?.iconName ?? "circle",
+                color: transaction?.iconColor ?? "#94A3B8",
+              }}
+            />
           </View>
           <View style={styles.headerText}>
             <Text style={[styles.title, ui.title]}>
@@ -170,6 +160,12 @@ export default function TransactionDetailsModal() {
         </View>
 
         <View style={styles.detailList}>
+          <View style={[styles.detailCard, ui.detailCard]}>
+            <Text style={[styles.detailLabel, ui.detailLabel]}>Merchant</Text>
+            <Text style={[styles.detailValue, ui.detailValue]}>
+              {transaction?.merchant ?? "Unknown merchant"}
+            </Text>
+          </View>
           <View style={[styles.detailCard, ui.detailCard]}>
             <Text style={[styles.detailLabel, ui.detailLabel]}>Category</Text>
             <Text style={[styles.detailValue, ui.detailValue]}>
@@ -280,6 +276,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.full,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },

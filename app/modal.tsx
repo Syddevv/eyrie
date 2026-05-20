@@ -18,6 +18,7 @@ import {
   CategoryEditorSheet,
   type CategoryDraft,
 } from "@/components/category-editor-sheet";
+import MerchantLogo from "@/components/merchant-logo";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -985,29 +986,20 @@ export default function AddTransactionModal() {
                             )
                           }
                         >
-                          <View
+                          <MerchantLogo
+                            merchant={merchant.label}
+                            size={24}
                             style={[
                               styles.merchantBadge,
                               { backgroundColor: merchant.color },
                             ]}
-                          >
-                            {merchant.icon ? (
-                              <MaterialCommunityIcons
-                                name={merchant.icon as any}
-                                size={13}
-                                color={merchant.textColor ?? "#FFFFFF"}
-                              />
-                            ) : (
-                              <Text
-                                style={[
-                                  styles.merchantBadgeText,
-                                  { color: merchant.textColor ?? "#FFFFFF" },
-                                ]}
-                              >
-                                {merchant.initials}
-                              </Text>
-                            )}
-                          </View>
+                            backgroundColor={merchant.color}
+                            fallbackIcon={{
+                              library: "material",
+                              name: merchant.icon,
+                              color: merchant.textColor ?? "#FFFFFF",
+                            }}
+                          />
                           <Text style={[styles.merchantText, ui.chipText]}>
                             {merchant.label}
                           </Text>

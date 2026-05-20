@@ -25,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import MerchantLogo from "@/components/merchant-logo";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -35,6 +36,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification } from "@/services/notifications";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -110,6 +112,9 @@ const NotificationRow = memo(function NotificationRow({
   >(null);
   const effectivePendingAction = localPendingAction ?? pendingAction;
   const isBusy = effectivePendingAction !== null;
+  const merchantName =
+    typeof item.data?.merchantName === "string" ? item.data.merchantName : null;
+  const hasMerchantLogo = Boolean(getMerchantLogo(merchantName));
 
   useEffect(() => {
     if (!pendingAction) {
@@ -237,18 +242,28 @@ const NotificationRow = memo(function NotificationRow({
                 style={[
                   styles.notificationIconContainer,
                   {
-                    backgroundColor: withOpacity(
-                      item.color,
-                      item.is_read ? 0.1 : 0.14,
-                    ),
-                    borderColor: withOpacity(
-                      item.color,
-                      item.is_read ? 0.08 : 0.12,
-                    ),
+                    backgroundColor: hasMerchantLogo
+                      ? "transparent"
+                      : withOpacity(item.color, item.is_read ? 0.1 : 0.14),
+                    borderColor: hasMerchantLogo
+                      ? "transparent"
+                      : withOpacity(item.color, item.is_read ? 0.08 : 0.12),
                   },
                 ]}
               >
-                <Feather name={item.icon as any} size={22} color={item.color} />
+                {merchantName ? (
+                  <MerchantLogo
+                    merchant={merchantName}
+                    size={56}
+                    fallbackIcon={{
+                      library: "feather",
+                      name: item.icon,
+                      color: item.color,
+                    }}
+                  />
+                ) : (
+                  <Feather name={item.icon as any} size={22} color={item.color} />
+                )}
               </View>
 
               <View style={styles.contentSection}>
@@ -521,15 +536,17 @@ export default function NotificationsScreen() {
 
   const handleToggleReadNotification = useCallback(
     (item: AppNotification) =>
-      runNotificationAction(item.id, "toggleRead", () =>
-        toggleRead(item, !item.is_read),
-      ),
+      runNotificationAction(item.id, "toggleRead", async () => {
+        await toggleRead(item, !item.is_read);
+      }),
     [toggleRead],
   );
 
   const handleDeleteNotification = useCallback(
     (item: AppNotification) =>
-      runNotificationAction(item.id, "delete", () => deleteNotification(item)),
+      runNotificationAction(item.id, "delete", async () => {
+        await deleteNotification(item);
+      }),
     [deleteNotification],
   );
 

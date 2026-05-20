@@ -241,6 +241,7 @@ async function buildUnusualSpendingCandidate(input: {
       transactionId: input.transactionId,
       categoryId: input.categoryId,
       amount: input.amount,
+      merchantName: input.merchantName ?? null,
       url: "/transactions",
     },
     action_url: "/transactions",
@@ -309,6 +310,7 @@ async function buildRecurringBillCandidate(input: {
       transactionId: input.transactionId,
       categoryId: input.categoryId,
       merchantId: sanitizeMerchantName(input.merchantName),
+      merchantName: input.merchantName,
       url: "/transactions",
     },
     action_url: "/transactions",
@@ -589,6 +591,7 @@ export async function processTransactionNotificationEvent(input: {
         data: {
           transactionId: input.transactionId,
           amount: input.amount,
+          merchantName: input.merchantName ?? null,
           url: "/transactions",
         },
         action_url: "/transactions",

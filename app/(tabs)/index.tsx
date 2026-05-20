@@ -15,7 +15,10 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { themeColors } from "@/constants/colors";
@@ -24,6 +27,7 @@ import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
 import Logo from "@/components/logo";
+import MerchantLogo from "@/components/merchant-logo";
 import { defaultBrandTheme, getBrandTheme } from "@/constants/brand-themes";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -43,6 +47,7 @@ import {
   useSpendingBreakdown,
 } from "@/hooks/use-dashboard";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
+import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
@@ -159,10 +164,7 @@ const AccountsSectionSkeleton = memo(function AccountsSectionSkeleton({
         >
           <View style={styles.accountSkeletonHeader}>
             <View
-              style={[
-                styles.accountSkeletonAvatar,
-                { backgroundColor: shine },
-              ]}
+              style={[styles.accountSkeletonAvatar, { backgroundColor: shine }]}
             />
             <View style={styles.accountSkeletonHeaderCopy}>
               <View
@@ -176,29 +178,41 @@ const AccountsSectionSkeleton = memo(function AccountsSectionSkeleton({
                 style={[
                   styles.accountSkeletonLine,
                   styles.accountSkeletonLineSecondary,
-                  { backgroundColor: withOpacity(colors.foreground, isLight ? 0.05 : 0.08) },
+                  {
+                    backgroundColor: withOpacity(
+                      colors.foreground,
+                      isLight ? 0.05 : 0.08,
+                    ),
+                  },
                 ]}
               />
             </View>
           </View>
           <View
-            style={[
-              styles.accountSkeletonBalance,
-              { backgroundColor: shine },
-            ]}
+            style={[styles.accountSkeletonBalance, { backgroundColor: shine }]}
           />
           <View style={styles.accountSkeletonFooter}>
             <View
               style={[
                 styles.accountSkeletonLine,
                 styles.accountSkeletonLineTertiary,
-                { backgroundColor: withOpacity(colors.foreground, isLight ? 0.06 : 0.1) },
+                {
+                  backgroundColor: withOpacity(
+                    colors.foreground,
+                    isLight ? 0.06 : 0.1,
+                  ),
+                },
               ]}
             />
             <View
               style={[
                 styles.accountSkeletonTag,
-                { backgroundColor: withOpacity(colors.foreground, isLight ? 0.06 : 0.1) },
+                {
+                  backgroundColor: withOpacity(
+                    colors.foreground,
+                    isLight ? 0.06 : 0.1,
+                  ),
+                },
               ]}
             />
           </View>
@@ -226,7 +240,12 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
   return (
     <>
       <View style={styles.startupSkeletonStack}>
-        <View style={[styles.startupInsightSkeleton, { backgroundColor: "#37D3C2" }]}>
+        <View
+          style={[
+            styles.startupInsightSkeleton,
+            { backgroundColor: "#37D3C2" },
+          ]}
+        >
           <View
             style={[
               styles.startupInsightGlow,
@@ -234,11 +253,36 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
             ]}
           />
           <View style={styles.startupInsightCopy}>
-            <View style={[styles.startupPillSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.18) }]} />
-            <View style={[styles.startupInsightHeadlineSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.26) }]} />
-            <View style={[styles.startupInsightBodySkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.22) }]} />
-            <View style={[styles.startupInsightBodyShortSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.22) }]} />
-            <View style={[styles.startupInsightButtonSkeleton, { backgroundColor: withOpacity("#FFFFFF", 0.82) }]} />
+            <View
+              style={[
+                styles.startupPillSkeleton,
+                { backgroundColor: withOpacity("#FFFFFF", 0.18) },
+              ]}
+            />
+            <View
+              style={[
+                styles.startupInsightHeadlineSkeleton,
+                { backgroundColor: withOpacity("#FFFFFF", 0.26) },
+              ]}
+            />
+            <View
+              style={[
+                styles.startupInsightBodySkeleton,
+                { backgroundColor: withOpacity("#FFFFFF", 0.22) },
+              ]}
+            />
+            <View
+              style={[
+                styles.startupInsightBodyShortSkeleton,
+                { backgroundColor: withOpacity("#FFFFFF", 0.22) },
+              ]}
+            />
+            <View
+              style={[
+                styles.startupInsightButtonSkeleton,
+                { backgroundColor: withOpacity("#FFFFFF", 0.82) },
+              ]}
+            />
           </View>
           <View
             style={[
@@ -258,20 +302,38 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
         >
           <View style={styles.balanceTopRow}>
             <View style={styles.startupBalanceLabelWrap}>
-              <View style={[styles.startupLabelSkeleton, { backgroundColor: line }]} />
-              <View style={[styles.startupEyeSkeleton, { backgroundColor: lineSoft }]} />
+              <View
+                style={[styles.startupLabelSkeleton, { backgroundColor: line }]}
+              />
+              <View
+                style={[
+                  styles.startupEyeSkeleton,
+                  { backgroundColor: lineSoft },
+                ]}
+              />
             </View>
             <View
               style={[
                 styles.growthPill,
                 styles.startupGrowthSkeleton,
-                { backgroundColor: isLight ? "#EEF8F3" : withOpacity("#16B76D", 0.18) },
+                {
+                  backgroundColor: isLight
+                    ? "#EEF8F3"
+                    : withOpacity("#16B76D", 0.18),
+                },
               ]}
             />
           </View>
           <View style={styles.balanceAmountBlock}>
-            <View style={[styles.startupCurrencySkeleton, { backgroundColor: withOpacity(colors.primary, 0.7) }]} />
-            <View style={[styles.startupAmountSkeleton, { backgroundColor: line }]} />
+            <View
+              style={[
+                styles.startupCurrencySkeleton,
+                { backgroundColor: withOpacity(colors.primary, 0.7) },
+              ]}
+            />
+            <View
+              style={[styles.startupAmountSkeleton, { backgroundColor: line }]}
+            />
           </View>
           <View
             style={[
@@ -279,8 +341,18 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
               pageStylesFromSkeleton(colors, colorScheme).sectionHintChip,
             ]}
           >
-            <View style={[styles.startupMetaIconSkeleton, { backgroundColor: lineSoft }]} />
-            <View style={[styles.startupMetaTextSkeleton, { backgroundColor: lineSoft }]} />
+            <View
+              style={[
+                styles.startupMetaIconSkeleton,
+                { backgroundColor: lineSoft },
+              ]}
+            />
+            <View
+              style={[
+                styles.startupMetaTextSkeleton,
+                { backgroundColor: lineSoft },
+              ]}
+            />
           </View>
           <View style={styles.metricsRow}>
             {[0, 1].map((item) => (
@@ -299,10 +371,25 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
                 ]}
               >
                 <View style={styles.metricLabelRow}>
-                  <View style={[styles.startupMetricDotSkeleton, { backgroundColor: item === 0 ? "#14B86A" : "#F05454" }]} />
-                  <View style={[styles.startupMetricLabelSkeleton, { backgroundColor: lineSoft }]} />
+                  <View
+                    style={[
+                      styles.startupMetricDotSkeleton,
+                      { backgroundColor: item === 0 ? "#14B86A" : "#F05454" },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.startupMetricLabelSkeleton,
+                      { backgroundColor: lineSoft },
+                    ]}
+                  />
                 </View>
-                <View style={[styles.startupMetricAmountSkeleton, { backgroundColor: line }]} />
+                <View
+                  style={[
+                    styles.startupMetricAmountSkeleton,
+                    { backgroundColor: line },
+                  ]}
+                />
               </View>
             ))}
           </View>
@@ -310,7 +397,12 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
 
         <View style={styles.sectionHeader}>
           <View>
-            <View style={[styles.startupSectionTitleSkeleton, { backgroundColor: line }]} />
+            <View
+              style={[
+                styles.startupSectionTitleSkeleton,
+                { backgroundColor: line },
+              ]}
+            />
             <View
               style={[
                 styles.sectionHintChip,
@@ -318,13 +410,30 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
                 styles.startupSectionHintSkeleton,
               ]}
             >
-              <View style={[styles.startupMetaIconSkeleton, { backgroundColor: lineSoft }]} />
-              <View style={[styles.startupSectionHintTextSkeleton, { backgroundColor: lineSoft }]} />
+              <View
+                style={[
+                  styles.startupMetaIconSkeleton,
+                  { backgroundColor: lineSoft },
+                ]}
+              />
+              <View
+                style={[
+                  styles.startupSectionHintTextSkeleton,
+                  { backgroundColor: lineSoft },
+                ]}
+              />
             </View>
           </View>
           <View style={styles.hideRow}>
-            <View style={[styles.startupEyeSkeleton, { backgroundColor: lineSoft }]} />
-            <View style={[styles.startupHideTextSkeleton, { backgroundColor: lineSoft }]} />
+            <View
+              style={[styles.startupEyeSkeleton, { backgroundColor: lineSoft }]}
+            />
+            <View
+              style={[
+                styles.startupHideTextSkeleton,
+                { backgroundColor: lineSoft },
+              ]}
+            />
           </View>
         </View>
 
@@ -338,7 +447,12 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
         </ScrollView>
 
         <View style={[styles.sectionHeader, styles.walletsHeader]}>
-          <View style={[styles.startupSectionTitleSkeleton, { backgroundColor: line }]} />
+          <View
+            style={[
+              styles.startupSectionTitleSkeleton,
+              { backgroundColor: line },
+            ]}
+          />
         </View>
 
         <ScrollView
@@ -374,7 +488,10 @@ const HomeStartupSkeleton = memo(function HomeStartupSkeleton({
   );
 });
 
-function pageStylesFromSkeleton(colors: ThemePalette, colorScheme: "light" | "dark") {
+function pageStylesFromSkeleton(
+  colors: ThemePalette,
+  colorScheme: "light" | "dark",
+) {
   return {
     sectionHintChip: {
       backgroundColor:
@@ -447,11 +564,7 @@ const EmptyStateIllustration = memo(function EmptyStateIllustration({
               { backgroundColor: withOpacity(accent, isLight ? 0.16 : 0.22) },
             ]}
           />
-          <MaterialCommunityIcons
-            name="chart-donut"
-            size={20}
-            color={accent}
-          />
+          <MaterialCommunityIcons name="chart-donut" size={20} color={accent} />
         </View>
         <View style={styles.emptyVisualBudgetBars}>
           {[0.84, 0.58, 0.72].map((width, index) => (
@@ -555,10 +668,19 @@ const PremiumEmptyState = memo(function PremiumEmptyState({
         : "credit-card-outline";
   const gradientColors =
     variant === "budgets"
-      ? ([withOpacity("#2DBBBA", isLight ? 0.08 : 0.12), "transparent"] as const)
+      ? ([
+          withOpacity("#2DBBBA", isLight ? 0.08 : 0.12),
+          "transparent",
+        ] as const)
       : variant === "transactions"
-        ? ([withOpacity(colors.primary, isLight ? 0.06 : 0.1), "transparent"] as const)
-        : ([withOpacity(colors.primary, isLight ? 0.08 : 0.12), "transparent"] as const);
+        ? ([
+            withOpacity(colors.primary, isLight ? 0.06 : 0.1),
+            "transparent",
+          ] as const)
+        : ([
+            withOpacity(colors.primary, isLight ? 0.08 : 0.12),
+            "transparent",
+          ] as const);
 
   return (
     <Animated.View
@@ -600,7 +722,10 @@ const PremiumEmptyState = memo(function PremiumEmptyState({
           style={[
             styles.premiumEmptyBlob,
             {
-              backgroundColor: withOpacity(colors.primary, isLight ? 0.05 : 0.08),
+              backgroundColor: withOpacity(
+                colors.primary,
+                isLight ? 0.05 : 0.08,
+              ),
             },
           ]}
         />
@@ -636,7 +761,9 @@ const PremiumEmptyState = memo(function PremiumEmptyState({
           <Text style={[styles.premiumEmptyEyebrow, { color: mutedTextColor }]}>
             {eyebrow}
           </Text>
-          <Text style={[styles.premiumEmptyTitle, { color: colors.foreground }]}>
+          <Text
+            style={[styles.premiumEmptyTitle, { color: colors.foreground }]}
+          >
             {title}
           </Text>
           <Text style={[styles.premiumEmptyBody, { color: mutedTextColor }]}>
@@ -683,10 +810,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
-  const {
-    user: currentUser,
-    isLoading: isCurrentUserLoading,
-  } = useCurrentUser();
+  const { user: currentUser, isLoading: isCurrentUserLoading } =
+    useCurrentUser();
   const summary = useDashboardSummary();
   const recentTransactions = useRecentTransactions();
   const activeBudgets = useBudgetProgress();
@@ -802,7 +927,10 @@ export default function HomeScreen() {
     accountsResolved && !accountsInitialLoading && cardAccounts.length === 0;
   const showWalletsEmptyState =
     accountsResolved && !accountsInitialLoading && walletAccounts.length === 0;
-  const visibleBudgets = useMemo(() => activeBudgets.slice(0, 2), [activeBudgets]);
+  const visibleBudgets = useMemo(
+    () => activeBudgets.slice(0, 2),
+    [activeBudgets],
+  );
   const visibleRecentTransactions = useMemo(
     () => recentTransactions.slice(0, 3),
     [recentTransactions],
@@ -1091,455 +1219,597 @@ export default function HomeScreen() {
             />
           ) : (
             <>
-          <LinearGradient
-            colors={pageStyles.insightGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.insightCard}
-          >
-            <View style={styles.insightContent}>
-              <View style={styles.insightTextBlock}>
-                <View style={styles.insightTitleRow}>
-                  <View style={styles.insightIconWrap}>
-                    <Ionicons
-                      name="sparkles-outline"
-                      size={13}
-                      color="#FFFFFF"
+              <LinearGradient
+                colors={pageStyles.insightGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.insightCard}
+              >
+                <View style={styles.insightContent}>
+                  <View style={styles.insightTextBlock}>
+                    <View style={styles.insightTitleRow}>
+                      <View style={styles.insightIconWrap}>
+                        <Ionicons
+                          name="sparkles-outline"
+                          size={13}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <Text style={styles.insightTitle}>Eyrie Insight</Text>
+                    </View>
+                    <Text style={styles.insightHeadline}>
+                      {insightContent.headline}
+                    </Text>
+                    <Text style={styles.insightBody}>
+                      {insightContent.body}
+                    </Text>
+                    <View style={styles.insightFooterRow}>
+                      <View style={styles.insightPill}>
+                        <Feather
+                          name="trending-down"
+                          size={12}
+                          color="#0E7C74"
+                        />
+                        <Text style={styles.insightPillText}>
+                          {insightContent.pill}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View
+                    style={[
+                      styles.insightMascotWrap,
+                      { backgroundColor: pageStyles.insightBubble },
+                    ]}
+                  >
+                    <Image
+                      contentFit="cover"
+                      source={require("@/assets/images/Eyrie_Mascot_2.png")}
+                      style={styles.insightMascot}
                     />
                   </View>
-                  <Text style={styles.insightTitle}>Eyrie Insight</Text>
                 </View>
-                <Text style={styles.insightHeadline}>
-                  {insightContent.headline}
-                </Text>
-                <Text style={styles.insightBody}>{insightContent.body}</Text>
-                <View style={styles.insightFooterRow}>
-                  <View style={styles.insightPill}>
-                    <Feather name="trending-down" size={12} color="#0E7C74" />
-                    <Text style={styles.insightPillText}>
-                      {insightContent.pill}
+              </LinearGradient>
+
+              <View
+                style={[styles.balanceCard, pageStyles.whiteCard, shadows.card]}
+              >
+                <View style={styles.balanceTopRow}>
+                  <View style={styles.balanceLabelRow}>
+                    <Text style={[styles.balanceLabel, pageStyles.mutedText]}>
+                      Total Balance
+                    </Text>
+                    <Pressable
+                      disabled={!isSensitiveUiReady}
+                      onPress={() => setShowTotalBalance((value) => !value)}
+                    >
+                      <Feather
+                        name={shouldRevealTotalBalance ? "eye" : "eye-off"}
+                        size={16}
+                        color={colors.mutedForeground}
+                      />
+                    </Pressable>
+                  </View>
+                  <View
+                    style={[
+                      styles.growthPill,
+                      colorScheme === "light"
+                        ? styles.growthPillLight
+                        : styles.growthPillDark,
+                    ]}
+                  >
+                    <Text style={styles.growthText}>{balanceContextLabel}</Text>
+                    <Text style={styles.growthSubtext}>Updated today</Text>
+                  </View>
+                </View>
+
+                <View style={styles.balanceAmountBlock}>
+                  <Text style={styles.balanceCurrency}>₱</Text>
+                  <Text
+                    style={[styles.balanceAmount, { color: colors.foreground }]}
+                  >
+                    {!shouldRevealTotalBalance
+                      ? hiddenMoneyValue
+                      : isLoading && !summary
+                        ? "---"
+                        : formatCurrency(totalBalanceValue).replace("₱", "")}
+                  </Text>
+                </View>
+
+                <View
+                  style={[styles.balanceMetaChip, pageStyles.sectionHintChip]}
+                >
+                  <Feather
+                    name="rotate-cw"
+                    size={11}
+                    color={colors.mutedForeground}
+                  />
+                  <Text style={[styles.balanceMetaText, pageStyles.mutedText]}>
+                    Monthly overview
+                  </Text>
+                </View>
+
+                <View style={styles.metricsRow}>
+                  <View
+                    style={[styles.metricBlock, pageStyles.balanceStatCard]}
+                  >
+                    <View style={styles.metricLabelRow}>
+                      <Feather
+                        name="arrow-up-right"
+                        size={13}
+                        color="#14B86A"
+                      />
+                      <Text style={[styles.metricLabel, pageStyles.mutedText]}>
+                        Income
+                      </Text>
+                    </View>
+                    <Text style={styles.incomeAmount}>
+                      {shouldRevealTotalBalance
+                        ? summary
+                          ? formatCurrency(summary.totalIncome)
+                          : "---"
+                        : hiddenMoneyValue}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[styles.metricBlock, pageStyles.balanceStatCard]}
+                  >
+                    <View style={styles.metricLabelRow}>
+                      <Feather
+                        name="arrow-down-right"
+                        size={13}
+                        color="#F05454"
+                      />
+                      <Text style={[styles.metricLabel, pageStyles.mutedText]}>
+                        Expenses
+                      </Text>
+                    </View>
+                    <Text style={styles.expenseAmount}>
+                      {shouldRevealTotalBalance
+                        ? summary
+                          ? formatCurrency(summary.totalExpenses)
+                          : "---"
+                        : hiddenMoneyValue}
                     </Text>
                   </View>
                 </View>
               </View>
-              <View
-                style={[
-                  styles.insightMascotWrap,
-                  { backgroundColor: pageStyles.insightBubble },
-                ]}
-              >
-                <Image
-                  contentFit="cover"
-                  source={require("@/assets/images/Eyrie_Mascot_2.png")}
-                  style={styles.insightMascot}
-                />
-              </View>
-            </View>
-          </LinearGradient>
 
-          <View
-            style={[styles.balanceCard, pageStyles.whiteCard, shadows.card]}
-          >
-            <View style={styles.balanceTopRow}>
-              <View style={styles.balanceLabelRow}>
-                <Text style={[styles.balanceLabel, pageStyles.mutedText]}>
-                  Total Balance
-                </Text>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text
+                    style={[styles.sectionTitle, { color: colors.foreground }]}
+                  >
+                    Cards
+                  </Text>
+                  <View
+                    style={[styles.sectionHintChip, pageStyles.sectionHintChip]}
+                  >
+                    <Feather
+                      name="arrow-up-right"
+                      size={11}
+                      color={colors.mutedForeground}
+                    />
+                    <Text
+                      style={[styles.sectionHintText, pageStyles.mutedText]}
+                    >
+                      Tap to view details
+                    </Text>
+                  </View>
+                </View>
                 <Pressable
+                  style={styles.hideRow}
                   disabled={!isSensitiveUiReady}
-                  onPress={() => setShowTotalBalance((value) => !value)}
+                  onPress={() => setShowCardBalances((value) => !value)}
                 >
                   <Feather
-                    name={shouldRevealTotalBalance ? "eye" : "eye-off"}
+                    name={shouldRevealCardBalances ? "eye" : "eye-off"}
                     size={16}
                     color={colors.mutedForeground}
                   />
+                  <Text style={[styles.hideText, pageStyles.mutedText]}>
+                    {shouldRevealCardBalances ? "Hide" : "Show"}
+                  </Text>
                 </Pressable>
               </View>
-              <View
-                style={[
-                  styles.growthPill,
-                  colorScheme === "light"
-                    ? styles.growthPillLight
-                    : styles.growthPillDark,
-                ]}
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.cardsRow}
+                onScroll={(event) => {
+                  if (
+                    showCardsSwipeHint &&
+                    event.nativeEvent.contentOffset.x > 8
+                  ) {
+                    setShowCardsSwipeHint(false);
+                  }
+                }}
+                scrollEventThrottle={16}
               >
-                <Text style={styles.growthText}>{balanceContextLabel}</Text>
-                <Text style={styles.growthSubtext}>Updated today</Text>
-              </View>
-            </View>
-
-            <View style={styles.balanceAmountBlock}>
-              <Text style={styles.balanceCurrency}>₱</Text>
-              <Text
-                style={[styles.balanceAmount, { color: colors.foreground }]}
-              >
-                {!shouldRevealTotalBalance
-                  ? hiddenMoneyValue
-                  : isLoading && !summary
-                    ? "---"
-                    : formatCurrency(totalBalanceValue).replace("₱", "")}
-              </Text>
-            </View>
-
-            <View
-              style={[styles.balanceMetaChip, pageStyles.sectionHintChip]}
-            >
-              <Feather
-                name="rotate-cw"
-                size={11}
-                color={colors.mutedForeground}
-              />
-              <Text style={[styles.balanceMetaText, pageStyles.mutedText]}>
-                Monthly overview
-              </Text>
-            </View>
-
-            <View style={styles.metricsRow}>
-              <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
-                <View style={styles.metricLabelRow}>
-                  <Feather name="arrow-up-right" size={13} color="#14B86A" />
-                  <Text style={[styles.metricLabel, pageStyles.mutedText]}>
-                    Income
-                  </Text>
-                </View>
-                <Text style={styles.incomeAmount}>
-                  {shouldRevealTotalBalance
-                    ? summary
-                      ? formatCurrency(summary.totalIncome)
-                      : "---"
-                    : hiddenMoneyValue}
-                </Text>
-              </View>
-
-              <View style={[styles.metricBlock, pageStyles.balanceStatCard]}>
-                <View style={styles.metricLabelRow}>
-                  <Feather
-                    name="arrow-down-right"
-                    size={13}
-                    color="#F05454"
-                  />
-                  <Text style={[styles.metricLabel, pageStyles.mutedText]}>
-                    Expenses
-                  </Text>
-                </View>
-                <Text style={styles.expenseAmount}>
-                  {shouldRevealTotalBalance
-                    ? summary
-                      ? formatCurrency(summary.totalExpenses)
-                      : "---"
-                    : hiddenMoneyValue}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text
-                style={[styles.sectionTitle, { color: colors.foreground }]}
-              >
-                Cards
-              </Text>
-              <View
-                style={[styles.sectionHintChip, pageStyles.sectionHintChip]}
-              >
-                <Feather
-                  name="arrow-up-right"
-                  size={11}
-                  color={colors.mutedForeground}
-                />
-                <Text style={[styles.sectionHintText, pageStyles.mutedText]}>
-                  Tap to view details
-                </Text>
-              </View>
-            </View>
-            <Pressable
-              style={styles.hideRow}
-              disabled={!isSensitiveUiReady}
-              onPress={() => setShowCardBalances((value) => !value)}
-            >
-              <Feather
-                name={shouldRevealCardBalances ? "eye" : "eye-off"}
-                size={16}
-                color={colors.mutedForeground}
-              />
-              <Text style={[styles.hideText, pageStyles.mutedText]}>
-                {shouldRevealCardBalances ? "Hide" : "Show"}
-              </Text>
-            </Pressable>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsRow}
-            onScroll={(event) => {
-              if (
-                showCardsSwipeHint &&
-                event.nativeEvent.contentOffset.x > 8
-              ) {
-                setShowCardsSwipeHint(false);
-              }
-            }}
-            scrollEventThrottle={16}
-          >
-            {(() => {
-              if (showAccountsSkeleton) {
-                return (
-                  <AccountsSectionSkeleton
-                    colors={colors}
-                    colorScheme={colorScheme}
-                  />
-                );
-              }
-
-              if (showCardsEmptyState) {
-                return (
-                  <PremiumEmptyState
-                    variant="cards"
-                    eyebrow="Card setup"
-                    title="No cards yet"
-                    body="Link your first card to track balances here."
-                    ctaLabel="Add card"
-                    width={HOME_CONTENT_WIDTH}
-                    delay={70}
-                    colors={colors}
-                    colorScheme={colorScheme}
-                    mutedTextColor={pageStyles.mutedText.color}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/add-bank-card-method-modal",
-                        params: {
-                          returnTo: "/(tabs)",
-                          parentTo: "/(tabs)",
-                        },
-                      })
-                    }
-                  />
-                );
-              }
-
-              return [
-                ...cardAccounts.map((acct) =>
-                  (() => {
-                    const brandTheme = resolveBrandTheme(acct);
-
+                {(() => {
+                  if (showAccountsSkeleton) {
                     return (
-                      <Pressable
-                        key={acct.id}
-                        style={styles.cardPressable}
+                      <AccountsSectionSkeleton
+                        colors={colors}
+                        colorScheme={colorScheme}
+                      />
+                    );
+                  }
+
+                  if (showCardsEmptyState) {
+                    return (
+                      <PremiumEmptyState
+                        variant="cards"
+                        eyebrow="Card setup"
+                        title="No cards yet"
+                        body="Link your first card to track balances here."
+                        ctaLabel="Add card"
+                        width={HOME_CONTENT_WIDTH}
+                        delay={70}
+                        colors={colors}
+                        colorScheme={colorScheme}
+                        mutedTextColor={pageStyles.mutedText.color}
                         onPress={() =>
                           router.push({
-                            pathname: "/payment-card-details-modal",
+                            pathname: "/add-bank-card-method-modal",
                             params: {
-                              accountId: acct.id,
-                              hideActions: "1",
+                              returnTo: "/(tabs)",
+                              parentTo: "/(tabs)",
                             },
                           })
                         }
-                      >
-                        <PremiumCardGradient
-                          theme={brandTheme}
-                          isDark={colorScheme === "dark"}
-                          variant="card"
-                          style={styles.accountCard}
-                        >
-                          <View style={styles.cardTopRow}>
-                            <View
-                              style={styles.cardBrandRow}
+                      />
+                    );
+                  }
+
+                  return [
+                    ...cardAccounts.map((acct) =>
+                      (() => {
+                        const brandTheme = resolveBrandTheme(acct);
+
+                        return (
+                          <Pressable
+                            key={acct.id}
+                            style={styles.cardPressable}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/payment-card-details-modal",
+                                params: {
+                                  accountId: acct.id,
+                                  hideActions: "1",
+                                },
+                              })
+                            }
+                          >
+                            <PremiumCardGradient
+                              theme={brandTheme}
+                              isDark={colorScheme === "dark"}
+                              variant="card"
+                              style={styles.accountCard}
                             >
-                              <Logo
-                                size={34}
-                                logo={resolveLogo(acct)}
-                                name={resolveBrandName(acct)}
-                                backgroundColor={brandTheme.primary}
-                              />
+                              <View style={styles.cardTopRow}>
+                                <View style={styles.cardBrandRow}>
+                                  <Logo
+                                    size={34}
+                                    logo={resolveLogo(acct)}
+                                    name={resolveBrandName(acct)}
+                                    backgroundColor={brandTheme.primary}
+                                  />
+                                  <Text
+                                    numberOfLines={1}
+                                    style={[
+                                      styles.cardName,
+                                      { color: brandTheme.text },
+                                    ]}
+                                  >
+                                    {resolveBrandName(acct)}
+                                  </Text>
+                                </View>
+                              </View>
                               <Text
-                                numberOfLines={1}
                                 style={[
-                                  styles.cardName,
+                                  styles.cardAmount,
                                   { color: brandTheme.text },
                                 ]}
                               >
-                                {resolveBrandName(acct)}
+                                {shouldRevealCardBalances
+                                  ? formatCurrency(
+                                      acct.balance ?? 0,
+                                      acct.currencyCode,
+                                    )
+                                  : hiddenMoneyValue}
                               </Text>
-                            </View>
+                              <View style={styles.cardBottomRow}>
+                                <Text
+                                  style={[
+                                    styles.cardDigits,
+                                    {
+                                      color: withOpacity(brandTheme.text, 0.78),
+                                    },
+                                  ]}
+                                >
+                                  {shouldRevealCardBalances
+                                    ? `•••• ${acct.accountNumberLast4 ?? ""}`
+                                    : hiddenCardDigits}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.cardType,
+                                    {
+                                      color: withOpacity(brandTheme.text, 0.76),
+                                    },
+                                  ]}
+                                >
+                                  {acct.type === "credit" ? "CREDIT" : "DEBIT"}
+                                </Text>
+                              </View>
+                            </PremiumCardGradient>
+                          </Pressable>
+                        );
+                      })(),
+                    ),
+                    <Pressable
+                      key="add-account-card"
+                      style={[
+                        styles.cardPressable,
+                        styles.addAccountCardPressable,
+                      ]}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/add-bank-card-method-modal",
+                          params: {
+                            returnTo: "/(tabs)",
+                            parentTo: "/(tabs)",
+                          },
+                        })
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.addAccountCard,
+                          pageStyles.whiteCard,
+                          { borderColor: withOpacity(colors.border, 0.95) },
+                        ]}
+                      >
+                        <View style={styles.addAccountIconWrap}>
+                          <Feather name="plus" size={16} color="#2FAF66" />
+                        </View>
+                        <Text
+                          style={[
+                            styles.addAccountLabel,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          Add Card
+                        </Text>
+                      </View>
+                    </Pressable>,
+                  ];
+                })()}
+              </ScrollView>
+              {cardAccounts.length >= 2 && showCardsSwipeHint ? (
+                <View style={styles.swipeHintRow}>
+                  <View style={styles.swipeHintDots}>
+                    <View
+                      style={[styles.swipeHintDot, styles.swipeHintDotActive]}
+                    />
+                    <View style={styles.swipeHintDot} />
+                    <View style={styles.swipeHintDot} />
+                  </View>
+                  <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
+                    Swipe to view more
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={14}
+                    color={colors.mutedForeground}
+                  />
+                </View>
+              ) : null}
+
+              <View style={[styles.sectionHeader, styles.walletsHeader]}>
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  Wallets
+                </Text>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.cardsRow}
+                onScroll={(event) => {
+                  if (
+                    showWalletsSwipeHint &&
+                    event.nativeEvent.contentOffset.x > 8
+                  ) {
+                    setShowWalletsSwipeHint(false);
+                  }
+                }}
+                scrollEventThrottle={16}
+              >
+                {(() => {
+                  if (showAccountsSkeleton) {
+                    return (
+                      <AccountsSectionSkeleton
+                        colors={colors}
+                        colorScheme={colorScheme}
+                      />
+                    );
+                  }
+
+                  if (showWalletsEmptyState) {
+                    return (
+                      <View
+                        style={[
+                          styles.emptyCard,
+                          {
+                            backgroundColor:
+                              pageStyles.whiteCard.backgroundColor,
+                            borderColor: withOpacity(colors.border, 0.9),
+                          },
+                          shadows.soft,
+                        ]}
+                      >
+                        <View style={styles.emptyCardHero}>
+                          <View
+                            style={[
+                              styles.emptyCardIconWrap,
+                              {
+                                backgroundColor:
+                                  colorScheme === "light"
+                                    ? "#E7FAEF"
+                                    : withOpacity("#16B76D", 0.22),
+                              },
+                            ]}
+                          >
+                            <MaterialCommunityIcons
+                              name="wallet-outline"
+                              size={24}
+                              color="#16B76D"
+                            />
                           </View>
                           <Text
                             style={[
-                              styles.cardAmount,
-                              { color: brandTheme.text },
+                              styles.emptyCardEyebrow,
+                              pageStyles.mutedText,
                             ]}
                           >
-                            {shouldRevealCardBalances
-                              ? formatCurrency(
-                                  acct.balance ?? 0,
-                                  acct.currencyCode,
-                                )
-                              : hiddenMoneyValue}
+                            Wallet Setup
                           </Text>
-                          <View style={styles.cardBottomRow}>
-                            <Text
-                            style={[
-                              styles.cardDigits,
-                              { color: withOpacity(brandTheme.text, 0.78) },
-                            ]}
-                          >
-                              {shouldRevealCardBalances
-                                ? `•••• ${acct.accountNumberLast4 ?? ""}`
-                                : hiddenCardDigits}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.cardType,
-                                { color: withOpacity(brandTheme.text, 0.76) },
-                              ]}
-                            >
-                              {acct.type === "credit" ? "CREDIT" : "DEBIT"}
+                        </View>
+                        <Text
+                          style={[
+                            styles.emptyCardTitle,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          No wallets yet
+                        </Text>
+                        <Text
+                          style={[styles.emptyCardBody, pageStyles.mutedText]}
+                        >
+                          Connect your first e-wallet or cash account to track
+                          balances.
+                        </Text>
+                        <Pressable
+                          style={[
+                            styles.emptyCardButton,
+                            { backgroundColor: colors.primary },
+                          ]}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/add-e-wallet-method-modal",
+                              params: {
+                                returnTo: "/(tabs)",
+                                parentTo: "/(tabs)",
+                              },
+                            })
+                          }
+                        >
+                          <View style={styles.emptyCardButtonContent}>
+                            <Feather name="plus" size={15} color="#FFFFFF" />
+                            <Text style={styles.emptyCardButtonText}>
+                              Add wallet
                             </Text>
                           </View>
-                        </PremiumCardGradient>
-                      </Pressable>
-                    );
-                  })(),
-                ),
-                <Pressable
-                  key="add-account-card"
-                  style={[styles.cardPressable, styles.addAccountCardPressable]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/add-bank-card-method-modal",
-                      params: {
-                        returnTo: "/(tabs)",
-                        parentTo: "/(tabs)",
-                      },
-                    })
-                  }
-                >
-                  <View
-                    style={[
-                      styles.addAccountCard,
-                      pageStyles.whiteCard,
-                      { borderColor: withOpacity(colors.border, 0.95) },
-                    ]}
-                  >
-                    <View style={styles.addAccountIconWrap}>
-                      <Feather name="plus" size={16} color="#2FAF66" />
-                    </View>
-                    <Text
-                      style={[
-                        styles.addAccountLabel,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      Add Card
-                    </Text>
-                  </View>
-                </Pressable>,
-              ];
-            })()}
-          </ScrollView>
-          {cardAccounts.length >= 2 && showCardsSwipeHint ? (
-            <View style={styles.swipeHintRow}>
-              <View style={styles.swipeHintDots}>
-                <View style={[styles.swipeHintDot, styles.swipeHintDotActive]} />
-                <View style={styles.swipeHintDot} />
-                <View style={styles.swipeHintDot} />
-              </View>
-              <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
-                Swipe to view more
-              </Text>
-              <Feather
-                name="chevron-right"
-                size={14}
-                color={colors.mutedForeground}
-              />
-            </View>
-          ) : null}
-
-          <View style={[styles.sectionHeader, styles.walletsHeader]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Wallets
-            </Text>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cardsRow}
-            onScroll={(event) => {
-              if (
-                showWalletsSwipeHint &&
-                event.nativeEvent.contentOffset.x > 8
-              ) {
-                setShowWalletsSwipeHint(false);
-              }
-            }}
-            scrollEventThrottle={16}
-          >
-            {(() => {
-              if (showAccountsSkeleton) {
-                return (
-                  <AccountsSectionSkeleton
-                    colors={colors}
-                    colorScheme={colorScheme}
-                  />
-                );
-              }
-
-              if (showWalletsEmptyState) {
-                return (
-                  <View
-                    style={[
-                      styles.emptyCard,
-                      {
-                        backgroundColor: pageStyles.whiteCard.backgroundColor,
-                        borderColor: withOpacity(colors.border, 0.9),
-                      },
-                      shadows.soft,
-                    ]}
-                  >
-                    <View style={styles.emptyCardHero}>
-                      <View
-                        style={[
-                          styles.emptyCardIconWrap,
-                          {
-                            backgroundColor:
-                              colorScheme === "light"
-                                ? "#E7FAEF"
-                                : withOpacity("#16B76D", 0.22),
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="wallet-outline"
-                          size={24}
-                          color="#16B76D"
-                        />
+                        </Pressable>
                       </View>
-                      <Text
-                        style={[styles.emptyCardEyebrow, pageStyles.mutedText]}
-                      >
-                        Wallet Setup
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.emptyCardTitle,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      No wallets yet
-                    </Text>
-                    <Text style={[styles.emptyCardBody, pageStyles.mutedText]}>
-                      Connect your first e-wallet or cash account to track
-                      balances.
-                    </Text>
+                    );
+                  }
+
+                  return [
+                    ...walletAccounts.map((acct) =>
+                      (() => {
+                        const brandTheme = resolveBrandTheme(acct);
+
+                        return (
+                          <Pressable
+                            key={acct.id}
+                            style={styles.cardPressable}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/payment-wallet-details-modal",
+                                params: {
+                                  accountId: acct.id,
+                                  hideActions: "1",
+                                },
+                              })
+                            }
+                          >
+                            <PremiumCardGradient
+                              theme={brandTheme}
+                              isDark={colorScheme === "dark"}
+                              variant="wallet"
+                              style={styles.accountCard}
+                            >
+                              <View style={styles.cardTopRow}>
+                                <View style={styles.cardBrandRow}>
+                                  <Logo
+                                    size={34}
+                                    logo={resolveLogo(acct)}
+                                    name={resolveBrandName(acct)}
+                                    backgroundColor={brandTheme.primary}
+                                  />
+                                  <Text
+                                    numberOfLines={1}
+                                    style={[
+                                      styles.cardName,
+                                      { color: brandTheme.text },
+                                    ]}
+                                  >
+                                    {resolveBrandName(acct)}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text
+                                style={[
+                                  styles.walletAmount,
+                                  { color: brandTheme.text },
+                                ]}
+                              >
+                                {shouldRevealCardBalances
+                                  ? formatCurrency(
+                                      acct.balance ?? 0,
+                                      acct.currencyCode,
+                                    )
+                                  : hiddenMoneyValue}
+                              </Text>
+                              <View style={styles.cardBottomRow}>
+                                <Text
+                                  style={[
+                                    styles.cardDigits,
+                                    {
+                                      color: withOpacity(brandTheme.text, 0.78),
+                                    },
+                                  ]}
+                                >
+                                  {hiddenCardDigits}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.cardType,
+                                    {
+                                      color: withOpacity(brandTheme.text, 0.76),
+                                    },
+                                  ]}
+                                >
+                                  {acct.type === "cash" ? "CASH" : "E-WALLET"}
+                                </Text>
+                              </View>
+                            </PremiumCardGradient>
+                          </Pressable>
+                        );
+                      })(),
+                    ),
                     <Pressable
+                      key="add-account-wallet"
                       style={[
-                        styles.emptyCardButton,
-                        { backgroundColor: colors.primary },
+                        styles.cardPressable,
+                        styles.addAccountCardPressable,
                       ]}
                       onPress={() =>
                         router.push({
@@ -1551,388 +1821,321 @@ export default function HomeScreen() {
                         })
                       }
                     >
-                      <View style={styles.emptyCardButtonContent}>
-                        <Feather name="plus" size={15} color="#FFFFFF" />
-                        <Text style={styles.emptyCardButtonText}>
-                          Add wallet
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </View>
-                );
-              }
-
-              return [
-                ...walletAccounts.map((acct) =>
-                  (() => {
-                    const brandTheme = resolveBrandTheme(acct);
-
-                    return (
-                      <Pressable
-                        key={acct.id}
-                        style={styles.cardPressable}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/payment-wallet-details-modal",
-                            params: {
-                              accountId: acct.id,
-                              hideActions: "1",
-                            },
-                          })
-                        }
+                      <View
+                        style={[
+                          styles.addAccountCard,
+                          pageStyles.whiteCard,
+                          { borderColor: withOpacity(colors.border, 0.95) },
+                        ]}
                       >
-                        <PremiumCardGradient
-                          theme={brandTheme}
-                          isDark={colorScheme === "dark"}
-                          variant="wallet"
-                          style={styles.accountCard}
-                        >
-                          <View style={styles.cardTopRow}>
-                            <View style={styles.cardBrandRow}>
-                              <Logo
-                                size={34}
-                                logo={resolveLogo(acct)}
-                                name={resolveBrandName(acct)}
-                                backgroundColor={brandTheme.primary}
-                              />
-                              <Text
-                                numberOfLines={1}
-                                style={[
-                                  styles.cardName,
-                                  { color: brandTheme.text },
-                                ]}
-                              >
-                                {resolveBrandName(acct)}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text
-                            style={[
-                              styles.walletAmount,
-                              { color: brandTheme.text },
-                            ]}
-                          >
-                            {shouldRevealCardBalances
-                              ? formatCurrency(
-                                  acct.balance ?? 0,
-                                  acct.currencyCode,
-                                )
-                              : hiddenMoneyValue}
-                          </Text>
-                          <View style={styles.cardBottomRow}>
-                            <Text
-                              style={[
-                                styles.cardDigits,
-                                { color: withOpacity(brandTheme.text, 0.78) },
-                              ]}
-                            >
-                              {hiddenCardDigits}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.cardType,
-                                { color: withOpacity(brandTheme.text, 0.76) },
-                              ]}
-                            >
-                              {acct.type === "cash" ? "CASH" : "E-WALLET"}
-                            </Text>
-                          </View>
-                        </PremiumCardGradient>
-                      </Pressable>
-                    );
-                  })(),
-                ),
-                <Pressable
-                  key="add-account-wallet"
-                  style={[styles.cardPressable, styles.addAccountCardPressable]}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/add-e-wallet-method-modal",
-                      params: {
-                        returnTo: "/(tabs)",
-                        parentTo: "/(tabs)",
-                      },
-                    })
-                  }
-                >
-                  <View
-                    style={[
-                      styles.addAccountCard,
-                      pageStyles.whiteCard,
-                      { borderColor: withOpacity(colors.border, 0.95) },
-                    ]}
-                  >
-                    <View style={styles.addAccountIconWrap}>
-                      <Feather name="plus" size={16} color="#2FAF66" />
-                    </View>
-                    <Text
-                      style={[
-                        styles.addAccountLabel,
-                        { color: colors.foreground },
-                      ]}
-                    >
-                      Add Wallet
-                    </Text>
-                  </View>
-                </Pressable>,
-              ];
-            })()}
-          </ScrollView>
-          {walletAccounts.length >= 2 && showWalletsSwipeHint ? (
-            <View style={styles.swipeHintRow}>
-              <View style={styles.swipeHintDots}>
-                <View style={[styles.swipeHintDot, styles.swipeHintDotActive]} />
-                <View style={styles.swipeHintDot} />
-                <View style={styles.swipeHintDot} />
-              </View>
-              <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
-                Swipe to view more
-              </Text>
-              <Feather
-                name="chevron-right"
-                size={14}
-                color={colors.mutedForeground}
-              />
-            </View>
-          ) : null}
-
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Budget Progress
-            </Text>
-            <Pressable
-              style={styles.linkRow}
-              onPress={() => router.push("/explore")}
-            >
-              <Text style={[styles.sectionLink, pageStyles.linkText]}>
-                See all
-              </Text>
-              <Feather
-                name="chevron-right"
-                size={16}
-                color={colorScheme === "light" ? "#0E67F7" : colors.primary}
-              />
-            </Pressable>
-          </View>
-
-          <View style={styles.budgetList}>
-            {visibleBudgets.length ? (
-              visibleBudgets.map((item) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.budgetCard,
-                    pageStyles.whiteCard,
-                    shadows.soft,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.budgetIconWrap,
-                      { backgroundColor: item.iconBackground },
-                    ]}
-                  >
-                    {renderDashboardIcon(item, 22)}
-                  </View>
-                  <View style={styles.budgetBody}>
-                    <View style={styles.budgetRow}>
-                      <View style={styles.budgetTextBlock}>
+                        <View style={styles.addAccountIconWrap}>
+                          <Feather name="plus" size={16} color="#2FAF66" />
+                        </View>
                         <Text
                           style={[
-                            styles.budgetTitle,
+                            styles.addAccountLabel,
                             { color: colors.foreground },
                           ]}
                         >
-                          {item.title}
-                        </Text>
-                        <Text
-                          style={[styles.budgetSpent, pageStyles.mutedText]}
-                        >
-                          {item.spentLabel}
+                          Add Wallet
                         </Text>
                       </View>
-                      <View>
-                        <Text style={styles.budgetRemaining}>
-                          {item.remainingLabel}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.budgetRemainingLabel,
-                            pageStyles.mutedText,
-                          ]}
-                        >
-                          remaining
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.progressTrack}>
+                    </Pressable>,
+                  ];
+                })()}
+              </ScrollView>
+              {walletAccounts.length >= 2 && showWalletsSwipeHint ? (
+                <View style={styles.swipeHintRow}>
+                  <View style={styles.swipeHintDots}>
+                    <View
+                      style={[styles.swipeHintDot, styles.swipeHintDotActive]}
+                    />
+                    <View style={styles.swipeHintDot} />
+                    <View style={styles.swipeHintDot} />
+                  </View>
+                  <Text style={[styles.swipeHintText, pageStyles.mutedText]}>
+                    Swipe to view more
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={14}
+                    color={colors.mutedForeground}
+                  />
+                </View>
+              ) : null}
+
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  Budget Progress
+                </Text>
+                <Pressable
+                  style={styles.linkRow}
+                  onPress={() => router.push("/explore")}
+                >
+                  <Text style={[styles.sectionLink, pageStyles.linkText]}>
+                    See all
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={colorScheme === "light" ? "#0E67F7" : colors.primary}
+                  />
+                </Pressable>
+              </View>
+
+              <View style={styles.budgetList}>
+                {visibleBudgets.length ? (
+                  visibleBudgets.map((item) => (
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.budgetCard,
+                        pageStyles.whiteCard,
+                        shadows.soft,
+                      ]}
+                    >
                       <View
                         style={[
-                          styles.progressFill,
-                          { width: `${item.progress * 100}%` },
+                          styles.budgetIconWrap,
+                          { backgroundColor: item.iconBackground },
                         ]}
-                      />
+                      >
+                        <MerchantLogo
+                          size={22}
+                          style={{}}
+                          // budgets don't have a merchant — use the configured icon as a fallback
+                          fallbackIcon={{
+                            library: item.iconLibrary,
+                            name: item.iconName,
+                            color: item.iconColor,
+                          }}
+                        />
+                      </View>
+                      <View style={styles.budgetBody}>
+                        <View style={styles.budgetRow}>
+                          <View style={styles.budgetTextBlock}>
+                            <Text
+                              style={[
+                                styles.budgetTitle,
+                                { color: colors.foreground },
+                              ]}
+                            >
+                              {item.title}
+                            </Text>
+                            <Text
+                              style={[styles.budgetSpent, pageStyles.mutedText]}
+                            >
+                              {item.spentLabel}
+                            </Text>
+                          </View>
+                          <View>
+                            <Text style={styles.budgetRemaining}>
+                              {item.remainingLabel}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.budgetRemainingLabel,
+                                pageStyles.mutedText,
+                              ]}
+                            >
+                              remaining
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.progressTrack}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              { width: `${item.progress * 100}%` },
+                            ]}
+                          />
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              ))
-            ) : isLoading ? (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.whiteCard,
-                  shadows.soft,
-                ]}
-              >
-                <ActivityIndicator color={colors.primary} />
-                <Text
-                  style={[styles.emptyStateTitle, { color: colors.foreground }]}
-                >
-                  Loading budgets
-                </Text>
-                <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
-                  Pulling your active budget progress from the local database.
-                </Text>
-              </View>
-            ) : (
-              <PremiumEmptyState
-                variant="budgets"
-                eyebrow="Budget progress"
-                title="No active budgets yet"
-                body="Create a budget to see live category progress."
-                ctaLabel="Create budget"
-                delay={120}
-                colors={colors}
-                colorScheme={colorScheme}
-                mutedTextColor={pageStyles.mutedText.color}
-                onPress={() =>
-                  router.push({
-                    pathname: "/add-category-modal",
-                    params: { cycle: "monthly" },
-                  })
-                }
-              />
-            )}
-          </View>
-
-          <View style={[styles.sectionHeader, styles.recentHeader]}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Recent Transactions
-            </Text>
-            <Pressable
-              style={styles.linkRow}
-              onPress={() => router.push("/transactions")}
-            >
-              <Text style={[styles.sectionLink, pageStyles.linkText]}>
-                See all
-              </Text>
-              <Feather
-                name="chevron-right"
-                size={16}
-                color={colorScheme === "light" ? "#0E67F7" : colors.primary}
-              />
-            </Pressable>
-          </View>
-
-          <View style={styles.transactionList}>
-            {visibleRecentTransactions.length ? (
-              visibleRecentTransactions.map((item) => (
-                <View key={item.id} style={styles.transactionRow}>
+                  ))
+                ) : isLoading ? (
                   <View
                     style={[
-                      styles.transactionIconWrap,
-                      { backgroundColor: item.iconBackground },
+                      styles.emptyStateCard,
+                      pageStyles.whiteCard,
+                      shadows.soft,
                     ]}
                   >
-                    {renderDashboardIcon(
-                      item,
-                      item.iconLibrary === "material" ? 22 : 20,
-                    )}
+                    <ActivityIndicator color={colors.primary} />
+                    <Text
+                      style={[
+                        styles.emptyStateTitle,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Loading budgets
+                    </Text>
+                    <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
+                      Pulling your active budget progress from the local
+                      database.
+                    </Text>
                   </View>
-                  <View style={styles.transactionContent}>
-                    <View style={styles.transactionDetails}>
-                      <Text
+                ) : (
+                  <PremiumEmptyState
+                    variant="budgets"
+                    eyebrow="Budget progress"
+                    title="No active budgets yet"
+                    body="Create a budget to see live category progress."
+                    ctaLabel="Create budget"
+                    delay={120}
+                    colors={colors}
+                    colorScheme={colorScheme}
+                    mutedTextColor={pageStyles.mutedText.color}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/add-category-modal",
+                        params: { cycle: "monthly" },
+                      })
+                    }
+                  />
+                )}
+              </View>
+
+              <View style={[styles.sectionHeader, styles.recentHeader]}>
+                <Text
+                  style={[styles.sectionTitle, { color: colors.foreground }]}
+                >
+                  Recent Transactions
+                </Text>
+                <Pressable
+                  style={styles.linkRow}
+                  onPress={() => router.push("/transactions")}
+                >
+                  <Text style={[styles.sectionLink, pageStyles.linkText]}>
+                    See all
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={colorScheme === "light" ? "#0E67F7" : colors.primary}
+                  />
+                </Pressable>
+              </View>
+
+              <View style={styles.transactionList}>
+                {visibleRecentTransactions.length ? (
+                  visibleRecentTransactions.map((item) => {
+                    const hasMerchantLogo = Boolean(getMerchantLogo(item.merchant));
+
+                    return (
+                    <View key={item.id} style={styles.transactionRow}>
+                      <View
                         style={[
-                          styles.transactionTitle,
-                          { color: colors.foreground },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.merchant}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.transactionCategory,
-                          pageStyles.mutedText,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.category} · {item.typeLabel}
-                      </Text>
-                    </View>
-                    <View style={styles.transactionAmountBlock}>
-                      <Text
-                        style={[
-                          styles.transactionAmount,
+                          styles.transactionIconWrap,
                           {
-                            color: item.isIncome
-                              ? "#00A76F"
-                              : colors.foreground,
+                            backgroundColor: hasMerchantLogo
+                              ? "transparent"
+                              : item.iconBackground,
                           },
                         ]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
                       >
-                        {item.amountLabel}
-                      </Text>
-                      <Text
-                        style={[styles.transactionDate, pageStyles.mutedText]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                      >
-                        {item.dateLabel}
-                      </Text>
+                        <MerchantLogo
+                          merchant={item.merchant}
+                          size={46}
+                          fallbackIcon={{
+                            library: item.iconLibrary,
+                            name: item.iconName,
+                            color: item.iconColor,
+                          }}
+                        />
+                      </View>
+                      <View style={styles.transactionContent}>
+                        <View style={styles.transactionDetails}>
+                          <Text
+                            style={[
+                              styles.transactionTitle,
+                              { color: colors.foreground },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.merchant}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.transactionCategory,
+                              pageStyles.mutedText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.category} · {item.typeLabel}
+                          </Text>
+                        </View>
+                        <View style={styles.transactionAmountBlock}>
+                          <Text
+                            style={[
+                              styles.transactionAmount,
+                              {
+                                color: item.isIncome
+                                  ? "#00A76F"
+                                  : colors.foreground,
+                              },
+                            ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                          >
+                            {item.amountLabel}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.transactionDate,
+                              pageStyles.mutedText,
+                            ]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                          >
+                            {item.dateLabel}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
+                    );
+                  })
+                ) : isLoading ? (
+                  <View
+                    style={[
+                      styles.emptyStateCard,
+                      pageStyles.whiteCard,
+                      shadows.soft,
+                    ]}
+                  >
+                    <ActivityIndicator color={colors.primary} />
+                    <Text
+                      style={[
+                        styles.emptyStateTitle,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      Loading transactions
+                    </Text>
+                    <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
+                      Fetching your latest movement from SQLite.
+                    </Text>
                   </View>
-                </View>
-              ))
-            ) : isLoading ? (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.whiteCard,
-                  shadows.soft,
-                ]}
-              >
-                <ActivityIndicator color={colors.primary} />
-                <Text
-                  style={[styles.emptyStateTitle, { color: colors.foreground }]}
-                >
-                  Loading transactions
-                </Text>
-                <Text style={[styles.emptyStateBody, pageStyles.mutedText]}>
-                  Fetching your latest movement from SQLite.
-                </Text>
+                ) : (
+                  <PremiumEmptyState
+                    variant="transactions"
+                    eyebrow="Activity feed"
+                    title="No recent transactions"
+                    body="Add a transaction to start building your history."
+                    ctaLabel="Add transaction"
+                    delay={170}
+                    colors={colors}
+                    colorScheme={colorScheme}
+                    mutedTextColor={pageStyles.mutedText.color}
+                    onPress={() => router.push("/modal")}
+                  />
+                )}
               </View>
-            ) : (
-              <PremiumEmptyState
-                variant="transactions"
-                eyebrow="Activity feed"
-                title="No recent transactions"
-                body="Add a transaction to start building your history."
-                ctaLabel="Add transaction"
-                delay={170}
-                colors={colors}
-                colorScheme={colorScheme}
-                mutedTextColor={pageStyles.mutedText.color}
-                onPress={() => router.push("/modal")}
-              />
-            )}
-          </View>
             </>
           )}
         </ScrollView>
-
       </View>
     </SafeAreaView>
   );

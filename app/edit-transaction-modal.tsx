@@ -19,6 +19,7 @@ import {
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
 import Logo from "@/components/logo";
+import MerchantLogo from "@/components/merchant-logo";
 import { WALLETS } from "@/constants/wallets";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -44,6 +45,7 @@ import {
   useTransaction,
 } from "@/hooks/useTransactions";
 import { transactionsService } from "@/src/db/services";
+import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 function formatAmount(value: string) {
   return value
@@ -395,31 +397,11 @@ export default function EditTransactionModal() {
     );
   })();
 
-  const transactionIconNode =
-    transactionIcon.iconLibrary === "material" ? (
-      <MaterialCommunityIcons
-        name={
-          transactionIcon.iconName as React.ComponentProps<
-            typeof MaterialCommunityIcons
-          >["name"]
-        }
-        size={22}
-        color={transactionIcon.iconColor}
-      />
-    ) : (
-      <Feather
-        name={
-          transactionIcon.iconName as React.ComponentProps<
-            typeof Feather
-          >["name"]
-        }
-        size={20}
-        color={transactionIcon.iconColor}
-      />
-    );
-
   const previewMerchantLabel =
     selectedMerchantOption?.label ?? (merchantQuery.trim() || null);
+  const hasPreviewMerchantLogo = Boolean(
+    getMerchantLogo(isIncomeTransaction ? null : previewMerchantLabel),
+  );
   const previewTitle = isIncomeTransaction
     ? (selectedCategory?.label ?? transaction?.category ?? transaction?.title)
     : (previewMerchantLabel ?? transaction?.title);
@@ -540,14 +522,24 @@ export default function EditTransactionModal() {
                 styles.iconWrap,
                 {
                   backgroundColor: transaction
-                    ? isDark
-                      ? transactionIcon.iconBackgroundDark
-                      : transactionIcon.iconBackgroundLight
+                    ? hasPreviewMerchantLogo
+                      ? "transparent"
+                      : isDark
+                        ? transactionIcon.iconBackgroundDark
+                        : transactionIcon.iconBackgroundLight
                     : getFieldSurface(isDark),
                 },
               ]}
             >
-              {transactionIconNode}
+              <MerchantLogo
+                merchant={isIncomeTransaction ? null : previewMerchantLabel}
+                size={46}
+                fallbackIcon={{
+                  library: transactionIcon.iconLibrary,
+                  name: transactionIcon.iconName,
+                  color: transactionIcon.iconColor,
+                }}
+              />
             </View>
             <View style={styles.headerText}>
               <Text style={[styles.title, ui.title]}>
@@ -899,31 +891,20 @@ export default function EditTransactionModal() {
                               }}
                             >
                               <View style={styles.optionLeft}>
-                                <View
+                                <MerchantLogo
+                                  merchant={option.label}
+                                  size={28}
                                   style={[
                                     styles.optionIconWrap,
                                     { backgroundColor: option.color },
                                   ]}
-                                >
-                                  {option.icon ? (
-                                    <MaterialCommunityIcons
-                                      name={option.icon as any}
-                                      size={16}
-                                      color={option.textColor ?? "#FFFFFF"}
-                                    />
-                                  ) : (
-                                    <Text
-                                      style={[
-                                        styles.badgeText,
-                                        {
-                                          color: option.textColor ?? "#FFFFFF",
-                                        },
-                                      ]}
-                                    >
-                                      {option.initials}
-                                    </Text>
-                                  )}
-                                </View>
+                                  backgroundColor={option.color}
+                                  fallbackIcon={{
+                                    library: "material",
+                                    name: option.icon,
+                                    color: option.textColor ?? "#FFFFFF",
+                                  }}
+                                />
                                 <Text
                                   style={[styles.categoryLabel, ui.fieldText]}
                                   numberOfLines={1}

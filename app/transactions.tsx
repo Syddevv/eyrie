@@ -1,6 +1,6 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { themeColors } from "@/constants/colors";
+import MerchantLogo from "@/components/merchant-logo";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -24,6 +25,7 @@ import {
   type TransactionListItem,
 } from "@/hooks/useTransactions";
 import { useSyncStatus } from "@/src/sync";
+import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 const monthNames = [
   "January",
@@ -58,31 +60,82 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-function renderTransactionIcon(transaction: TransactionListItem) {
-  if (transaction.iconLibrary === "material") {
-    return (
-      <MaterialCommunityIcons
-        name={
-          transaction.iconName as React.ComponentProps<
-            typeof MaterialCommunityIcons
-          >["name"]
-        }
-        size={22}
-        color={transaction.iconColor}
-      />
-    );
-  }
+const TransactionRow = memo(function TransactionRow({
+  item,
+  isDark,
+  titleColor,
+  subtitleColor,
+  incomeAmountColor,
+  defaultAmountColor,
+  chevronColor,
+  onPress,
+}: {
+  item: TransactionListItem;
+  isDark: boolean;
+  titleColor: string;
+  subtitleColor: string;
+  incomeAmountColor: string;
+  defaultAmountColor: string;
+  chevronColor: string;
+  onPress: (transactionId: string) => void;
+}) {
+  const hasMerchantLogo = Boolean(getMerchantLogo(item.merchant));
 
   return (
-    <Feather
-      name={
-        transaction.iconName as React.ComponentProps<typeof Feather>["name"]
-      }
-      size={20}
-      color={transaction.iconColor}
-    />
+    <Pressable style={styles.recordRow} onPress={() => onPress(item.id)}>
+      <View style={styles.recordLeft}>
+        <View
+          style={[
+            styles.recordIconWrap,
+            {
+              backgroundColor: hasMerchantLogo
+                ? "transparent"
+                : isDark
+                  ? item.iconBackgroundDark
+                  : item.iconBackgroundLight,
+            },
+          ]}
+        >
+          <MerchantLogo
+            merchant={item.merchant}
+            size={46}
+            fallbackIcon={{
+              library: item.iconLibrary,
+              name: item.iconName,
+              color: item.iconColor,
+            }}
+          />
+        </View>
+
+        <View>
+          <Text style={[styles.recordTitle, { color: titleColor }]}>
+            {item.title}
+          </Text>
+          <Text style={[styles.recordCategory, { color: subtitleColor }]}>
+            {item.category}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.recordRight}>
+        <Text
+          style={[
+            styles.recordAmount,
+            {
+              color:
+                item.amountColor === "income"
+                  ? incomeAmountColor
+                  : defaultAmountColor,
+            },
+          ]}
+        >
+          {item.signedAmountLabel}
+        </Text>
+        <Feather name="chevron-right" size={18} color={chevronColor} />
+      </View>
+    </Pressable>
   );
-}
+});
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -245,6 +298,12 @@ export default function TransactionsScreen() {
     (count, section) => count + section.items.length,
     0,
   );
+  const handlePressTransaction = useCallback((transactionId: string) => {
+    void router.push({
+      pathname: "/transaction-details-modal",
+      params: { transactionId },
+    });
+  }, [router]);
 
   const syncLabel = isRestoring
     ? "Restoring your data..."
@@ -463,64 +522,16 @@ export default function TransactionsScreen() {
                   >
                     {section.items.map((item, index) => (
                       <View key={item.id}>
-                        <Pressable
-                          style={styles.recordRow}
-                          onPress={() =>
-                            router.push({
-                              pathname: "/transaction-details-modal",
-                              params: { transactionId: item.id },
-                            })
-                          }
-                        >
-                          <View style={styles.recordLeft}>
-                            <View
-                              style={[
-                                styles.recordIconWrap,
-                                {
-                                  backgroundColor: isDark
-                                    ? item.iconBackgroundDark
-                                    : item.iconBackgroundLight,
-                                },
-                              ]}
-                            >
-                              {renderTransactionIcon(item)}
-                            </View>
-
-                            <View>
-                              <Text
-                                style={[styles.recordTitle, pageStyles.title]}
-                              >
-                                {item.title}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.recordCategory,
-                                  pageStyles.subtitle,
-                                ]}
-                              >
-                                {item.category}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.recordRight}>
-                            <Text
-                              style={[
-                                styles.recordAmount,
-                                item.amountColor === "income"
-                                  ? pageStyles.incomeAmount
-                                  : pageStyles.defaultAmount,
-                              ]}
-                            >
-                              {item.signedAmountLabel}
-                            </Text>
-                            <Feather
-                              name="chevron-right"
-                              size={18}
-                              color={pageStyles.chevron.color}
-                            />
-                          </View>
-                        </Pressable>
+                        <TransactionRow
+                          item={item}
+                          isDark={isDark}
+                          titleColor={pageStyles.title.color}
+                          subtitleColor={pageStyles.subtitle.color}
+                          incomeAmountColor={pageStyles.incomeAmount.color}
+                          defaultAmountColor={pageStyles.defaultAmount.color}
+                          chevronColor={pageStyles.chevron.color}
+                          onPress={handlePressTransaction}
+                        />
 
                         {index < section.items.length - 1 ? (
                           <View
