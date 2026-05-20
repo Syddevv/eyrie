@@ -1,15 +1,21 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import * as Linking from "expo-linking";
 import { useRootNavigationState, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
+import LoadingScreen from "@/app/loading-screen";
 import { CreateNewPasswordModal } from "@/components/auth/CreateNewPasswordModal";
 import { ForgotPasswordEmailModal } from "@/components/auth/ForgotPasswordEmailModal";
 import { OtpVerificationModal } from "@/components/auth/OtpVerificationModal";
 import { PasswordResetCodeModal } from "@/components/auth/PasswordResetCodeModal";
-import { themeColors } from "@/constants/colors";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getHasCompletedOnboarding } from "@/lib/onboarding-storage";
 import { supabase } from "@/lib/supabase";
 import {
@@ -23,16 +29,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // Splash can already be controlled elsewhere during fast refresh.
 });
 
-function FullScreenLoader() {
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = themeColors[colorScheme];
-
-  return (
-    <View style={[styles.loaderWrap, { backgroundColor: colors.background }]}>
-      <ActivityIndicator color={colors.primary} size="large" />
-    </View>
-  );
-}
+const STARTUP_MINIMUM_MS = 2600;
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const router = useRouter();
@@ -52,6 +49,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
   const closeOtpModal = useAuthStore((state) => state.closeOtpModal);
   const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
+  const [hasMinimumElapsed, setHasMinimumElapsed] = useState(false);
+  const [hasHiddenNativeSplash, setHasHiddenNativeSplash] = useState(false);
+  const [showStartupScreen, setShowStartupScreen] = useState(true);
+  const startupOpacity = useSharedValue(1);
+
+  const hideStartupScreen = () => {
+    setShowStartupScreen(false);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -157,6 +162,26 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
+    const minimumTimer = setTimeout(() => {
+      setHasMinimumElapsed(true);
+    }, STARTUP_MINIMUM_MS);
+
+    return () => {
+      clearTimeout(minimumTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    SplashScreen.hideAsync()
+      .then(() => {
+        setHasHiddenNativeSplash(true);
+      })
+      .catch(() => {
+        setHasHiddenNativeSplash(true);
+      });
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function handleIncomingUrl(url: string | null) {
@@ -193,15 +218,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  const isStartupReady =
+    isReady &&
+    isOnboardingReady &&
+    !isAuthStateValidating &&
+    Boolean(navigationState?.key);
+
   useEffect(() => {
-    if (!isReady || !isOnboardingReady || isAuthStateValidating) {
+    if (!showStartupScreen || !hasMinimumElapsed || !hasHiddenNativeSplash || !isStartupReady) {
       return;
     }
 
-    SplashScreen.hideAsync().catch(() => {
-      // Ignore repeated hide attempts during dev reloads.
-    });
-  }, [isAuthStateValidating, isOnboardingReady, isReady]);
+    startupOpacity.value = withTiming(
+      0,
+      {
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+      },
+      (finished) => {
+        if (finished) {
+          runOnJS(hideStartupScreen)();
+        }
+      },
+    );
+  }, [
+    hasHiddenNativeSplash,
+    hasMinimumElapsed,
+    isStartupReady,
+    showStartupScreen,
+    startupOpacity,
+  ]);
 
   useEffect(() => {
     if (
@@ -257,25 +303,35 @@ export function AuthProvider({ children }: PropsWithChildren) {
     passwordResetPhase,
   ]);
 
-  if (!isReady || !isOnboardingReady) {
-    return <FullScreenLoader />;
-  }
+  const startupAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: startupOpacity.value,
+  }));
+
+  const canRenderAppContent = isReady && isOnboardingReady;
 
   return (
     <>
-      {children}
-      <OtpVerificationModal />
-      <ForgotPasswordEmailModal />
-      <PasswordResetCodeModal />
-      <CreateNewPasswordModal />
+      {canRenderAppContent ? (
+        <>
+          {children}
+          <OtpVerificationModal />
+          <ForgotPasswordEmailModal />
+          <PasswordResetCodeModal />
+          <CreateNewPasswordModal />
+        </>
+      ) : null}
+      {showStartupScreen ? (
+        <Animated.View style={[styles.startupOverlay, startupAnimatedStyle]}>
+          <LoadingScreen />
+        </Animated.View>
+      ) : null}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  loaderWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  startupOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
   },
 });
