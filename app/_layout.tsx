@@ -1,10 +1,13 @@
 import { ThemeProvider } from "@react-navigation/native";
+import * as SystemUI from "expo-system-ui";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import "../global.css";
 import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { STARTUP_BACKGROUND_COLOR } from "@/app/loading-screen";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { navigationThemes } from "@/constants/theme";
 import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
@@ -19,12 +22,16 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
+SystemUI.setBackgroundColorAsync(STARTUP_BACKGROUND_COLOR).catch(() => {
+  // Ignore unsupported platforms during boot.
+});
+
 function AppShell() {
   useNotificationBootstrap();
   useUserActivityTracker();
 
   return (
-    <Stack>
+    <Stack screenOptions={{ contentStyle: { backgroundColor: STARTUP_BACKGROUND_COLOR } }}>
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="loading-screen" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -266,8 +273,16 @@ function GlobalToastLayer() {
 export default function RootLayout() {
   const colorScheme = useColorScheme() ?? "light";
 
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(STARTUP_BACKGROUND_COLOR).catch(() => {
+      // Ignore unsupported platforms after mount.
+    });
+  }, []);
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView
+      style={{ flex: 1, backgroundColor: STARTUP_BACKGROUND_COLOR }}
+    >
       <ThemeProvider value={navigationThemes[colorScheme]}>
         <DatabaseProvider>
           <AuthProvider>

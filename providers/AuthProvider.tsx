@@ -1,4 +1,4 @@
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useCallback, useEffect, useState, type PropsWithChildren } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import * as Linking from "expo-linking";
 import { useRootNavigationState, useRouter, useSegments } from "expo-router";
@@ -54,12 +54,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
   const [hasMinimumElapsed, setHasMinimumElapsed] = useState(false);
   const [hasHiddenNativeSplash, setHasHiddenNativeSplash] = useState(false);
+  const [isLoadingScreenReady, setIsLoadingScreenReady] = useState(false);
   const [showStartupScreen, setShowStartupScreen] = useState(true);
   const startupOpacity = useSharedValue(1);
 
   const hideStartupScreen = () => {
     setShowStartupScreen(false);
   };
+  const markLoadingScreenReady = useCallback(() => {
+    setIsLoadingScreenReady(true);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -175,14 +179,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    SplashScreen.hideAsync()
-      .then(() => {
-        setHasHiddenNativeSplash(true);
-      })
-      .catch(() => {
-        setHasHiddenNativeSplash(true);
-      });
-  }, []);
+    if (!isLoadingScreenReady || hasHiddenNativeSplash) {
+      return;
+    }
+
+    let isCancelled = false;
+    let frameId: number | null = null;
+
+    frameId = requestAnimationFrame(() => {
+      SplashScreen.hideAsync()
+        .then(() => {
+          if (!isCancelled) {
+            setHasHiddenNativeSplash(true);
+          }
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            setHasHiddenNativeSplash(true);
+          }
+        });
+    });
+
+    return () => {
+      isCancelled = true;
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [hasHiddenNativeSplash, isLoadingScreenReady]);
 
   useEffect(() => {
     let isMounted = true;
@@ -333,7 +357,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       ) : null}
       {showStartupScreen ? (
         <Animated.View style={[styles.startupOverlay, startupAnimatedStyle]}>
-          <LoadingScreen />
+          <LoadingScreen onReady={markLoadingScreenReady} />
         </Animated.View>
       ) : null}
     </>

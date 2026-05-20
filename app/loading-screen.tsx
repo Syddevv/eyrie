@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
 import { Dimensions, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, {
@@ -27,14 +27,20 @@ const SPINNER_SIZE = 54;
 const SPINNER_STROKE = 6;
 const STARTUP_COPY = "Loading your experience...";
 const BACKGROUND_COLORS = ["#F7F7FF", "#F3F3FF", "#ECECFF"] as const;
+export const STARTUP_BACKGROUND_COLOR = "#F7F7FF";
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-export function LoadingScreen() {
+type LoadingScreenProps = {
+  onReady?: () => void;
+};
+
+export function LoadingScreen({ onReady }: LoadingScreenProps) {
   const contentOpacity = useSharedValue(0);
   const contentTranslateY = useSharedValue(16);
   const mascotScale = useSharedValue(0.94);
   const spinnerRotation = useSharedValue(0);
+  const hasReportedReady = useRef(false);
 
   useEffect(() => {
     contentOpacity.value = withTiming(1, {
@@ -91,8 +97,21 @@ export function LoadingScreen() {
     transform: [{ rotate: `${spinnerRotation.value}deg` }],
   }));
 
+  const handleLayout = useCallback(() => {
+    if (hasReportedReady.current) {
+      return;
+    }
+
+    hasReportedReady.current = true;
+    onReady?.();
+  }, [onReady]);
+
   return (
-    <LinearGradient colors={BACKGROUND_COLORS} style={styles.background}>
+    <LinearGradient
+      colors={BACKGROUND_COLORS}
+      style={styles.background}
+      onLayout={handleLayout}
+    >
       <View pointerEvents="none" style={styles.backgroundGlowTop} />
       <View pointerEvents="none" style={styles.backgroundGlowBottom} />
 
