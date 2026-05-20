@@ -9,7 +9,11 @@ import {
   assertRequiredText,
 } from "../utils/validation";
 import { SYSTEM_CATEGORY_USER_ID } from "../utils/constants";
-import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import {
+  prepareCreateForSync,
+  prepareDeleteForSync,
+  prepareUpdateForSync,
+} from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 
 export type CreateCategoryInput = Omit<
@@ -38,6 +42,15 @@ type CategoriesRepositoryLike = typeof categoriesRepository;
 type DeleteCategoryInput = { mode: "delete" } | { mode: "archive" };
 
 export class CategoriesService {
+  private assertCategoryEditable(category: {
+    isDefault?: boolean | null;
+    isSystem?: boolean | null;
+  }) {
+    if (category.isDefault || category.isSystem) {
+      throw new Error("System categories cannot be modified.");
+    }
+  }
+
   async create(input: CreateCategoryInput) {
     assertRequiredText(input.name, "category name");
     assertCategoryType(input.type);
@@ -57,7 +70,11 @@ export class CategoriesService {
       }),
     });
 
-    if (created && created.userId && created.userId !== SYSTEM_CATEGORY_USER_ID) {
+    if (
+      created &&
+      created.userId &&
+      created.userId !== SYSTEM_CATEGORY_USER_ID
+    ) {
       await enqueueSync("categories", created.id, "upsert", created.userId);
     }
     emitCategoriesChanged();
@@ -82,6 +99,8 @@ export class CategoriesService {
       throw new Error("Category not found.");
     }
 
+    this.assertCategoryEditable(existing);
+
     const nextType = input.type ?? existing.type;
     const nextName = input.name ?? existing.name;
     if (
@@ -103,7 +122,11 @@ export class CategoriesService {
         updatedAt: nowIso(),
       }),
     );
-    if (updated && updated.userId && updated.userId !== SYSTEM_CATEGORY_USER_ID) {
+    if (
+      updated &&
+      updated.userId &&
+      updated.userId !== SYSTEM_CATEGORY_USER_ID
+    ) {
       await enqueueSync("categories", updated.id, "upsert", updated.userId);
     }
     emitCategoriesChanged();
@@ -116,8 +139,17 @@ export class CategoriesService {
       return;
     }
 
-    const deleted = await categoriesRepository.update(id, prepareDeleteForSync());
-    if (deleted && deleted.userId && deleted.userId !== SYSTEM_CATEGORY_USER_ID) {
+    this.assertCategoryEditable(category);
+
+    const deleted = await categoriesRepository.update(
+      id,
+      prepareDeleteForSync(),
+    );
+    if (
+      deleted &&
+      deleted.userId &&
+      deleted.userId !== SYSTEM_CATEGORY_USER_ID
+    ) {
       await enqueueSync("categories", deleted.id, "delete", deleted.userId);
     }
     emitCategoriesChanged();
@@ -130,6 +162,8 @@ export class CategoriesService {
       throw new Error("Category not found.");
     }
 
+    this.assertCategoryEditable(category);
+
     const archived = await categoriesRepository.update(
       id,
       prepareUpdateForSync({
@@ -137,7 +171,11 @@ export class CategoriesService {
         updatedAt: nowIso(),
       }),
     );
-    if (archived && archived.userId && archived.userId !== SYSTEM_CATEGORY_USER_ID) {
+    if (
+      archived &&
+      archived.userId &&
+      archived.userId !== SYSTEM_CATEGORY_USER_ID
+    ) {
       await enqueueSync("categories", archived.id, "upsert", archived.userId);
     }
     emitCategoriesChanged();
@@ -145,6 +183,14 @@ export class CategoriesService {
   }
 
   async restore(id: string) {
+    const category = await categoriesRepository.findById(id);
+
+    if (!category) {
+      throw new Error("Category not found.");
+    }
+
+    this.assertCategoryEditable(category);
+
     const restored = await categoriesRepository.update(
       id,
       prepareUpdateForSync({
@@ -152,7 +198,11 @@ export class CategoriesService {
         updatedAt: nowIso(),
       }),
     );
-    if (restored && restored.userId && restored.userId !== SYSTEM_CATEGORY_USER_ID) {
+    if (
+      restored &&
+      restored.userId &&
+      restored.userId !== SYSTEM_CATEGORY_USER_ID
+    ) {
       await enqueueSync("categories", restored.id, "upsert", restored.userId);
     }
     emitCategoriesChanged();
@@ -201,7 +251,11 @@ export class CategoriesService {
       throw new Error("Category not found.");
     }
 
-    if (category.isSystem || input.mode === "archive") {
+    if (category.isDefault || category.isSystem) {
+      throw new Error("System categories cannot be modified.");
+    }
+
+    if (input.mode === "archive") {
       await this.archive(id);
       return;
     }

@@ -14,7 +14,10 @@ import {
   Keyboard,
 } from "react-native";
 import Animated, { FadeInUp, LinearTransition } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -195,6 +198,23 @@ export default function CategoriesSettingsScreen() {
     categories.find((category) => category.id === editingCategoryId) ?? null;
   const deleteCategory =
     categories.find((category) => category.id === deleteCategoryId) ?? null;
+  const isProtectedCategory = (category?: CategoryOption | null) =>
+    Boolean(category?.isDefault || category?.isSystem);
+  const getProtectionLabel = (category?: CategoryOption | null) => {
+    if (!category) {
+      return null;
+    }
+
+    if (category.isSystem) {
+      return "System";
+    }
+
+    if (category.isDefault) {
+      return "Default";
+    }
+
+    return null;
+  };
 
   const openCreate = () => {
     setEditingCategoryId(null);
@@ -202,6 +222,13 @@ export default function CategoriesSettingsScreen() {
   };
 
   const openEdit = (categoryId: string) => {
+    const category = categories.find((item) => item.id === categoryId) ?? null;
+
+    if (isProtectedCategory(category)) {
+      showSnackbar("Default categories cannot be edited.", "error");
+      return;
+    }
+
     setEditingCategoryId(categoryId);
     setIsEditorVisible(true);
   };
@@ -211,6 +238,11 @@ export default function CategoriesSettingsScreen() {
 
     try {
       if (editingCategory) {
+        if (isProtectedCategory(editingCategory)) {
+          showSnackbar("Default categories cannot be edited.", "error");
+          return;
+        }
+
         await categoriesService.update(editingCategory.id, {
           name: draft.name,
           type: draft.type,
@@ -257,6 +289,11 @@ export default function CategoriesSettingsScreen() {
     mode: "archive" | "delete";
   }) => {
     if (!deleteCategory) {
+      return;
+    }
+
+    if (isProtectedCategory(deleteCategory)) {
+      showSnackbar("Default categories cannot be deleted.", "error");
       return;
     }
 
@@ -495,196 +532,209 @@ export default function CategoriesSettingsScreen() {
             </View>
           ) : (
             <>
-          {archivedCategories.length ? (
-            <View style={styles.archivedSection}>
-              <Text style={[styles.archivedSectionTitle, ui.title]}>
-                Archived Categories
-              </Text>
-              <View style={styles.archivedCategoriesList}>
-                {archivedCategories.map((category) => (
-                  <View
-                    key={category.id}
-                    style={[styles.archivedCategoryCard, ui.card, shadows.soft]}
-                  >
-                    <View style={styles.archivedCardContent}>
+              {archivedCategories.length ? (
+                <View style={styles.archivedSection}>
+                  <Text style={[styles.archivedSectionTitle, ui.title]}>
+                    Archived Categories
+                  </Text>
+                  <View style={styles.archivedCategoriesList}>
+                    {archivedCategories.map((category) => (
+                      <View
+                        key={category.id}
+                        style={[
+                          styles.archivedCategoryCard,
+                          ui.card,
+                          shadows.soft,
+                        ]}
+                      >
+                        <View style={styles.archivedCardContent}>
+                          <View
+                            style={[
+                              styles.iconWrap,
+                              { backgroundColor: `${category.color}22` },
+                            ]}
+                          >
+                            <CategoryAvatar
+                              category={{
+                                iconType: (category.iconType ??
+                                  "vector") as CategoryOption["iconType"],
+                                iconName:
+                                  category.iconName ??
+                                  category.icon ??
+                                  "shape-outline",
+                                iconImageUri: category.iconImageUri ?? null,
+                                emoji: category.emoji ?? null,
+                                color: category.color ?? "#64748B",
+                              }}
+                              size={20}
+                            />
+                          </View>
+                          <View style={styles.cardTextBlock}>
+                            <Text style={[styles.cardTitle, ui.title]}>
+                              {category.name}
+                            </Text>
+                          </View>
+                        </View>
+                        <Pressable
+                          disabled={isUnarchivingId === category.id}
+                          style={[
+                            styles.unarchiveButton,
+                            isUnarchivingId === category.id &&
+                              styles.unarchiveButtonDisabled,
+                          ]}
+                          onPress={() => handleUnarchiveCategory(category.id)}
+                        >
+                          <Feather
+                            name="rotate-ccw"
+                            size={16}
+                            color={colors.primary}
+                          />
+                          <Text
+                            style={[
+                              styles.unarchiveButtonText,
+                              { color: colors.primary },
+                            ]}
+                          >
+                            {isUnarchivingId === category.id
+                              ? "Restoring..."
+                              : "Restore"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {activeCategories.length ? (
+                <Text style={[styles.activeSectionTitle, ui.title]}>
+                  Active Categories
+                </Text>
+              ) : null}
+
+              {activeCategories.map((category, index) => (
+                <Animated.View
+                  key={category.id}
+                  entering={FadeInUp.delay(index * 24).duration(180)}
+                  layout={LinearTransition.springify()
+                    .damping(18)
+                    .stiffness(180)}
+                >
+                  <View style={[styles.categoryCard, ui.card, shadows.soft]}>
+                    <View style={styles.cardTopRow}>
+                      <View style={styles.cardIdentity}>
+                        <View
+                          style={[
+                            styles.iconWrap,
+                            { backgroundColor: `${category.color}22` },
+                          ]}
+                        >
+                          <CategoryAvatar
+                            category={{
+                              iconType: (category.iconType ??
+                                "vector") as CategoryOption["iconType"],
+                              iconName:
+                                category.iconName ??
+                                category.icon ??
+                                "shape-outline",
+                              iconImageUri: category.iconImageUri ?? null,
+                              emoji: category.emoji ?? null,
+                              color: category.color ?? "#64748B",
+                            }}
+                            size={22}
+                          />
+                        </View>
+                        <View style={styles.cardTextBlock}>
+                          <Text style={[styles.cardTitle, ui.title]}>
+                            {category.name}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.cardActions}>
+                        {!isProtectedCategory(category) ? (
+                          <>
+                            <Pressable
+                              style={[styles.actionButton, ui.fieldSurface]}
+                              onPress={() => openEdit(category.id)}
+                            >
+                              <Feather
+                                name="edit-3"
+                                size={16}
+                                color={colors.foreground}
+                              />
+                            </Pressable>
+                            <Pressable
+                              style={[styles.actionButton, ui.fieldSurface]}
+                              onPress={() => setDeleteCategoryId(category.id)}
+                            >
+                              <Feather
+                                name="trash-2"
+                                size={16}
+                                color={colors.foreground}
+                              />
+                            </Pressable>
+                          </>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <View style={styles.badgesRow}>
                       <View
                         style={[
-                          styles.iconWrap,
-                          { backgroundColor: `${category.color}22` },
+                          styles.badge,
+                          {
+                            backgroundColor:
+                              category.type === "expense"
+                                ? ui.badgeExpense.backgroundColor
+                                : ui.badgeIncome.backgroundColor,
+                          },
                         ]}
                       >
-                        <CategoryAvatar
-                          category={{
-                            iconType: (category.iconType ??
-                              "vector") as CategoryOption["iconType"],
-                            iconName:
-                              category.iconName ??
-                              category.icon ??
-                              "shape-outline",
-                            iconImageUri: category.iconImageUri ?? null,
-                            emoji: category.emoji ?? null,
-                            color: category.color ?? "#64748B",
-                          }}
-                          size={20}
-                        />
-                      </View>
-                      <View style={styles.cardTextBlock}>
-                        <Text style={[styles.cardTitle, ui.title]}>
-                          {category.name}
+                        <Text
+                          style={[
+                            styles.badgeText,
+                            {
+                              color:
+                                category.type === "expense"
+                                  ? ui.badgeExpense.color
+                                  : ui.badgeIncome.color,
+                            },
+                          ]}
+                        >
+                          {category.type === "expense" ? "Expense" : "Income"}
                         </Text>
                       </View>
-                    </View>
-                    <Pressable
-                      disabled={isUnarchivingId === category.id}
-                      style={[
-                        styles.unarchiveButton,
-                        isUnarchivingId === category.id &&
-                          styles.unarchiveButtonDisabled,
-                      ]}
-                      onPress={() => handleUnarchiveCategory(category.id)}
-                    >
-                      <Feather
-                        name="rotate-ccw"
-                        size={16}
-                        color={colors.primary}
-                      />
-                      <Text
-                        style={[
-                          styles.unarchiveButtonText,
-                          { color: colors.primary },
-                        ]}
-                      >
-                        {isUnarchivingId === category.id
-                          ? "Restoring..."
-                          : "Restore"}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          {activeCategories.length ? (
-            <Text style={[styles.activeSectionTitle, ui.title]}>
-              Active Categories
-            </Text>
-          ) : null}
-
-          {activeCategories.map((category, index) => (
-            <Animated.View
-              key={category.id}
-              entering={FadeInUp.delay(index * 24).duration(180)}
-              layout={LinearTransition.springify().damping(18).stiffness(180)}
-            >
-              <View style={[styles.categoryCard, ui.card, shadows.soft]}>
-                <View style={styles.cardTopRow}>
-                  <View style={styles.cardIdentity}>
-                    <View
-                      style={[
-                        styles.iconWrap,
-                        { backgroundColor: `${category.color}22` },
-                      ]}
-                    >
-                      <CategoryAvatar
-                        category={{
-                          iconType: (category.iconType ??
-                            "vector") as CategoryOption["iconType"],
-                          iconName:
-                            category.iconName ??
-                            category.icon ??
-                            "shape-outline",
-                          iconImageUri: category.iconImageUri ?? null,
-                          emoji: category.emoji ?? null,
-                          color: category.color ?? "#64748B",
-                        }}
-                        size={22}
-                      />
-                    </View>
-                    <View style={styles.cardTextBlock}>
-                      <Text style={[styles.cardTitle, ui.title]}>
-                        {category.name}
-                      </Text>
+                      {getProtectionLabel(category) ? (
+                        <View style={[styles.badge, ui.archivedBadge]}>
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              { color: ui.archivedBadge.color },
+                            ]}
+                          >
+                            {getProtectionLabel(category)}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                   </View>
+                </Animated.View>
+              ))}
 
-                  <View style={styles.cardActions}>
-                    <Pressable
-                      style={[styles.actionButton, ui.fieldSurface]}
-                      onPress={() => openEdit(category.id)}
-                    >
-                      <Feather
-                        name="edit-3"
-                        size={16}
-                        color={colors.foreground}
-                      />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.actionButton, ui.fieldSurface]}
-                      onPress={() => setDeleteCategoryId(category.id)}
-                    >
-                      <Feather
-                        name="trash-2"
-                        size={16}
-                        color={colors.foreground}
-                      />
-                    </Pressable>
-                  </View>
+              {!activeCategories.length && !archivedCategories.length ? (
+                <View style={[styles.emptyCard, ui.card, shadows.soft]}>
+                  <Text style={[styles.emptyTitle, ui.title]}>
+                    {isLoading
+                      ? "Loading categories..."
+                      : "No categories found"}
+                  </Text>
+                  <Text style={[styles.emptyText, ui.subtitle]}>
+                    Try a different search or create a new category for your
+                    flows.
+                  </Text>
                 </View>
-
-                <View style={styles.badgesRow}>
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        backgroundColor:
-                          category.type === "expense"
-                            ? ui.badgeExpense.backgroundColor
-                            : ui.badgeIncome.backgroundColor,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.badgeText,
-                        {
-                          color:
-                            category.type === "expense"
-                              ? ui.badgeExpense.color
-                              : ui.badgeIncome.color,
-                        },
-                      ]}
-                    >
-                      {category.type === "expense" ? "Expense" : "Income"}
-                    </Text>
-                  </View>
-                  {category.isDefault ? (
-                    <View style={[styles.badge, ui.archivedBadge]}>
-                      <Text
-                        style={[
-                          styles.badgeText,
-                          { color: ui.archivedBadge.color },
-                        ]}
-                      >
-                        System Default
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </Animated.View>
-          ))}
-
-          {!activeCategories.length && !archivedCategories.length ? (
-            <View style={[styles.emptyCard, ui.card, shadows.soft]}>
-              <Text style={[styles.emptyTitle, ui.title]}>
-                {isLoading ? "Loading categories..." : "No categories found"}
-              </Text>
-              <Text style={[styles.emptyText, ui.subtitle]}>
-                Try a different search or create a new category for your flows.
-              </Text>
-            </View>
-          ) : null}
+              ) : null}
             </>
           )}
         </ScrollView>
