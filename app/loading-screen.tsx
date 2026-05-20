@@ -3,7 +3,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect } from "react";
 import { Dimensions, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+} from "react-native-svg";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -115,9 +120,19 @@ export function LoadingScreen() {
 
           <View style={styles.loaderBlock}>
             <Animated.View style={[styles.spinnerWrap, spinnerAnimatedStyle]}>
-              <Svg width={SPINNER_SIZE} height={SPINNER_SIZE} viewBox={`0 0 ${SPINNER_SIZE} ${SPINNER_SIZE}`}>
+              <Svg
+                width={SPINNER_SIZE}
+                height={SPINNER_SIZE}
+                viewBox={`0 0 ${SPINNER_SIZE} ${SPINNER_SIZE}`}
+              >
                 <Defs>
-                  <SvgLinearGradient id="spinnerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <SvgLinearGradient
+                    id="spinnerGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                  >
                     <Stop offset="0%" stopColor="#CEC6FF" />
                     <Stop offset="55%" stopColor="#8B78FF" />
                     <Stop offset="100%" stopColor="#6B5BFF" />

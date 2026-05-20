@@ -1,5 +1,5 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import * as Linking from "expo-linking";
 import { useRootNavigationState, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -24,6 +24,7 @@ import {
   hydratePasswordResetFlow,
 } from "@/services/password-reset";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useDatabaseBootstrap } from "@/src/db/DatabaseProvider";
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Splash can already be controlled elsewhere during fast refresh.
@@ -35,6 +36,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const router = useRouter();
   const segments = useSegments();
   const navigationState = useRootNavigationState();
+  const { isReady: isDatabaseReady, error: databaseError } =
+    useDatabaseBootstrap();
   const isReady = useAuthStore((state) => state.isReady);
   const user = useAuthStore((state) => state.user);
   const hasCompletedOnboarding = useAuthStore(
@@ -219,13 +222,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const isStartupReady =
+    isDatabaseReady &&
     isReady &&
     isOnboardingReady &&
     !isAuthStateValidating &&
     Boolean(navigationState?.key);
+  const canDismissStartupScreen =
+    hasMinimumElapsed &&
+    hasHiddenNativeSplash &&
+    (isStartupReady || Boolean(databaseError));
 
   useEffect(() => {
-    if (!showStartupScreen || !hasMinimumElapsed || !hasHiddenNativeSplash || !isStartupReady) {
+    if (!showStartupScreen || !canDismissStartupScreen) {
       return;
     }
 
@@ -242,9 +250,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
     );
   }, [
-    hasHiddenNativeSplash,
-    hasMinimumElapsed,
-    isStartupReady,
+    canDismissStartupScreen,
     showStartupScreen,
     startupOpacity,
   ]);
@@ -307,11 +313,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     opacity: startupOpacity.value,
   }));
 
-  const canRenderAppContent = isReady && isOnboardingReady;
+  const canRenderAppContent = isDatabaseReady && isReady && isOnboardingReady;
 
   return (
     <>
-      {canRenderAppContent ? (
+      {databaseError ? (
+        <View style={styles.errorScreen}>
+          <Text style={styles.errorTitle}>Startup failed</Text>
+          <Text style={styles.errorMessage}>{databaseError.message}</Text>
+        </View>
+      ) : canRenderAppContent ? (
         <>
           {children}
           <OtpVerificationModal />
@@ -333,5 +344,25 @@ const styles = StyleSheet.create({
   startupOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,
+  },
+  errorScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "#F7F7FF",
+  },
+  errorTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "700",
+    color: "#101A78",
+    marginBottom: 12,
+  },
+  errorMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#6B7280",
+    textAlign: "center",
   },
 });
