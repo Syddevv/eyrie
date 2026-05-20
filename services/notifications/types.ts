@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPES = [
   "transaction_added",
   "wallet_low_balance",
   "achievement",
+  "streak_lost",
   "reminder",
   "security_alert",
 ] as const;

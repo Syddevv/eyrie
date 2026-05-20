@@ -1,5 +1,9 @@
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 import { clamp, roundMoney } from "@/src/db/utils/money";
+import {
+  calculateBudgetHealthSummary,
+  getBudgetHealthStatus,
+} from "@/src/lib/budget-health";
 
 type BudgetProgressRow = {
   id: string;
@@ -196,21 +200,6 @@ function safePercentChange(current: number, previous: number) {
   }
 
   return roundMoney(((current - previous) / previous) * 100, 1);
-}
-
-function getBudgetStatus(spent: number, amount: number) {
-  if (amount <= 0) {
-    return "onTrack" as const;
-  }
-
-  const ratio = spent / amount;
-  if (ratio > 1) {
-    return "overBudget" as const;
-  }
-  if (ratio >= 0.8) {
-    return "warning" as const;
-  }
-  return "onTrack" as const;
 }
 
 function buildEffectiveBudgets(
@@ -560,10 +549,10 @@ function buildInsights(input: {
   const { budgetRows, spendingBreakdown, weeklySpending, incomeVsExpenses, accounts, goals } = input;
 
   const warningBudget = budgetRows.find(
-    (budget) => getBudgetStatus(budget.effectiveSpent, budget.effectiveAmount) === "warning",
+    (budget) => getBudgetHealthStatus(budget.effectiveSpent, budget.effectiveAmount) === "warning",
   );
   const overBudget = budgetRows.find(
-    (budget) => getBudgetStatus(budget.effectiveSpent, budget.effectiveAmount) === "overBudget",
+    (budget) => getBudgetHealthStatus(budget.effectiveSpent, budget.effectiveAmount) === "overBudget",
   );
 
   if (overBudget) {
@@ -740,36 +729,13 @@ export function buildAnalyticsSnapshot(input: {
   const currencyCode = input.currencyCode ?? DEFAULT_CURRENCY_CODE;
   const budgetRows = buildEffectiveBudgets(input.budgets, input.transactions, range);
 
-  const budgetHealthSummary = budgetRows.reduce(
-    (summary, budget) => {
-      const status = getBudgetStatus(budget.effectiveSpent, budget.effectiveAmount);
-      if (status === "onTrack") {
-        summary.onTrackCount += 1;
-      } else if (status === "warning") {
-        summary.warningCount += 1;
-      } else {
-        summary.overBudgetCount += 1;
-      }
-
-      if (budget.effectiveAmount <= 0) {
-        summary.totalScore += 100;
-      } else {
-        const remainingRatio = clamp(
-          (budget.effectiveAmount - budget.effectiveSpent) / budget.effectiveAmount,
-          -1,
-          1,
-        );
-        summary.totalScore += clamp(remainingRatio * 100, 0, 100);
-      }
-
-      return summary;
-    },
-    { onTrackCount: 0, warningCount: 0, overBudgetCount: 0, totalScore: 0 },
+  const budgetHealthSummary = calculateBudgetHealthSummary(
+    budgetRows.map((budget) => ({
+      amount: budget.effectiveAmount,
+      spent: budget.effectiveSpent,
+    })),
   );
-
-  const score = budgetRows.length
-    ? Math.round(clamp(budgetHealthSummary.totalScore / budgetRows.length, 0, 100))
-    : 100;
+  const score = budgetHealthSummary.score;
 
   const spendingBreakdown = buildBreakdown(input.transactions, range.start, range.end);
   const weeklySpending = buildWeeklySpendingPoints(input.transactions, range);

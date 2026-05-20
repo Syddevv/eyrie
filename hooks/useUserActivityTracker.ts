@@ -13,7 +13,7 @@ export function useUserActivityTracker() {
     }
 
     usersService
-      .markUserActive(user.id)
+      .validateCurrentStreak(user.id)
       .then((updated) => {
         if (updated) {
           publishCurrentUserUpdate(updated);
@@ -37,7 +37,7 @@ export function useUserActivityTracker() {
         }
 
         usersService
-          .markUserActive(user.id)
+          .validateCurrentStreak(user.id)
           .then((updated) => {
             if (updated) {
               publishCurrentUserUpdate(updated);

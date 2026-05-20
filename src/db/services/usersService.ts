@@ -1,11 +1,17 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
+import { processStreakLostNotificationEvent } from "@/services/notifications";
 import { usersRepository } from "../repositories/usersRepository";
 import { nowIso } from "../utils/time";
 import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
 import { prepareCreateForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { emitUsersChanged } from "@/src/lib/dbSync";
+import {
+  getLocalDateKey,
+  getNextStreakAfterActivity,
+  validateStreakState,
+} from "@/src/lib/streaks";
 
 type LocalUser = {
   id: string;
@@ -25,23 +31,6 @@ const LOCAL_DUPLICATE_EMAIL_ERROR =
 
 function normalizeEmail(email?: string | null) {
   return email?.trim().toLowerCase() || null;
-}
-
-function getLocalDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseDateKey(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return Date.UTC(year, (month ?? 1) - 1, day ?? 1);
-}
-
-function diffDays(left: string, right: string) {
-  const msPerDay = 86_400_000;
-  return Math.round((parseDateKey(left) - parseDateKey(right)) / msPerDay);
 }
 
 export class UsersService {
@@ -180,19 +169,23 @@ export class UsersService {
     }
 
     const today = getLocalDateKey();
-    const previousDate = existing.lastActiveDate ?? null;
+    const validated = await this.validateCurrentStreak(id, existing, today);
+    const baseUser = validated ?? existing;
+    const previousDate = baseUser.lastActiveDate ?? null;
 
     if (previousDate === today) {
-      return existing;
+      return baseUser;
     }
 
-    const previousStreak = existing.currentStreak ?? 0;
-    const nextCurrentStreak =
-      previousDate && diffDays(today, previousDate) === 1
-        ? previousStreak + 1
-        : 1;
+    const nextCurrentStreak = getNextStreakAfterActivity(
+      {
+        currentStreak: baseUser.currentStreak ?? 0,
+        lastActiveDate: previousDate,
+      },
+      today,
+    );
     const nextLongestStreak = Math.max(
-      existing.longestStreak ?? 0,
+      baseUser.longestStreak ?? 0,
       nextCurrentStreak,
     );
 
@@ -208,6 +201,51 @@ export class UsersService {
 
     await enqueueSync("users", updated.id, "upsert", updated.id);
     emitUsersChanged();
+    return updated;
+  }
+
+  async validateCurrentStreak(
+    id: string,
+    existingUser?: LocalUser | null,
+    today = getLocalDateKey(),
+  ) {
+    const existing =
+      existingUser ?? ((await usersRepository.findById(id)) as LocalUser | null);
+    if (!existing) {
+      return null;
+    }
+
+    const validated = validateStreakState(
+      {
+        currentStreak: existing.currentStreak ?? 0,
+        lastActiveDate: existing.lastActiveDate ?? null,
+      },
+      today,
+    );
+
+    if (!validated.lostStreak) {
+      return existing;
+    }
+
+    const updated = (await usersRepository.update(
+      id,
+      prepareUpdateForSync({
+        currentStreak: 0,
+        updatedAt: nowIso(),
+      }),
+    )) as LocalUser;
+
+    await enqueueSync("users", updated.id, "upsert", updated.id);
+    emitUsersChanged();
+
+    if (existing.lastActiveDate) {
+      await processStreakLostNotificationEvent({
+        userId: updated.id,
+        previousActiveDate: existing.lastActiveDate,
+        lostAt: today,
+      }).catch(() => undefined);
+    }
+
     return updated;
   }
 }

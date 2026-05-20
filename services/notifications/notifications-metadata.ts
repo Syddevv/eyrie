@@ -97,6 +97,12 @@ export const notificationMetadataMap: Record<
     category: "achievements",
     priority: "medium",
   },
+  streak_lost: {
+    icon: "flame",
+    color: "#F97316",
+    category: "achievements",
+    priority: "medium",
+  },
   reminder: {
     icon: "bell",
     color: "#6366F1",
@@ -216,6 +222,7 @@ export function shouldReceiveNotification(
     case "security_alert":
       return preferences.security_alerts;
     case "achievement":
+    case "streak_lost":
       return true;
     default:
       return notification.priority === "high";

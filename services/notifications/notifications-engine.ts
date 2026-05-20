@@ -693,3 +693,24 @@ export async function processPasswordChangedNotificationEvent(input: {
     }),
   ]);
 }
+
+export async function processStreakLostNotificationEvent(input: {
+  userId: string;
+  previousActiveDate: string;
+  lostAt: string;
+}) {
+  return persistCandidates(input.userId, [
+    buildNotificationCandidate({
+      type: "streak_lost",
+      title: "Streak lost",
+      message: "You lost your streak. Start tracking again to build a new streak!",
+      data: {
+        lastActiveDate: input.previousActiveDate,
+        lostAt: input.lostAt,
+        url: "/notifications",
+      },
+      action_url: "/notifications",
+      dedupe_key: `streak:lost:${input.previousActiveDate}:${input.lostAt}`,
+    }),
+  ]);
+}

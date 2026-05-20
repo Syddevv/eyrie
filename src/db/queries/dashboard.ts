@@ -12,6 +12,7 @@ import {
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
+import { calculateBudgetHealthSummary } from "@/src/lib/budget-health";
 import { dedupeCashAccountsForDisplay } from "../services/accountsService";
 import { clamp, roundMoney } from "../utils/money";
 import { addDaysIso, endOfDayIso, nowIso, startOfDayIso } from "../utils/time";
@@ -255,24 +256,10 @@ export async function getGoalsProgress(userId: string) {
 
 export async function getBudgetHealthScore(userId: string) {
   const progress = await getBudgetProgress(userId);
-
-  if (!progress.length) {
-    return 100;
-  }
-
-  const score =
-    progress.reduce((total, budget) => {
-      if (budget.amount <= 0) {
-        return total + 100;
-      }
-
-      const remainingRatio = clamp(
-        (budget.amount - budget.spent) / budget.amount,
-        -1,
-        1,
-      );
-      return total + clamp(remainingRatio * 100, 0, 100);
-    }, 0) / progress.length;
-
-  return Math.round(clamp(score, 0, 100));
+  return calculateBudgetHealthSummary(
+    progress.map((budget) => ({
+      amount: budget.amount,
+      spent: budget.spent,
+    })),
+  ).score;
 }

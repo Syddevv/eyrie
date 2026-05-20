@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
+import { buildAnalyticsSnapshot } from "@/src/lib/analytics";
 import { db } from "@/src/db/client";
-import { accounts, budgets, goals, transactions, users } from "@/src/db/schema";
+import { accounts, goals, transactions, users } from "@/src/db/schema";
 import {
-  getBudgetHealthScore,
   getBudgetProgress,
   getGoalsProgress,
 } from "@/src/db/queries/dashboard";
@@ -123,7 +123,6 @@ export async function getProfileStatsSnapshot(userId: string) {
     activeGoalsCount,
     budgetRows,
     goalRows,
-    budgetHealthScore,
   ] =
     await Promise.all([
       Promise.resolve(getCurrentMonthRange()),
@@ -134,7 +133,6 @@ export async function getProfileStatsSnapshot(userId: string) {
       getActiveGoalsCount(userId),
       getBudgetProgress(userId),
       getGoalsProgress(userId),
-      getBudgetHealthScore(userId),
     ]);
 
   const [monthIncomeRow, monthExpensesRow, activityDaysRow, eligibleAccounts] =
@@ -214,6 +212,42 @@ export async function getProfileStatsSnapshot(userId: string) {
     0,
     100,
   );
+  const budgetHealthScore = buildAnalyticsSnapshot({
+    filter: "thisMonth",
+    currencyCode: userRow?.currencyCode ?? undefined,
+    transactions: await db.query.transactions.findMany({
+      where: and(eq(transactions.userId, userId), isNull(transactions.deletedAt)),
+      with: {
+        category: true,
+      },
+    }).then((rows) =>
+      rows.map((row) => ({
+        amount: row.amount,
+        category: row.category?.name ?? null,
+        categoryId: row.categoryId ?? null,
+        currencyCode: row.currencyCode,
+        transactionDate: row.transactionDate,
+        typeValue: row.type,
+      })),
+    ),
+    budgets: budgetRows,
+    accounts: eligibleAccounts.map((account) => ({
+      id: account.id,
+      balance: account.balance,
+      currencyCode: account.currencyCode,
+      isHidden: account.isHidden,
+      type: account.type,
+    })),
+    goals: goalRows.map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      currentAmount: goal.currentAmount,
+      targetAmount: goal.targetAmount,
+      targetDate: goal.targetDate,
+      isArchived: goal.isArchived,
+      isCompleted: goal.isCompleted,
+    })),
+  }).budgetHealth.score;
 
   return {
     currentStreak: Number(userRow?.currentStreak ?? 0),
