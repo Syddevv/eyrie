@@ -107,8 +107,14 @@ export default function PersonalDetailsModal() {
         backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#E9EEF5',
         borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(223, 230, 238, 0.96)',
       },
+      lockedFieldSurface: {
+        backgroundColor: isDark ? 'rgba(255,255,255,0.035)' : '#E3E9F1',
+        borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(214, 222, 233, 0.98)',
+      },
       fieldValue: { color: isDark ? '#F8FAFC' : '#202733' },
+      lockedFieldValue: { color: isDark ? '#97A4B8' : '#7A8596' },
       placeholder: { color: isDark ? '#8F9CAF' : '#7A8596' },
+      lockIcon: { color: isDark ? '#97A4B8' : '#7A8596' },
       primaryButton: { backgroundColor: colors.primary },
       primaryButtonText: { color: '#FFFFFF' },
       cameraButton: {
@@ -219,17 +225,19 @@ export default function PersonalDetailsModal() {
 
             <View style={styles.fieldBlock}>
               <Text style={[styles.fieldLabel, ui.fieldLabel]}>Email Address</Text>
-              <View style={[styles.fieldSurface, ui.fieldSurface]}>
+              <View style={[styles.fieldSurface, styles.lockedFieldSurface, ui.fieldSurface, ui.lockedFieldSurface]}>
                 <TextInput
                   value={email}
-                  onChangeText={setEmail}
+                  editable={false}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   placeholder="Email address"
                   placeholderTextColor={ui.placeholder.color}
-                  selectionColor={colors.primary}
-                  style={[styles.fieldInput, ui.fieldValue]}
+                  contextMenuHidden
+                  selectTextOnFocus={false}
+                  style={[styles.fieldInput, styles.lockedFieldInput, ui.lockedFieldValue]}
                 />
+                <Feather name="lock" size={16} color={ui.lockIcon.color} />
               </View>
             </View>
 
@@ -248,23 +256,13 @@ export default function PersonalDetailsModal() {
                 }
 
                 const fullName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-                const normalizedEmail = email.trim().toLowerCase();
-
                 if (!fullName) {
                   showSnackbar('Enter your name before saving.', 'error');
                   return;
                 }
 
-                if (!normalizedEmail) {
-                  showSnackbar('Enter your email before saving.', 'error');
-                  return;
-                }
-
                 await run(async () => {
-                  const emailChanged = normalizedEmail !== (user.email ?? '').toLowerCase();
-
                   const { error } = await supabase.auth.updateUser({
-                    ...(emailChanged ? { email: normalizedEmail } : {}),
                     data: {
                       full_name: fullName,
                       avatar_url: avatarUri,
@@ -277,7 +275,7 @@ export default function PersonalDetailsModal() {
 
                   const updated = await usersService.updateProfile(user.id, {
                     fullName,
-                    email: normalizedEmail,
+                    email: user.email ?? email.trim().toLowerCase(),
                     avatarUrl: avatarUri,
                   });
 
@@ -285,9 +283,7 @@ export default function PersonalDetailsModal() {
                   router.back();
                   showToast({
                     variant: 'success',
-                    title: emailChanged
-                      ? 'Profile saved. Check your email to confirm the new address if required.'
-                      : 'Profile updated.',
+                    title: 'Profile updated.',
                     source: 'personal-details-modal',
                   });
                 }).catch((error) => {
@@ -411,14 +407,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
   },
+  lockedFieldSurface: {
+    opacity: 0.92,
+  },
   fieldInput: {
+    flex: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 15,
     lineHeight: 20,
     fontWeight: fontWeights.regular,
     paddingVertical: 0,
+  },
+  lockedFieldInput: {
+    paddingRight: 12,
   },
   saveButton: {
     marginTop: 28,
