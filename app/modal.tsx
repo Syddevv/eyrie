@@ -1,6 +1,6 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -218,6 +218,7 @@ export default function AddTransactionModal() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCategoryEditorVisible, setIsCategoryEditorVisible] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const merchantCarouselRef = useRef<ScrollView>(null);
   const [budgetExceededWarning, setBudgetExceededWarning] = useState<{
     categoryName: string;
     spent: number;
@@ -225,6 +226,18 @@ export default function AddTransactionModal() {
     status: "alreadyOver" | "willExceed";
   } | null>(null);
   const merchantOptions = useMerchantsByCategory(selectedExpenseCategoryLabel);
+  const merchantCarouselSignature = useMemo(
+    () => merchantOptions.map((merchant) => merchant.id).join("|"),
+    [merchantOptions],
+  );
+
+  useLayoutEffect(() => {
+    if (entryType !== "expense") {
+      return;
+    }
+
+    merchantCarouselRef.current?.scrollTo({ x: 0, animated: false });
+  }, [entryType, selectedExpenseCategoryId, merchantCarouselSignature]);
   const categoryEditorInitialValue = useMemo(
     () => ({
       type: entryType,
@@ -964,6 +977,7 @@ export default function AddTransactionModal() {
                 </Text>
                 {selectedExpenseCategoryId ? (
                   <ScrollView
+                    ref={merchantCarouselRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.merchantRow}
@@ -1357,7 +1371,11 @@ export default function AddTransactionModal() {
           <View style={[styles.footer, ui.divider]}>
             <LoadingActionButton
               label={saveLabel}
-              loadingLabel={entryType === "income" ? "Saving income..." : "Saving expense..."}
+              loadingLabel={
+                entryType === "income"
+                  ? "Saving income..."
+                  : "Saving expense..."
+              }
               loading={isSavingTransaction}
               style={[
                 styles.saveButton,
