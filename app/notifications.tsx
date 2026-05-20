@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
+  ListRenderItemInfo,
   Pressable,
   RefreshControl,
-  ScrollView,
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleSheet,
@@ -51,17 +52,6 @@ function withOpacity(hex: string, opacity: number) {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-function waitForNextFrame() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
-}
-
-async function waitForPaint() {
-  await waitForNextFrame();
-  await waitForNextFrame();
-}
-
 function formatRelativeTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -93,15 +83,15 @@ function formatRelativeTime(value: string) {
   }).format(date);
 }
 
-function NotificationRow({
+const NotificationRow = memo(function NotificationRow({
   item,
   titleColor,
   bodyColor,
   cardStyle,
   unreadDotStyle,
-  onPress,
-  onToggleRead,
-  onDelete,
+  onPressItem,
+  onToggleReadItem,
+  onDeleteItem,
   pendingAction,
 }: {
   item: AppNotification;
@@ -109,9 +99,9 @@ function NotificationRow({
   bodyColor: string;
   cardStyle: object;
   unreadDotStyle: object;
-  onPress: () => void;
-  onToggleRead: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  onPressItem: (item: AppNotification) => void;
+  onToggleReadItem: (item: AppNotification) => Promise<void>;
+  onDeleteItem: (item: AppNotification) => Promise<void>;
   pendingAction: "toggleRead" | "delete" | null;
 }) {
   const swipeableRef = useRef<SwipeableMethods | null>(null);
@@ -135,7 +125,9 @@ function NotificationRow({
     setLocalPendingAction("toggleRead");
 
     try {
-      await onToggleRead();
+      await onToggleReadItem(item);
+    } catch {
+      // Optimistic state rollback is handled by the notification hook.
     } finally {
       swipeable.close();
       swipeable.reset();
@@ -150,7 +142,9 @@ function NotificationRow({
     setLocalPendingAction("delete");
 
     try {
-      await onDelete();
+      await onDeleteItem(item);
+    } catch {
+      // Optimistic state rollback is handled by the notification hook.
     } finally {
       swipeable.close();
       swipeable.reset();
@@ -228,12 +222,14 @@ function NotificationRow({
           overshootRight={false}
         >
           <Pressable
-            disabled={isBusy}
-            onPress={onPress}
+            disabled={effectivePendingAction === "delete"}
+            onPress={() => onPressItem(item)}
             style={({ pressed }) => [
               styles.notificationCardInner,
-              pressed && !isBusy && styles.notificationCardPressed,
-              isBusy && styles.notificationCardBusy,
+              pressed &&
+                effectivePendingAction !== "delete" &&
+                styles.notificationCardPressed,
+              effectivePendingAction === "delete" && styles.notificationCardBusy,
             ]}
           >
             <View style={styles.notificationCardContent}>
@@ -303,13 +299,24 @@ function NotificationRow({
       </View>
     </Animated.View>
   );
-}
+},
+(previous, next) =>
+  previous.item === next.item &&
+  previous.pendingAction === next.pendingAction &&
+  previous.titleColor === next.titleColor &&
+  previous.bodyColor === next.bodyColor &&
+  previous.cardStyle === next.cardStyle &&
+  previous.unreadDotStyle === next.unreadDotStyle,
+);
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const scrollViewRef = useRef<ScrollView | null>(null);
+  const listRef = useRef<FlatList<AppNotification> | null>(null);
   const hasRestoredScrollRef = useRef(false);
   const currentScrollOffsetRef = useRef(0);
+  const pendingActionsByIdRef = useRef<Record<string, "toggleRead" | "delete">>(
+    {},
+  );
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
@@ -348,6 +355,10 @@ export default function NotificationsScreen() {
     currentScrollOffsetRef.current = initialScrollOffsetRef.current;
   }, []);
 
+  useEffect(() => {
+    pendingActionsByIdRef.current = pendingActionsById;
+  }, [pendingActionsById]);
+
   const persistScrollOffset = useCallback(() => {
     if (!userId) {
       return;
@@ -372,8 +383,8 @@ export default function NotificationsScreen() {
     }
 
     const frame = requestAnimationFrame(() => {
-      scrollViewRef.current?.scrollTo({
-        y: initialScrollOffsetRef.current,
+      listRef.current?.scrollToOffset({
+        offset: initialScrollOffsetRef.current,
         animated: false,
       });
       hasRestoredScrollRef.current = true;
@@ -458,7 +469,6 @@ export default function NotificationsScreen() {
 
     setIsMarkAllPending(true);
     try {
-      await waitForPaint();
       await markAllAsRead();
     } finally {
       setIsMarkAllPending(false);
@@ -470,7 +480,7 @@ export default function NotificationsScreen() {
     action: "toggleRead" | "delete",
     callback: () => Promise<void>,
   ) => {
-    if (pendingActionsById[notificationId]) {
+    if (pendingActionsByIdRef.current[notificationId]) {
       return;
     }
 
@@ -480,7 +490,6 @@ export default function NotificationsScreen() {
     }));
 
     try {
-      await waitForPaint();
       await callback();
     } finally {
       setPendingActionsById((current) => {
@@ -490,6 +499,194 @@ export default function NotificationsScreen() {
       });
     }
   };
+
+  const handlePressNotification = useCallback(
+    (item: AppNotification) => {
+      if (pendingActionsByIdRef.current[item.id] === "delete") {
+        return;
+      }
+
+      if (item.action_url) {
+        router.push(item.action_url as any);
+      }
+
+      if (!item.is_read) {
+        requestAnimationFrame(() => {
+          void toggleRead(item, true).catch(() => undefined);
+        });
+      }
+    },
+    [router, toggleRead],
+  );
+
+  const handleToggleReadNotification = useCallback(
+    (item: AppNotification) =>
+      runNotificationAction(item.id, "toggleRead", () =>
+        toggleRead(item, !item.is_read),
+      ),
+    [toggleRead],
+  );
+
+  const handleDeleteNotification = useCallback(
+    (item: AppNotification) =>
+      runNotificationAction(item.id, "delete", () => deleteNotification(item)),
+    [deleteNotification],
+  );
+
+  const renderNotification = useCallback(
+    ({ item }: ListRenderItemInfo<AppNotification>) => (
+      <NotificationRow
+        item={item}
+        titleColor={pageStyles.titleText}
+        bodyColor={pageStyles.bodyText}
+        cardStyle={item.is_read ? pageStyles.readCard : pageStyles.unreadCard}
+        unreadDotStyle={pageStyles.unreadDot}
+        pendingAction={pendingActionsById[item.id] ?? null}
+        onPressItem={handlePressNotification}
+        onToggleReadItem={handleToggleReadNotification}
+        onDeleteItem={handleDeleteNotification}
+      />
+    ),
+    [
+      handleDeleteNotification,
+      handlePressNotification,
+      handleToggleReadNotification,
+      pageStyles.bodyText,
+      pageStyles.readCard,
+      pageStyles.titleText,
+      pageStyles.unreadCard,
+      pageStyles.unreadDot,
+      pendingActionsById,
+    ],
+  );
+
+  const listHeaderComponent = useMemo(
+    () => (
+      <>
+        <View style={[styles.infoCard, pageStyles.infoCard]}>
+          <View style={styles.infoAvatarFrame}>
+            <Image
+              contentFit="cover"
+              source={require("@/assets/images/Eyrie_Mascot_1.png")}
+              style={styles.infoAvatar}
+            />
+          </View>
+          <View style={styles.infoBody}>
+            <Text style={[styles.infoTitle, pageStyles.infoTitle]}>
+              Intelligent finance alerts
+            </Text>
+            <Text style={[styles.infoText, pageStyles.infoText]}>
+              {!notificationsEnabled && !isPreferencesLoading
+                ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
+                : preferences?.push_enabled
+                  ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
+                  : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
+            </Text>
+          </View>
+        </View>
+
+        {notificationsEnabled && !!notifications.length ? (
+          <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
+            <Feather
+              name="move"
+              size={13}
+              color={pageStyles.swipeHintText.color}
+            />
+            <Text style={[styles.swipeHintText, pageStyles.swipeHintText]}>
+              Swipe each notification left or right for quick actions
+            </Text>
+          </View>
+        ) : null}
+
+        {error ? (
+          <View
+            style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+          >
+            <Feather name="alert-circle" size={22} color="#F97316" />
+            <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+              Notifications need attention
+            </Text>
+            <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+              {error}
+            </Text>
+          </View>
+        ) : null}
+      </>
+    ),
+    [
+      error,
+      isPreferencesLoading,
+      notifications.length,
+      notificationsEnabled,
+      pageStyles.emptyCard,
+      pageStyles.infoCard,
+      pageStyles.infoText,
+      pageStyles.infoTitle,
+      pageStyles.subtitle,
+      pageStyles.swipeHintChip,
+      pageStyles.swipeHintText,
+      pageStyles.title,
+      preferences?.push_enabled,
+    ],
+  );
+
+  const listEmptyComponent = useMemo(() => {
+    if (!notificationsEnabled && !isPreferencesLoading) {
+      return (
+        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+          <Feather name="bell-off" size={22} color={colors.mutedForeground} />
+          <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+            Notifications are off
+          </Text>
+          <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+            Enable the notifications toggle in Settings to receive budget
+            alerts, goal progress, and weekly insights here.
+          </Text>
+        </View>
+      );
+    }
+
+    if (shouldShowBlockingLoadingState) {
+      return (
+        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+          <ActivityIndicator color={colors.primary} size="small" />
+          <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+            Loading notifications...
+          </Text>
+          <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+            Pulling your latest alerts and reminders.
+          </Text>
+        </View>
+      );
+    }
+
+    if (notificationsEnabled && !error) {
+      return (
+        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+          <Feather name="bell" size={22} color={colors.mutedForeground} />
+          <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+            No notifications yet
+          </Text>
+          <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+            Budget alerts, savings goal progress, and weekly insights will show
+            up here automatically.
+          </Text>
+        </View>
+      );
+    }
+
+    return <View style={styles.listEmptySpacer} />;
+  }, [
+    colors.mutedForeground,
+    colors.primary,
+    error,
+    isPreferencesLoading,
+    notificationsEnabled,
+    pageStyles.emptyCard,
+    pageStyles.subtitle,
+    pageStyles.title,
+    shouldShowBlockingLoadingState,
+  ]);
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -544,10 +741,22 @@ export default function NotificationsScreen() {
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollViewRef}
+        <FlatList
+          ref={listRef}
+          data={notificationsEnabled ? notifications : []}
+          keyExtractor={(item) => item.id}
+          renderItem={renderNotification}
+          ListHeaderComponent={listHeaderComponent}
+          ListEmptyComponent={listEmptyComponent}
           contentContainerStyle={styles.listContent}
+          style={styles.flex}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          updateCellsBatchingPeriod={16}
+          extraData={pendingActionsById}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           onScrollEndDrag={scheduleScrollOffsetPersist}
@@ -558,161 +767,7 @@ export default function NotificationsScreen() {
               onRefresh={() => void handleRefresh()}
             />
           }
-        >
-          <View style={[styles.infoCard, pageStyles.infoCard]}>
-            <View style={styles.infoAvatarFrame}>
-              <Image
-                contentFit="cover"
-                source={require("@/assets/images/Eyrie_Mascot_1.png")}
-                style={styles.infoAvatar}
-              />
-            </View>
-            <View style={styles.infoBody}>
-              <Text style={[styles.infoTitle, pageStyles.infoTitle]}>
-                Intelligent finance alerts
-              </Text>
-              <Text style={[styles.infoText, pageStyles.infoText]}>
-                {!notificationsEnabled && !isPreferencesLoading
-                  ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
-                  : preferences?.push_enabled
-                    ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
-                    : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
-              </Text>
-            </View>
-          </View>
-
-          {notificationsEnabled && !!notifications.length ? (
-            <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
-              <Feather
-                name="move"
-                size={13}
-                color={pageStyles.swipeHintText.color}
-              />
-              <Text style={[styles.swipeHintText, pageStyles.swipeHintText]}>
-                Swipe each notification left or right for quick actions
-              </Text>
-            </View>
-          ) : null}
-
-          {error ? (
-            <View
-              style={[
-                styles.emptyStateCard,
-                pageStyles.emptyCard,
-                shadows.soft,
-              ]}
-            >
-              <Feather name="alert-circle" size={22} color="#F97316" />
-              <Text style={[styles.emptyStateTitle, pageStyles.title]}>
-                Notifications need attention
-              </Text>
-              <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
-                {error}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.cardsList}>
-            {!notificationsEnabled && !isPreferencesLoading ? (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.emptyCard,
-                  shadows.soft,
-                ]}
-              >
-                <Feather
-                  name="bell-off"
-                  size={22}
-                  color={colors.mutedForeground}
-                />
-                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
-                  Notifications are off
-                </Text>
-                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
-                  Enable the notifications toggle in Settings to receive budget
-                  alerts, goal progress, and weekly insights here.
-                </Text>
-              </View>
-            ) : null}
-
-            {shouldShowBlockingLoadingState ? (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.emptyCard,
-                  shadows.soft,
-                ]}
-              >
-                <ActivityIndicator color={colors.primary} size="small" />
-                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
-                  Loading notifications...
-                </Text>
-                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
-                  Pulling your latest alerts and reminders.
-                </Text>
-              </View>
-            ) : null}
-
-            {notificationsEnabled &&
-            !notifications.length &&
-            !shouldShowBlockingLoadingState &&
-            !error ? (
-              <View
-                style={[
-                  styles.emptyStateCard,
-                  pageStyles.emptyCard,
-                  shadows.soft,
-                ]}
-              >
-                <Feather name="bell" size={22} color={colors.mutedForeground} />
-                <Text style={[styles.emptyStateTitle, pageStyles.title]}>
-                  No notifications yet
-                </Text>
-                <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
-                  Budget alerts, savings goal progress, and weekly insights will
-                  show up here automatically.
-                </Text>
-              </View>
-            ) : null}
-
-            {notificationsEnabled &&
-              notifications.map((item) => (
-                <NotificationRow
-                  key={item.id}
-                  item={item}
-                  titleColor={pageStyles.titleText}
-                  bodyColor={pageStyles.bodyText}
-                  cardStyle={
-                    item.is_read ? pageStyles.readCard : pageStyles.unreadCard
-                  }
-                  unreadDotStyle={pageStyles.unreadDot}
-                  pendingAction={pendingActionsById[item.id] ?? null}
-                  onPress={() => {
-                    if (pendingActionsById[item.id]) {
-                      return;
-                    }
-                    if (!item.is_read) {
-                      void toggleRead(item, true);
-                    }
-                    if (item.action_url) {
-                      router.push(item.action_url as any);
-                    }
-                  }}
-                  onToggleRead={() => {
-                    return runNotificationAction(item.id, "toggleRead", () =>
-                      toggleRead(item, !item.is_read),
-                    );
-                  }}
-                  onDelete={() => {
-                    return runNotificationAction(item.id, "delete", () =>
-                      deleteNotification(item),
-                    );
-                  }}
-                />
-              ))}
-          </View>
-        </ScrollView>
+        />
       </View>
     </SafeAreaView>
   );
@@ -758,6 +813,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 32,
+  },
+  listEmptySpacer: {
+    height: 1,
   },
   infoCard: {
     borderRadius: 26,
@@ -815,12 +873,8 @@ const styles = StyleSheet.create({
     fontWeight: fontWeights.medium,
     opacity: 0.85,
   },
-  cardsList: {
-    marginTop: 24,
-    gap: 14,
-    paddingHorizontal: 0,
-  },
   notificationCardContainer: {
+    marginTop: 14,
     borderRadius: 28,
     borderWidth: 1,
     overflow: "hidden",

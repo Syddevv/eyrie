@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
@@ -16,6 +16,10 @@ import { useNotificationStore } from "@/store/useNotificationStore";
 
 const NOTIFICATIONS_STALE_MS = 60_000;
 const inflightRefreshes = new Map<string, Promise<void>>();
+
+function queueBadgeSync(count: number) {
+  void syncNotificationBadge(count).catch(() => undefined);
+}
 
 function normalizeNotificationsError(error: unknown) {
   const fallback = "Notifications are temporarily unavailable.";
@@ -86,6 +90,8 @@ function hasFreshNotificationCache(lastFetchedAt: number | null) {
 export function useNotifications(enabled = true) {
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
+  const notificationMutationVersionRef = useRef<Record<string, number>>({});
+  const markAllMutationVersionRef = useRef(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,9 +104,6 @@ export function useNotifications(enabled = true) {
   const setCacheForUser = useNotificationStore((state) => state.setCacheForUser);
   const patchNotificationsForUser = useNotificationStore(
     (state) => state.patchNotificationsForUser,
-  );
-  const patchUnreadCountForUser = useNotificationStore(
-    (state) => state.patchUnreadCountForUser,
   );
   const clearCacheForUser = useNotificationStore((state) => state.clearCacheForUser);
   const notifications = cache?.notifications ?? [];
@@ -124,7 +127,7 @@ export function useNotifications(enabled = true) {
         setError(null);
         setIsLoading(false);
         setIsRefreshing(false);
-        await syncNotificationBadge(0);
+        queueBadgeSync(0);
         return;
       }
 
@@ -169,7 +172,7 @@ export function useNotifications(enabled = true) {
             lastFetchedAt: Date.now(),
             hasHydrated: true,
           });
-          await syncNotificationBadge(count);
+          queueBadgeSync(count);
           setError(null);
         } catch (refreshError) {
           if (!currentCache?.notifications.length) {
@@ -213,23 +216,37 @@ export function useNotifications(enabled = true) {
       );
 
       const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
+      const mutationVersion =
+        (notificationMutationVersionRef.current[notification.id] ?? 0) + 1;
+      notificationMutationVersionRef.current[notification.id] = mutationVersion;
       setCacheForUser(userId, {
         notifications: updatedLocal,
         unreadCount: nextUnreadCount,
       });
-      await syncNotificationBadge(nextUnreadCount);
+      queueBadgeSync(nextUnreadCount);
 
-      try {
-        await markNotificationRead(notification.id, nextReadState);
-      } catch (toggleError) {
-        const restoredCount = previous.filter((item) => !item.is_read).length;
-        setCacheForUser(userId, {
-          notifications: previous,
-          unreadCount: restoredCount,
-        });
-        await syncNotificationBadge(restoredCount);
-        throw toggleError;
-      }
+      return markNotificationRead(notification.id, nextReadState).catch(
+        (toggleError) => {
+          const current =
+            useNotificationStore.getState().getCacheForUser(userId)?.notifications ??
+            [];
+          const currentItem = current.find((item) => item.id === notification.id);
+          const shouldRollback =
+            notificationMutationVersionRef.current[notification.id] ===
+              mutationVersion && currentItem?.is_read === nextReadState;
+
+          if (shouldRollback) {
+            const restoredCount = previous.filter((item) => !item.is_read).length;
+            setCacheForUser(userId, {
+              notifications: previous,
+              unreadCount: restoredCount,
+            });
+            queueBadgeSync(restoredCount);
+          }
+
+          throw toggleError;
+        },
+      );
     },
     [getCacheForUser, setCacheForUser, userId],
   );
@@ -245,24 +262,38 @@ export function useNotifications(enabled = true) {
       is_read: true,
       read_at: item.read_at ?? new Date().toISOString(),
     }));
+    const mutationVersion = markAllMutationVersionRef.current + 1;
+    markAllMutationVersionRef.current = mutationVersion;
 
     setCacheForUser(userId, {
       notifications: updatedLocal,
       unreadCount: 0,
     });
-    await syncNotificationBadge(0);
+    queueBadgeSync(0);
 
-    try {
-      await markAllNotificationsRead(userId);
-    } catch (markError) {
-      const restoredCount = previous.filter((item) => !item.is_read).length;
-      setCacheForUser(userId, {
-        notifications: previous,
-        unreadCount: restoredCount,
-      });
-      await syncNotificationBadge(restoredCount);
+    return markAllNotificationsRead(userId).catch((markError) => {
+      const current =
+        useNotificationStore.getState().getCacheForUser(userId)?.notifications ?? [];
+      const shouldRollback =
+        markAllMutationVersionRef.current === mutationVersion &&
+        current.length === updatedLocal.length &&
+        current.every(
+          (item, index) =>
+            item.id === updatedLocal[index]?.id &&
+            item.is_read === updatedLocal[index]?.is_read,
+        );
+
+      if (shouldRollback) {
+        const restoredCount = previous.filter((item) => !item.is_read).length;
+        setCacheForUser(userId, {
+          notifications: previous,
+          unreadCount: restoredCount,
+        });
+        queueBadgeSync(restoredCount);
+      }
+
       throw markError;
-    }
+    });
   }, [getCacheForUser, setCacheForUser, userId]);
 
   const deleteNotification = useCallback(
@@ -274,24 +305,36 @@ export function useNotifications(enabled = true) {
       const previous = getCacheForUser(userId)?.notifications ?? [];
       const updatedLocal = previous.filter((item) => item.id !== notification.id);
       const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
+      const mutationVersion =
+        (notificationMutationVersionRef.current[notification.id] ?? 0) + 1;
+      notificationMutationVersionRef.current[notification.id] = mutationVersion;
 
       setCacheForUser(userId, {
         notifications: updatedLocal,
         unreadCount: nextUnreadCount,
       });
-      await syncNotificationBadge(nextUnreadCount);
+      queueBadgeSync(nextUnreadCount);
 
-      try {
-        await softDeleteNotification(notification.id);
-      } catch (deleteError) {
-        const restoredCount = previous.filter((item) => !item.is_read).length;
-        setCacheForUser(userId, {
-          notifications: previous,
-          unreadCount: restoredCount,
-        });
-        await syncNotificationBadge(restoredCount);
+      return softDeleteNotification(notification.id).catch((deleteError) => {
+        const current =
+          useNotificationStore.getState().getCacheForUser(userId)?.notifications ??
+          [];
+        const shouldRollback =
+          notificationMutationVersionRef.current[notification.id] ===
+            mutationVersion &&
+          !current.some((item) => item.id === notification.id);
+
+        if (shouldRollback) {
+          const restoredCount = previous.filter((item) => !item.is_read).length;
+          setCacheForUser(userId, {
+            notifications: previous,
+            unreadCount: restoredCount,
+          });
+          queueBadgeSync(restoredCount);
+        }
+
         throw deleteError;
-      }
+      });
     },
     [getCacheForUser, setCacheForUser, userId],
   );
@@ -330,14 +373,11 @@ export function useNotifications(enabled = true) {
         );
       }
 
-      void fetchUnreadNotificationCount(userId)
-        .then((count) => {
-          patchUnreadCountForUser(userId, count);
-          return syncNotificationBadge(count);
-        })
-        .catch(() => undefined);
+      const nextUnreadCount =
+        useNotificationStore.getState().getCacheForUser(userId)?.unreadCount ?? 0;
+      queueBadgeSync(nextUnreadCount);
     });
-  }, [enabled, patchNotificationsForUser, patchUnreadCountForUser, userId]);
+  }, [enabled, patchNotificationsForUser, userId]);
 
   useEffect(() => {
     if (!userId) {
