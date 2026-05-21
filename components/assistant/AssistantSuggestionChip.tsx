@@ -1,7 +1,11 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { fontFamilies, fontWeights } from "@/constants/typography";
+import {
+  fontFamilies,
+  fontWeights,
+  letterSpacings,
+} from "@/constants/typography";
 import { radius } from "@/constants/theme";
 
 export function AssistantSuggestionChip({
@@ -27,31 +31,45 @@ export function AssistantSuggestionChip({
     <Pressable
       disabled={disabled}
       onPress={onPress}
+      hitSlop={6}
+      android_ripple={{ color: "rgba(20,149,255,0.08)", borderless: false }}
       style={({ pressed }) => [
         styles.chip,
         {
           backgroundColor,
           borderColor,
-          opacity: disabled ? 0.45 : pressed ? 0.78 : 1,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
+          opacity: disabled ? 0.45 : 1,
+          transform: [{ scale: pressed ? 0.975 : 1 }],
         },
       ]}
     >
-      <Feather name={icon} size={14} color={iconColor} style={styles.icon} />
-      <Text numberOfLines={1} style={[styles.label, { color: textColor }]}>
-        {label}
-      </Text>
+      <View style={styles.content}>
+        <Feather
+          name={icon}
+          size={14}
+          color={iconColor}
+          style={styles.icon}
+        />
+        <Text numberOfLines={1} style={[styles.label, { color: textColor }]}>
+          {label}
+        </Text>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 38,
-    borderRadius: radius.full,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    minHeight: 42,
+    minWidth: 116,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -62,9 +80,10 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: fontFamilies.sans,
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: fontWeights.medium,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: fontWeights.regular,
+    letterSpacing: letterSpacings.wide,
     includeFontPadding: false,
   },
 });

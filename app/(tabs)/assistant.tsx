@@ -32,9 +32,9 @@ const analyticsFilters: readonly {
 ] as const;
 
 const quickPrompts = [
-  { icon: 'trending-up', text: 'Summarize my expenses' },
-  { icon: 'shield', text: 'How can I save more this month?' },
-  { icon: 'target', text: 'Give me a weekly budget plan' },
+  { icon: 'trending-up', text: 'Review my spend' },
+  { icon: 'shield', text: 'Help me save more' },
+  { icon: 'target', text: 'Plan my week' },
 ] as const;
 
 function categoryCountLabel(count: number) {

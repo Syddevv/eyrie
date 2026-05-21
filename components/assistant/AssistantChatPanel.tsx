@@ -13,7 +13,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInRight,
+  FadeOut,
+} from "react-native-reanimated";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -125,11 +129,16 @@ export function AssistantChatPanel({
       },
       suggestionsCard: {
         backgroundColor: isDark
-          ? "rgba(16,23,34,0.8)"
-          : "rgba(255,255,255,0.88)",
+          ? "rgba(18,26,39,0.9)"
+          : "rgba(255,255,255,0.9)",
         borderColor: isDark
-          ? "rgba(255,255,255,0.05)"
-          : withOpacity(colors.border, 0.88),
+          ? "rgba(148,163,184,0.14)"
+          : withOpacity(colors.border, 0.78),
+        shadowColor: isDark ? "#020617" : "#0F172A",
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: isDark ? 0.2 : 0,
+        shadowRadius: 18,
+        elevation: isDark ? 3 : 0,
       },
       composerCard: {
         backgroundColor: isDark
@@ -279,27 +288,33 @@ export function AssistantChatPanel({
                 horizontal
                 data={quickPrompts as QuickPrompt[]}
                 keyExtractor={(item) => item.text}
-                renderItem={({ item }) => (
-                  <View
-                    style={[
-                      styles.suggestionItemCard,
-                      pageStyles.suggestionsCard,
-                    ]}
+                renderItem={({ item, index }) => (
+                  <Animated.View
+                    entering={FadeInRight.duration(240).delay(index * 55)}
                   >
-                    <AssistantSuggestionChip
-                      disabled={isOffline || isSending}
-                      label={item.text}
-                      icon={item.icon}
-                      onPress={() => void sendSuggestion(item.text)}
-                      backgroundColor="transparent"
-                      borderColor="transparent"
-                      textColor={pageStyles.title.color}
-                      iconColor="#1495FF"
-                    />
-                  </View>
+                    <View
+                      style={[
+                        styles.suggestionItemCard,
+                        pageStyles.suggestionsCard,
+                      ]}
+                    >
+                      <AssistantSuggestionChip
+                        disabled={isOffline || isSending}
+                        label={item.text}
+                        icon={item.icon}
+                        onPress={() => void sendSuggestion(item.text)}
+                        backgroundColor="transparent"
+                        borderColor="transparent"
+                        textColor={pageStyles.title.color}
+                        iconColor="#1495FF"
+                      />
+                    </View>
+                  </Animated.View>
                 )}
                 contentContainerStyle={styles.quickPromptRow}
                 showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                removeClippedSubviews={false}
               />
             </Animated.View>
           ) : null}
@@ -382,21 +397,23 @@ const styles = StyleSheet.create({
     left: 14,
     right: 14,
     paddingTop: 0,
-    gap: 6,
+    gap: 8,
   },
   promptsWrap: {
     minHeight: 0,
+    marginHorizontal: -2,
   },
   suggestionItemCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 3,
-    paddingVertical: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    marginVertical: 2,
   },
   quickPromptRow: {
-    gap: 7,
-    paddingLeft: 2,
-    paddingRight: 8,
+    gap: 10,
+    paddingLeft: 6,
+    paddingRight: 14,
   },
   composerMeta: {
     minHeight: 0,
