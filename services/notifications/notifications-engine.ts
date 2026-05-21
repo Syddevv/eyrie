@@ -93,6 +93,11 @@ function getSecurityDeviceLabel() {
   return modelName ? `${modelName} (${platformName})` : platformName;
 }
 
+function getFriendlyFirstName(fullName?: string | null) {
+  const firstName = fullName?.trim().split(/\s+/)[0];
+  return firstName && firstName.length > 0 ? firstName : "there";
+}
+
 async function persistCandidates(userId: string, candidates: NotificationCandidate[]) {
   if (!candidates.length) {
     return [] as AppNotification[];
@@ -693,6 +698,32 @@ export async function processPasswordChangedNotificationEvent(input: {
       },
       action_url: "/security-password-modal",
       dedupe_key: `security:password-changed:${changedAt}`,
+    }),
+  ]);
+}
+
+export async function processWelcomeNotificationEvent(input: {
+  userId: string;
+  fullName?: string | null;
+}) {
+  const firstName = getFriendlyFirstName(input.fullName);
+
+  return persistCandidates(input.userId, [
+    buildNotificationCandidate({
+      type: "achievement",
+      title: `Welcome to Eyrie, ${firstName}!`,
+      message:
+        "Your finance hub is ready. Track spending, build savings goals, and check back here for smart alerts and weekly insights.",
+      data: {
+        onboarding: true,
+        url: "/(tabs)",
+      },
+      action_url: "/(tabs)",
+      dedupe_key: "system:welcome:v1",
+      icon: "star",
+      color: "#14B86A",
+      category: "reminders",
+      priority: "low",
     }),
   ]);
 }

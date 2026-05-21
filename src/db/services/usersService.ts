@@ -1,6 +1,9 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { processStreakLostNotificationEvent } from "@/services/notifications";
+import {
+  processStreakLostNotificationEvent,
+  processWelcomeNotificationEvent,
+} from "@/services/notifications";
 import { usersRepository } from "../repositories/usersRepository";
 import { nowIso } from "../utils/time";
 import { DEFAULT_CURRENCY_CODE } from "../utils/constants";
@@ -77,6 +80,10 @@ export class UsersService {
           updatedAt: now,
         }),
       }) as LocalUser;
+      await processWelcomeNotificationEvent({
+        userId: created.id,
+        fullName: created.fullName ?? null,
+      }).catch(() => undefined);
       emitUsersChanged();
       return created;
     }

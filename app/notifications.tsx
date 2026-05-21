@@ -12,6 +12,7 @@ import {
   NativeSyntheticEvent,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Pressable as GestureHandlerPressable } from "react-native-gesture-handler";
@@ -344,6 +345,7 @@ const NotificationRow = memo(
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { height: viewportHeight } = useWindowDimensions();
   const listRef = useRef<FlatList<AppNotification> | null>(null);
   const hasRestoredScrollRef = useRef(false);
   const currentScrollOffsetRef = useRef(0);
@@ -440,6 +442,10 @@ export default function NotificationsScreen() {
 
   const shouldShowBlockingLoadingState =
     notificationsEnabled && isLoading && !hasCachedData && !hasHydrated;
+  const emptyStateTopMargin = Math.max(
+    20,
+    Math.min(36, Math.round(viewportHeight * 0.03)),
+  );
 
   const pageStyles = useMemo(
     () => ({
@@ -678,7 +684,7 @@ export default function NotificationsScreen() {
             styles.emptyStateCard,
             pageStyles.emptyCard,
             shadows.soft,
-            { marginTop: 16 },
+            { marginTop: emptyStateTopMargin },
           ]}
         >
           <Feather name="wifi-off" size={22} color={colors.mutedForeground} />
@@ -696,7 +702,12 @@ export default function NotificationsScreen() {
     if (!notificationsEnabled && !isPreferencesLoading) {
       return (
         <View
-          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft, { marginTop: 16 }]}
+          style={[
+            styles.emptyStateCard,
+            pageStyles.emptyCard,
+            shadows.soft,
+            { marginTop: emptyStateTopMargin },
+          ]}
         >
           <Feather name="bell-off" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
@@ -726,7 +737,12 @@ export default function NotificationsScreen() {
     if (shouldShowBlockingLoadingState) {
       return (
         <View
-          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+          style={[
+            styles.emptyStateCard,
+            pageStyles.emptyCard,
+            shadows.soft,
+            { marginTop: emptyStateTopMargin },
+          ]}
         >
           <ActivityIndicator color={colors.primary} size="small" />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
@@ -742,7 +758,12 @@ export default function NotificationsScreen() {
     if (notificationsEnabled && !error) {
       return (
         <View
-          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+          style={[
+            styles.emptyStateCard,
+            pageStyles.emptyCard,
+            shadows.soft,
+            { marginTop: emptyStateTopMargin },
+          ]}
         >
           <Feather name="bell" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
@@ -768,6 +789,7 @@ export default function NotificationsScreen() {
     pageStyles.subtitle,
     pageStyles.title,
     shouldShowBlockingLoadingState,
+    emptyStateTopMargin,
   ]);
 
   return (
