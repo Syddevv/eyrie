@@ -27,7 +27,7 @@ export function useModalMotion({
   keyboardLiftFactor = 0.22,
   keyboardMaxLift = 72,
 }: UseModalMotionOptions) {
-  const progress = useSharedValue(visible ? 1 : 0);
+  const progress = useSharedValue(0);
 
   useEffect(() => {
     progress.value = withTiming(visible ? 1 : 0, {

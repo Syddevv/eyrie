@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
+  Modal,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -8,8 +9,10 @@ import {
   TextStyle,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 
 import { LoadingActionButton } from "@/components/loading-action-button";
+import { useModalMotion } from "@/hooks/useModalMotion";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -55,6 +58,10 @@ export function DeleteConfirmationModal({
 }: DeleteConfirmationModalProps) {
   const colorScheme = useColorScheme() ?? "light";
   const isDark = colorScheme === "dark";
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible,
+    enteringOffset: 22,
+  });
   const [isPendingConfirm, setIsPendingConfirm] = useState(false);
   const isBusy = isDeleting || isPendingConfirm;
 
@@ -95,67 +102,112 @@ export function DeleteConfirmationModal({
   }
 
   return (
-    <View style={[styles.overlay, { backgroundColor: getSurfaceOverlay(isDark) }]}>
-      <Pressable
-        disabled={isBusy}
-        style={StyleSheet.absoluteFillObject}
-        onPress={onCancel}
-      />
+    <Modal
+      animationType="none"
+      onRequestClose={onCancel}
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      transparent
+      visible
+    >
+      <Animated.View
+        style={[
+          styles.overlay,
+          { backgroundColor: getSurfaceOverlay(isDark) },
+          animatedBackdropStyle,
+        ]}
+      >
+        <Pressable
+          disabled={isBusy}
+          style={StyleSheet.absoluteFillObject}
+          onPress={onCancel}
+        />
 
-      <View style={[styles.card, getSheetSurface(isDark), shadows.floating]}>
-        <View style={[styles.handle, { backgroundColor: getHandleColor(isDark) }]} />
-
-        <View style={styles.iconRow}>
+        <Animated.View style={[styles.cardWrap, animatedCardStyle]}>
           <View
-            style={[
-              styles.iconWrap,
-              {
-                backgroundColor:
-                  iconBackgroundColor ?? getDestructiveTint(isDark),
-              },
-            ]}>
-            <Feather name={iconName} size={18} color={iconColor} />
+            style={[styles.card, getSheetSurface(isDark), shadows.floating]}
+          >
+            <View
+              style={[
+                styles.handle,
+                { backgroundColor: getHandleColor(isDark) },
+              ]}
+            />
+
+            <View style={styles.iconRow}>
+              <View
+                style={[
+                  styles.iconWrap,
+                  {
+                    backgroundColor:
+                      iconBackgroundColor ?? getDestructiveTint(isDark),
+                  },
+                ]}
+              >
+                <Feather name={iconName} size={18} color={iconColor} />
+              </View>
+              <Pressable
+                disabled={isBusy}
+                style={[
+                  styles.closeButton,
+                  { backgroundColor: getBackdropButtonColor(isDark) },
+                ]}
+                onPress={onCancel}
+              >
+                <Feather name="x" size={18} color={getTitleColor(isDark)} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.title, { color: getTitleColor(isDark) }]}>
+              {title}
+            </Text>
+            <Text
+              style={[
+                styles.message,
+                { color: isDark ? "#9EA6B5" : "#5B78A2" },
+              ]}
+            >
+              {message}
+            </Text>
+
+            <View style={styles.actionsRow}>
+              <LoadingActionButton
+                disabled={isBusy}
+                label="Cancel"
+                haptic="none"
+                style={[
+                  styles.secondaryButton,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.06)"
+                      : "#EEF2F7",
+                  },
+                ]}
+                textStyle={[
+                  styles.secondaryText,
+                  { color: getTitleColor(isDark) },
+                ]}
+                onPress={onCancel}
+              />
+              <LoadingActionButton
+                label={confirmLabel}
+                loadingLabel={loadingLabel}
+                loading={isBusy}
+                haptic="destructive"
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: primaryButtonColor },
+                  isBusy && styles.buttonDisabled,
+                ]}
+                textStyle={[styles.primaryText, primaryTextStyle]}
+                spinnerColor="#FFFFFF"
+                onPress={handleConfirm}
+              />
+            </View>
           </View>
-          <Pressable
-            disabled={isBusy}
-            style={[styles.closeButton, { backgroundColor: getBackdropButtonColor(isDark) }]}
-            onPress={onCancel}>
-            <Feather name="x" size={18} color={getTitleColor(isDark)} />
-          </Pressable>
-        </View>
-
-        <Text style={[styles.title, { color: getTitleColor(isDark) }]}>{title}</Text>
-        <Text style={[styles.message, { color: isDark ? "#9EA6B5" : "#5B78A2" }]}>{message}</Text>
-
-        <View style={styles.actionsRow}>
-          <LoadingActionButton
-            disabled={isBusy}
-            label="Cancel"
-            haptic="none"
-            style={[
-              styles.secondaryButton,
-              { backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7" },
-            ]}
-            textStyle={[styles.secondaryText, { color: getTitleColor(isDark) }]}
-            onPress={onCancel}
-          />
-          <LoadingActionButton
-            label={confirmLabel}
-            loadingLabel={loadingLabel}
-            loading={isBusy}
-            haptic="destructive"
-            style={[
-              styles.primaryButton,
-              { backgroundColor: primaryButtonColor },
-              isBusy && styles.buttonDisabled,
-            ]}
-            textStyle={[styles.primaryText, primaryTextStyle]}
-            spinnerColor="#FFFFFF"
-            onPress={handleConfirm}
-          />
-        </View>
-      </View>
-    </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
   );
 }
 
@@ -164,6 +216,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  cardWrap: {
+    width: "100%",
   },
   card: {
     borderRadius: 28,
