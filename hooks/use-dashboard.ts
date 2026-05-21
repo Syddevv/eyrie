@@ -16,6 +16,7 @@ import {
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 import {
   onAccountsChanged,
+  onBudgetsChanged,
   onGoalsChanged,
   onTransactionsChanged,
 } from "@/src/lib/dbSync";
@@ -660,6 +661,11 @@ export function useDashboardBootstrap(userId?: string | null) {
         void loadDashboard(userId, { force: true });
       });
     });
+    const offBudgets = onBudgetsChanged(() => {
+      InteractionManager.runAfterInteractions(() => {
+        void loadDashboard(userId, { force: true });
+      });
+    });
     const offGoals = onGoalsChanged(() => {
       InteractionManager.runAfterInteractions(() => {
         void loadDashboard(userId, { force: true });
@@ -673,6 +679,7 @@ export function useDashboardBootstrap(userId?: string | null) {
 
     return () => {
       off();
+      offBudgets();
       offGoals();
       offTransactions();
     };

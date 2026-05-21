@@ -124,8 +124,7 @@ export async function getBudgetProgress(userId: string) {
           ),
         );
 
-      const rawRemaining = roundMoney(budget.amount - budget.spent);
-      const remaining = Math.max(0, rawRemaining);
+      const remaining = roundMoney(budget.amount - budget.spent);
       const progress =
         budget.amount > 0
           ? clamp((budget.spent / budget.amount) * 100, 0, 999)
@@ -137,7 +136,7 @@ export async function getBudgetProgress(userId: string) {
         progress,
         transactionCount: countResult?.count ?? 0,
         status:
-          rawRemaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
+          remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
       };
     }),
   );

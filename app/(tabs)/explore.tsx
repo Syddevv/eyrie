@@ -29,6 +29,13 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
+import {
+  formatBudgetBalanceLabel,
+  getBudgetProgressRatio,
+  getBudgetStatusCopy,
+  getBudgetUsagePercent,
+  getBudgetVisualState,
+} from "@/src/lib/budget-presentation";
 import { showSuccessToast } from "@/store/useToastStore";
 import { useBottomNavStore } from "@/store/useBottomNavStore";
 
@@ -108,6 +115,14 @@ export default function BudgetScreen() {
         colorScheme === "light"
           ? (["#1F9BFF", "#178BFF", "#117FFF"] as const)
           : (["#127FF0", "#0E71E2", "#0D5CCA"] as const),
+      totalWarningGradient:
+        colorScheme === "light"
+          ? (["#F59E0B", "#F97316", "#EA580C"] as const)
+          : (["#D97706", "#EA580C", "#C2410C"] as const),
+      totalDangerGradient:
+        colorScheme === "light"
+          ? (["#F97316", "#EF4444", "#DC2626"] as const)
+          : (["#EA580C", "#DC2626", "#B91C1C"] as const),
       cycleCard: {
         backgroundColor: colorScheme === "light" ? colors.card : "#101722",
         borderColor:
@@ -147,6 +162,18 @@ export default function BudgetScreen() {
             ? withOpacity(colors.border, 0.96)
             : "rgba(255,255,255,0.04)",
       },
+      categoryWarningCard: {
+        backgroundColor:
+          colorScheme === "light" ? "#FFF9ED" : "rgba(68, 43, 8, 0.9)",
+        borderColor:
+          colorScheme === "light" ? "rgba(245, 158, 11, 0.28)" : "rgba(251, 191, 36, 0.22)",
+      },
+      categoryDangerCard: {
+        backgroundColor:
+          colorScheme === "light" ? "#FFF3F2" : "rgba(68, 18, 18, 0.92)",
+        borderColor:
+          colorScheme === "light" ? "rgba(239, 68, 68, 0.24)" : "rgba(248, 113, 113, 0.22)",
+      },
       actionButton: {
         backgroundColor:
           colorScheme === "light"
@@ -159,6 +186,9 @@ export default function BudgetScreen() {
       },
       progressTrack: {
         backgroundColor: colorScheme === "light" ? "#E8EDF4" : "#1B2433",
+      },
+      totalProgressTrack: {
+        backgroundColor: colorScheme === "light" ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.18)",
       },
       modalOverlay: {
         backgroundColor:
@@ -197,6 +227,8 @@ export default function BudgetScreen() {
             ? withOpacity(colors.border, 0.96)
             : "rgba(255,255,255,0.04)",
       },
+      totalOverText: { color: colorScheme === "light" ? "#FFE2E0" : "#FFE2E0" },
+      totalWarningText: { color: colorScheme === "light" ? "#FFF2CC" : "#FFF2CC" },
     }),
     [colorScheme, colors],
   );
@@ -315,9 +347,31 @@ export default function BudgetScreen() {
     }
   };
 
-  const totalRemaining = Math.max(summary.limit - summary.spent, 0);
-  const totalProgress =
-    summary.limit > 0 ? Math.min(summary.spent / summary.limit, 1) : 0;
+  const totalRemainingRaw = summary.limit - summary.spent;
+  const totalProgress = getBudgetProgressRatio(summary.spent, summary.limit);
+  const totalUsagePercent = getBudgetUsagePercent(summary.spent, summary.limit);
+  const totalVisualState = getBudgetVisualState(summary.spent, summary.limit);
+  const totalStatusCopy = getBudgetStatusCopy(
+    totalVisualState,
+    Math.max(0, summary.spent - summary.limit),
+    totalUsagePercent,
+  );
+  const totalBalanceLabel = formatBudgetBalanceLabel(totalRemainingRaw);
+  const totalProgressWidth = `${Math.min(Math.max(totalProgress, 0), 1) * 100}%`;
+  const totalProgressLabel =
+    summary.limit > 0 ? `${Math.round(totalUsagePercent)}% used` : "No budget set";
+  const totalGradientColors =
+    totalVisualState === "over"
+      ? pageStyles.totalDangerGradient
+      : totalVisualState === "warning"
+        ? pageStyles.totalWarningGradient
+        : pageStyles.totalGradient;
+  const totalProgressFillColor =
+    totalVisualState === "over"
+      ? "#FEE2E2"
+      : totalVisualState === "warning"
+        ? "#FDE68A"
+        : "#FFC21A";
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -334,7 +388,7 @@ export default function BudgetScreen() {
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={pageStyles.totalGradient}
+            colors={totalGradientColors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.totalCard}
@@ -343,9 +397,19 @@ export default function BudgetScreen() {
             <View style={styles.totalTopRow}>
               <Text style={styles.totalLabel}>Total Budget</Text>
               <View style={styles.totalPill}>
-                <Feather name="trending-down" size={14} color="#FFFFFF" />
+                <Feather
+                  name={
+                    totalVisualState === "over"
+                      ? "alert-triangle"
+                      : totalVisualState === "warning"
+                        ? "alert-circle"
+                        : "trending-down"
+                  }
+                  size={14}
+                  color="#FFFFFF"
+                />
                 <Text style={styles.totalPillText}>
-                  {Math.round(totalProgress * 100)}% used
+                  {totalProgressLabel}
                 </Text>
               </View>
             </View>
@@ -354,14 +418,28 @@ export default function BudgetScreen() {
               {formatCurrency(summary.limit)}
             </Text>
 
-            <View style={styles.totalProgressTrack}>
+            <View style={[styles.totalProgressTrack, pageStyles.totalProgressTrack]}>
               <View
                 style={[
                   styles.totalProgressFill,
-                  { width: `${totalProgress * 100}%` },
+                  {
+                    width: totalProgressWidth,
+                    backgroundColor: totalProgressFillColor,
+                  },
                 ]}
               />
             </View>
+
+            {totalVisualState !== "safe" ? (
+              <View style={styles.totalAlertRow}>
+                <Feather
+                  name={totalStatusCopy.icon}
+                  size={13}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.totalAlertText}>{totalStatusCopy.long}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.totalStatsRow}>
               <View>
@@ -371,9 +449,21 @@ export default function BudgetScreen() {
                 </Text>
               </View>
               <View style={styles.totalStatRight}>
-                <Text style={styles.totalStatLabel}>Remaining</Text>
-                <Text style={styles.totalRemaining}>
-                  {formatCurrency(totalRemaining)}
+                <Text style={styles.totalStatLabel}>
+                  {totalVisualState === "over" ? "Exceeded" : "Remaining"}
+                </Text>
+                <Text
+                  style={[
+                    styles.totalRemaining,
+                    totalVisualState === "over"
+                      ? pageStyles.totalOverText
+                      : totalVisualState === "warning"
+                        ? pageStyles.totalWarningText
+                        : null,
+                  ]}
+                >
+                  {totalBalanceLabel.value}
+                  {totalVisualState === "over" ? " over" : ""}
                 </Text>
               </View>
             </View>
@@ -469,7 +559,31 @@ export default function BudgetScreen() {
           ) : budgets.length ? (
             <View style={styles.categoryList}>
               {budgets.map((item) => {
-                const remainingAmount = Math.max(item.remainingAmount, 0);
+                const visualState = getBudgetVisualState(
+                  item.amountSpent,
+                  item.budgetLimit,
+                );
+                const remainingLabel = formatBudgetBalanceLabel(
+                  item.remainingAmount,
+                );
+                const statusCopy = getBudgetStatusCopy(
+                  visualState,
+                  Math.max(0, item.amountSpent - item.budgetLimit),
+                  getBudgetUsagePercent(item.amountSpent, item.budgetLimit),
+                );
+                const progressWidth = `${Math.min(
+                  Math.max(
+                    getBudgetProgressRatio(item.amountSpent, item.budgetLimit),
+                    0,
+                  ),
+                  1,
+                ) * 100}%`;
+                const progressColor =
+                  visualState === "over"
+                    ? "#EF4444"
+                    : visualState === "warning"
+                      ? "#F59E0B"
+                      : item.categoryColor;
 
                 return (
                   <View
@@ -477,6 +591,12 @@ export default function BudgetScreen() {
                     style={[
                       styles.categoryCard,
                       pageStyles.categoryCard,
+                      visualState === "warning"
+                        ? pageStyles.categoryWarningCard
+                        : null,
+                      visualState === "over"
+                        ? pageStyles.categoryDangerCard
+                        : null,
                       shadows.soft,
                     ]}
                   >
@@ -510,6 +630,34 @@ export default function BudgetScreen() {
                             {item.transactionCount} transaction
                             {item.transactionCount === 1 ? "" : "s"}
                           </Text>
+                          {visualState !== "safe" ? (
+                            <View
+                              style={[
+                                styles.warningBadge,
+                                visualState === "over"
+                                  ? styles.warningBadgeDanger
+                                  : styles.warningBadgeWarning,
+                              ]}
+                            >
+                              <Feather
+                                name={statusCopy.icon}
+                                size={12}
+                                color={
+                                  visualState === "over" ? "#B91C1C" : "#B45309"
+                                }
+                              />
+                              <Text
+                                style={[
+                                  styles.warningBadgeText,
+                                  visualState === "over"
+                                    ? styles.warningBadgeTextDanger
+                                    : styles.warningBadgeTextWarning,
+                                ]}
+                              >
+                                {statusCopy.short}
+                              </Text>
+                            </View>
+                          ) : null}
                         </View>
                       </View>
 
@@ -547,20 +695,52 @@ export default function BudgetScreen() {
                       <Text
                         style={[
                           styles.categoryRemaining,
-                          { color: item.categoryColor },
+                          {
+                            color:
+                              visualState === "over"
+                                ? "#EF4444"
+                                : visualState === "warning"
+                                  ? "#F59E0B"
+                                  : item.categoryColor,
+                          },
                         ]}
                       >
-                        {formatCurrency(remainingAmount)}{" "}
+                          {remainingLabel.value}{" "}
                         <Text
                           style={[
                             styles.categoryLeftLabel,
                             pageStyles.categoryLeftLabel,
                           ]}
                         >
-                          left
+                          {remainingLabel.suffix === "remaining"
+                            ? "left"
+                            : remainingLabel.suffix}
                         </Text>
                       </Text>
                     </View>
+
+                    {visualState !== "safe" ? (
+                      <View style={styles.categoryWarningRow}>
+                        <Feather
+                          name={statusCopy.icon}
+                          size={12}
+                          color={visualState === "over" ? "#DC2626" : "#D97706"}
+                        />
+                        <Text
+                          style={[
+                            styles.categoryWarningText,
+                            {
+                              color:
+                                visualState === "over"
+                                  ? "#DC2626"
+                                  : "#D97706",
+                            },
+                          ]}
+                        >
+                          {statusCopy.long}
+                        </Text>
+                      </View>
+                    ) : null}
 
                     <View
                       style={[
@@ -572,8 +752,8 @@ export default function BudgetScreen() {
                         style={[
                           styles.categoryProgressFill,
                           {
-                            width: `${Math.min(item.progress, 1) * 100}%`,
-                            backgroundColor: item.categoryColor,
+                            width: progressWidth,
+                            backgroundColor: progressColor,
                           },
                         ]}
                       />
@@ -878,6 +1058,24 @@ function createStyles() {
       flexDirection: "row",
       justifyContent: "space-between",
     },
+    totalAlertRow: {
+      marginTop: 10,
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: radius.full,
+      backgroundColor: "rgba(255,255,255,0.14)",
+    },
+    totalAlertText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
     totalStatLabel: {
       fontFamily: fontFamilies.sans,
       fontSize: 14,
@@ -1061,6 +1259,34 @@ function createStyles() {
       fontSize: 14,
       lineHeight: 18,
     },
+    warningBadge: {
+      marginTop: 8,
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: radius.full,
+    },
+    warningBadgeWarning: {
+      backgroundColor: "rgba(245, 158, 11, 0.14)",
+    },
+    warningBadgeDanger: {
+      backgroundColor: "rgba(239, 68, 68, 0.12)",
+    },
+    warningBadgeText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 14,
+      fontWeight: fontWeights.bold,
+    },
+    warningBadgeTextWarning: {
+      color: "#B45309",
+    },
+    warningBadgeTextDanger: {
+      color: "#B91C1C",
+    },
     categoryActions: {
       flexDirection: "row",
       alignItems: "center",
@@ -1092,6 +1318,18 @@ function createStyles() {
     },
     categoryLeftLabel: {
       fontWeight: fontWeights.regular,
+    },
+    categoryWarningRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    categoryWarningText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: fontWeights.medium,
     },
     categoryProgressTrack: {
       marginTop: 10,

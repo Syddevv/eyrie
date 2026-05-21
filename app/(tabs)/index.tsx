@@ -28,6 +28,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
+import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useBudgets } from "@/hooks/useBudgets";
@@ -46,7 +47,6 @@ import { useNotificationStore } from "@/store/useNotificationStore";
 import { useTransactions } from "@/hooks/useTransactions";
 import {
   formatCurrency,
-  useBudgetProgress,
   useDashboardBootstrap,
   useDashboardError,
   useDashboardLoading,
@@ -55,6 +55,13 @@ import {
   useRecentTransactions,
   useSpendingBreakdown,
 } from "@/hooks/use-dashboard";
+import {
+  formatBudgetBalanceLabel,
+  getBudgetProgressRatio,
+  getBudgetStatusCopy,
+  getBudgetUsagePercent,
+  getBudgetVisualState,
+} from "@/src/lib/budget-presentation";
 import { buildHomeInsights } from "@/src/lib/home-insights";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
@@ -73,35 +80,6 @@ function withOpacity(hex: string, opacity: number) {
   const blue = parseInt(full.slice(4, 6), 16);
 
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
-}
-
-function renderDashboardIcon(
-  item: {
-    iconLibrary: "feather" | "material";
-    iconName: string;
-    iconColor: string;
-  },
-  size: number,
-) {
-  if (item.iconLibrary === "material") {
-    return (
-      <MaterialCommunityIcons
-        name={
-          item.iconName as ComponentProps<typeof MaterialCommunityIcons>["name"]
-        }
-        size={size}
-        color={item.iconColor}
-      />
-    );
-  }
-
-  return (
-    <Feather
-      name={item.iconName as ComponentProps<typeof Feather>["name"]}
-      size={size}
-      color={item.iconColor}
-    />
-  );
 }
 
 const HOME_CONTENT_WIDTH = Dimensions.get("window").width - 32;
@@ -824,7 +802,6 @@ export default function HomeScreen() {
     useCurrentUser();
   const summary = useDashboardSummary();
   const recentTransactions = useRecentTransactions();
-  const activeBudgets = useBudgetProgress();
   const spendingBreakdown = useSpendingBreakdown();
   const dashboardStatus = useDashboardStatus();
   const isLoading = useDashboardLoading();
@@ -944,8 +921,8 @@ export default function HomeScreen() {
   const showWalletsEmptyState =
     accountsResolved && !accountsInitialLoading && walletAccounts.length === 0;
   const visibleBudgets = useMemo(
-    () => activeBudgets.slice(0, 2),
-    [activeBudgets],
+    () => monthlyBudgets.slice(0, 2),
+    [monthlyBudgets],
   );
   const visibleRecentTransactions = useMemo(
     () => recentTransactions.slice(0, 3),
@@ -1059,6 +1036,25 @@ export default function HomeScreen() {
       whiteCard: {
         backgroundColor: colors.card,
         borderColor: withOpacity(colors.border, 0.94),
+      },
+      budgetWarningCard: {
+        backgroundColor:
+          colorScheme === "light" ? "#FFF9ED" : "rgba(68, 43, 8, 0.9)",
+        borderColor:
+          colorScheme === "light"
+            ? "rgba(245, 158, 11, 0.28)"
+            : "rgba(251, 191, 36, 0.22)",
+      },
+      budgetDangerCard: {
+        backgroundColor:
+          colorScheme === "light" ? "#FFF3F2" : "rgba(68, 18, 18, 0.92)",
+        borderColor:
+          colorScheme === "light"
+            ? "rgba(239, 68, 68, 0.24)"
+            : "rgba(248, 113, 113, 0.22)",
+      },
+      budgetProgressTrack: {
+        backgroundColor: colorScheme === "light" ? "#E8EDF4" : "#1B2433",
       },
       balanceStatCard: {
         backgroundColor:
@@ -2018,34 +2014,76 @@ export default function HomeScreen() {
 
               <View style={styles.budgetList}>
                 {visibleBudgets.length ? (
-                  visibleBudgets.map((item) => (
-                    <View
+                  visibleBudgets.map((item, index) => {
+                    const visualState = getBudgetVisualState(
+                      item.amountSpent,
+                      item.budgetLimit,
+                    );
+                    const usagePercent = getBudgetUsagePercent(
+                      item.amountSpent,
+                      item.budgetLimit,
+                    );
+                    const statusCopy = getBudgetStatusCopy(
+                      visualState,
+                      Math.max(0, item.amountSpent - item.budgetLimit),
+                      usagePercent,
+                    );
+                    const remainingLabel = formatBudgetBalanceLabel(
+                      item.remainingAmount,
+                    );
+                    const progressRatio = getBudgetProgressRatio(
+                      item.amountSpent,
+                      item.budgetLimit,
+                    );
+                    const progressWidth = `${Math.min(progressRatio, 1) * 100}%`;
+                    const progressColor =
+                      visualState === "over"
+                        ? "#EF4444"
+                        : visualState === "warning"
+                          ? "#F59E0B"
+                          : item.categoryColor;
+                    const isZeroBudget = item.budgetLimit <= 0;
+
+                    return (
+                    <Animated.View
                       key={item.id}
+                      entering={FadeInDown.duration(320).delay(80 + index * 45)}
                       style={[
                         styles.budgetCard,
                         pageStyles.whiteCard,
+                        visualState === "warning"
+                          ? pageStyles.budgetWarningCard
+                          : null,
+                        visualState === "over"
+                          ? pageStyles.budgetDangerCard
+                          : null,
                         shadows.soft,
                       ]}
-                    >
-                      <View
-                        style={[
-                          styles.budgetIconWrap,
-                          { backgroundColor: item.iconBackground },
-                        ]}
                       >
-                        <MerchantLogo
-                          size={22}
-                          style={{}}
-                          // budgets don't have a merchant — use the configured icon as a fallback
-                          fallbackIcon={{
-                            library: item.iconLibrary,
-                            name: item.iconName,
-                            color: item.iconColor,
-                          }}
-                        />
-                      </View>
-                      <View style={styles.budgetBody}>
-                        <View style={styles.budgetRow}>
+                      <View style={styles.budgetTopRow}>
+                        <View style={styles.budgetIdentity}>
+                          <View
+                            style={[
+                              styles.budgetIconWrap,
+                              {
+                                backgroundColor: withOpacity(
+                                  item.categoryColor,
+                                  0.16,
+                                ),
+                              },
+                            ]}
+                          >
+                            <CategoryAvatar
+                              category={{
+                                iconType: item.categoryIconType,
+                                iconName: item.categoryIcon,
+                                iconImageUri: item.categoryIconImageUri,
+                                emoji: item.categoryEmoji,
+                                color: item.categoryColor,
+                              }}
+                              size={22}
+                            />
+                          </View>
                           <View style={styles.budgetTextBlock}>
                             <Text
                               style={[
@@ -2053,39 +2091,134 @@ export default function HomeScreen() {
                                 { color: colors.foreground },
                               ]}
                             >
-                              {item.title}
+                              {item.categoryName}
                             </Text>
                             <Text
-                              style={[styles.budgetSpent, pageStyles.mutedText]}
+                              style={[
+                                styles.budgetTransactions,
+                                pageStyles.mutedText,
+                              ]}
                             >
-                              {item.spentLabel}
+                              {item.transactionCount} transaction
+                              {item.transactionCount === 1 ? "" : "s"}
                             </Text>
+                            {visualState !== "safe" && !isZeroBudget ? (
+                              <Animated.View
+                                entering={FadeIn.duration(220)}
+                                exiting={FadeOutUp.duration(180)}
+                                style={[
+                                  styles.budgetBadge,
+                                  visualState === "over"
+                                    ? styles.budgetBadgeDanger
+                                    : styles.budgetBadgeWarning,
+                                ]}
+                              >
+                                <Feather
+                                  name={statusCopy.icon}
+                                  size={12}
+                                  color={
+                                    visualState === "over" ? "#B91C1C" : "#B45309"
+                                  }
+                                />
+                                <Text
+                                  style={[
+                                    styles.budgetBadgeText,
+                                    visualState === "over"
+                                      ? styles.budgetBadgeTextDanger
+                                      : styles.budgetBadgeTextWarning,
+                                  ]}
+                                >
+                                  {statusCopy.short}
+                                </Text>
+                              </Animated.View>
+                            ) : null}
                           </View>
-                          <View>
-                            <Text style={styles.budgetRemaining}>
-                              {item.remainingLabel}
-                            </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.budgetBody}>
+                        <View style={styles.budgetAmountsRow}>
+                          <Text style={[styles.budgetSpent, pageStyles.mutedText]}>
+                            {isZeroBudget
+                              ? "No budget created yet"
+                              : `${formatCurrency(item.amountSpent)} / ${formatCurrency(item.budgetLimit)}`}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.budgetRemaining,
+                              { color: progressColor },
+                            ]}
+                          >
+                            {remainingLabel.value}{" "}
                             <Text
                               style={[
                                 styles.budgetRemainingLabel,
                                 pageStyles.mutedText,
                               ]}
                             >
-                              remaining
+                              {remainingLabel.suffix === "remaining"
+                                ? "left"
+                                : remainingLabel.suffix}
                             </Text>
-                          </View>
+                          </Text>
                         </View>
-                        <View style={styles.progressTrack}>
+
+                        {!isZeroBudget && visualState !== "safe" ? (
+                          <Animated.View
+                            entering={FadeIn.duration(220)}
+                            exiting={FadeOutUp.duration(180)}
+                            style={[
+                              styles.budgetAlertRow,
+                              visualState === "over"
+                                ? styles.budgetAlertRowDanger
+                                : styles.budgetAlertRowWarning,
+                            ]}
+                          >
+                            <Feather
+                              name={statusCopy.icon}
+                              size={12}
+                              color={
+                                visualState === "over" ? "#DC2626" : "#D97706"
+                              }
+                            />
+                            <Text
+                              style={[
+                                styles.budgetAlertText,
+                                {
+                                  color:
+                                    visualState === "over"
+                                      ? "#DC2626"
+                                      : "#D97706",
+                                },
+                              ]}
+                            >
+                              {visualState === "over"
+                                ? statusCopy.long
+                                : statusCopy.usageLabel}
+                            </Text>
+                          </Animated.View>
+                        ) : null}
+
+                        <View
+                          style={[
+                            styles.progressTrack,
+                            pageStyles.budgetProgressTrack,
+                          ]}
+                        >
                           <View
                             style={[
                               styles.progressFill,
-                              { width: `${item.progress * 100}%` },
+                              {
+                                width: progressWidth,
+                                backgroundColor: progressColor,
+                              },
                             ]}
                           />
                         </View>
                       </View>
-                    </View>
-                  ))
+                    </Animated.View>
+                    );
+                  })
                 ) : isLoading ? (
                   <View
                     style={[
@@ -3041,12 +3174,21 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   budgetCard: {
-    borderRadius: 24,
+    borderRadius: 26,
     borderWidth: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 14,
+  },
+  budgetTopRow: {
     flexDirection: "row",
-    gap: 14,
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  budgetIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
   },
   budgetIconWrap: {
     width: 46,
@@ -3056,12 +3198,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   budgetBody: {
-    flex: 1,
-  },
-  budgetRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
+    marginTop: 16,
   },
   budgetTextBlock: {
     flex: 1,
@@ -3070,32 +3207,86 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 17,
     lineHeight: 22,
-    fontWeight: fontWeights.medium,
+    fontWeight: fontWeights.bold,
   },
-  budgetSpent: {
-    marginTop: 4,
+  budgetTransactions: {
+    marginTop: 2,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
+    lineHeight: 18,
+  },
+  budgetSpent: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
     lineHeight: 20,
+  },
+  budgetBadge: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: radius.full,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  budgetBadgeWarning: {
+    backgroundColor: "rgba(251, 191, 36, 0.18)",
+  },
+  budgetBadgeDanger: {
+    backgroundColor: "rgba(248, 113, 113, 0.16)",
+  },
+  budgetBadgeText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: fontWeights.bold,
+  },
+  budgetBadgeTextWarning: {
+    color: "#B45309",
+  },
+  budgetBadgeTextDanger: {
+    color: "#B91C1C",
+  },
+  budgetAmountsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
   },
   budgetRemaining: {
     fontFamily: fontFamilies.sans,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: fontWeights.bold,
-    color: "#0E67F7",
-    textAlign: "right",
   },
   budgetRemainingLabel: {
-    marginTop: 4,
     fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
-    textAlign: "right",
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.regular,
+  },
+  budgetAlertRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  budgetAlertRowWarning: {
+    opacity: 0.94,
+  },
+  budgetAlertRowDanger: {
+    opacity: 0.98,
+  },
+  budgetAlertText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   progressTrack: {
     marginTop: 10,
-    height: 6,
+    height: 8,
     borderRadius: radius.full,
     backgroundColor: "#E8EDF4",
     overflow: "hidden",

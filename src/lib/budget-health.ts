@@ -26,7 +26,7 @@ export function getBudgetHealthStatus(
   if (ratio > 1) {
     return "overBudget";
   }
-  if (ratio >= 0.8) {
+  if (ratio >= 0.75) {
     return "warning";
   }
   return "onTrack";

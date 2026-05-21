@@ -31,7 +31,11 @@ function AppShell() {
   useUserActivityTracker();
 
   return (
-    <Stack screenOptions={{ contentStyle: { backgroundColor: STARTUP_BACKGROUND_COLOR } }}>
+    <Stack
+      screenOptions={{
+        contentStyle: { backgroundColor: STARTUP_BACKGROUND_COLOR },
+      }}
+    >
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="loading-screen" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -265,7 +269,9 @@ function AppShell() {
 }
 
 function GlobalToastLayer() {
-  const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
+  const passwordResetPhase = useAuthStore(
+    (state) => state.passwordResetFlow.phase,
+  );
 
   return <ToastHost disabled={passwordResetPhase === "email"} />;
 }
