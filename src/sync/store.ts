@@ -6,6 +6,7 @@ import type { SyncErrorKind } from "./errors";
 type SyncStoreState = {
   isOnline: boolean;
   networkReady: boolean;
+  connectivityChangeId: number;
   isSyncing: boolean;
   uiState: SyncUiState;
   lastSyncedAt: string | null;
@@ -48,6 +49,7 @@ type SyncStoreState = {
 const INITIAL_STATE = {
   isOnline: true,
   networkReady: false,
+  connectivityChangeId: 0,
   isSyncing: false,
   uiState: "idle" as SyncUiState,
   lastSyncedAt: null,
@@ -64,7 +66,14 @@ const INITIAL_STATE = {
 
 export const useSyncStore = create<SyncStoreState>((set) => ({
   ...INITIAL_STATE,
-  setOnline: (isOnline) => set({ isOnline }),
+  setOnline: (isOnline) =>
+    set((state) => ({
+      isOnline,
+      connectivityChangeId:
+        state.isOnline === isOnline
+          ? state.connectivityChangeId
+          : state.connectivityChangeId + 1,
+    })),
   setNetworkReady: (networkReady) => set({ networkReady }),
   setSyncing: ({ isSyncing, reason, uiState }) =>
     set((state) => ({

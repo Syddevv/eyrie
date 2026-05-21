@@ -7,6 +7,7 @@ import { useSyncStore } from "./store";
 export function useSyncStatus() {
   const isOnline = useSyncStore((state) => state.isOnline);
   const networkReady = useSyncStore((state) => state.networkReady);
+  const connectivityChangeId = useSyncStore((state) => state.connectivityChangeId);
   const isSyncing = useSyncStore((state) => state.isSyncing);
   const uiState = useSyncStore((state) => state.uiState);
   const pendingCount = useSyncStore((state) => state.pendingCount);
@@ -22,6 +23,7 @@ export function useSyncStatus() {
   return {
     isOnline,
     networkReady,
+    connectivityChangeId,
     isSyncing,
     uiState,
     pendingCount,

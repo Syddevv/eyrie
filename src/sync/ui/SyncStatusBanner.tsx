@@ -2,6 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -15,7 +16,11 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useManualSync, useSyncStatus } from "../hooks";
 
-type BannerKind = "offline" | "error";
+type BannerKind = "offline" | "online" | "error";
+
+const AUTO_DISMISS_MS = 3000;
+const ANIMATION_MS = 220;
+const BANNER_COOLDOWN_MS = 1500;
 
 export function SyncStatusBanner() {
   const colorScheme = useColorScheme() ?? "light";
@@ -23,6 +28,7 @@ export function SyncStatusBanner() {
   const {
     isOnline,
     networkReady,
+    connectivityChangeId,
     lastError,
     uiState,
     isRestoring,
@@ -40,14 +46,15 @@ export function SyncStatusBanner() {
   } | null>(null);
   const [renderedBanner, setRenderedBanner] = useState<typeof banner>(null);
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(-10)).current;
+  const translateY = useRef(new Animated.Value(-18)).current;
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previous = useRef({
-    isOnline,
-    uiState,
-    lastError,
-  });
+  const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastBannerKey = useRef<string | null>(null);
+  const lastHandledConnectivityChange = useRef(0);
+  const lastConnectivityBanner = useRef<{
+    kind: Extract<BannerKind, "offline" | "online">;
+    shownAt: number;
+  } | null>(null);
 
   const errorTone = useMemo(
     () =>
@@ -60,26 +67,60 @@ export function SyncStatusBanner() {
   );
 
   useEffect(() => {
-    if (!isAuthReady || !userId || !networkReady || isRestoring) {
+    if (!networkReady) {
       setBanner(null);
-      previous.current = {
-        isOnline,
-        uiState,
-        lastError,
-      };
+      lastBannerKey.current = null;
+      lastHandledConnectivityChange.current = connectivityChangeId;
       return;
     }
-
-    const wentOffline =
-      previous.current.isOnline && !isOnline && uiState === "offline";
 
     let nextBanner: {
       kind: BannerKind;
       title: string;
       subtitle: string;
     } | null = null;
+    const now = Date.now();
+    const hasNewConnectivityEvent =
+      connectivityChangeId > lastHandledConnectivityChange.current;
 
+    if (hasNewConnectivityEvent) {
+      lastHandledConnectivityChange.current = connectivityChangeId;
+
+      const kind: Extract<BannerKind, "offline" | "online"> = isOnline
+        ? "online"
+        : "offline";
+      const lastConnectivityEvent = lastConnectivityBanner.current;
+      const shouldSuppress =
+        lastConnectivityEvent?.kind === kind &&
+        now - lastConnectivityEvent.shownAt < BANNER_COOLDOWN_MS;
+
+      if (!shouldSuppress) {
+        lastConnectivityBanner.current = {
+          kind,
+          shownAt: now,
+        };
+        nextBanner =
+          kind === "online"
+            ? {
+                kind: "online",
+                title: "Back online",
+                subtitle: "Your connection has been restored.",
+              }
+            : {
+                kind: "offline",
+                title: "Offline mode",
+                subtitle:
+                  "Changes will sync automatically when your connection returns.",
+              };
+      }
+    }
+
+    // Error banners are still allowed when there was no connection transition.
     if (
+      !nextBanner &&
+      isAuthReady &&
+      userId &&
+      !isRestoring &&
       hasStartedSync &&
       hasCompletedSync &&
       (uiState === "schema_error" || uiState === "failed")
@@ -93,87 +134,92 @@ export function SyncStatusBanner() {
         subtitle:
           lastError ?? "A local sync issue needs manual review.",
       };
-    } else if (hasCompletedSync && (!isOnline || uiState === "offline" || wentOffline)) {
-      nextBanner = {
-        kind: "offline",
-        title: "Offline mode",
-        subtitle:
-          "Changes will sync automatically when your connection returns.",
-      };
-    } else {
-      nextBanner = null;
     }
 
     const nextKey = nextBanner
       ? `${nextBanner.kind}:${nextBanner.title}:${nextBanner.subtitle}`
       : null;
 
-    if (nextKey !== lastBannerKey.current) {
+    if (nextKey && nextKey !== lastBannerKey.current) {
       lastBannerKey.current = nextKey;
       setBanner(nextBanner);
+    } else if (!nextKey) {
+      lastBannerKey.current = null;
     }
-
-    previous.current = {
-      isOnline,
-      uiState,
-      lastError,
-    };
   }, [
     isOnline,
+    connectivityChangeId,
     isAuthReady,
     isRestoring,
     lastError,
     networkReady,
     hasCompletedSync,
     hasStartedSync,
-    opacity,
-    translateY,
     uiState,
     userId,
   ]);
 
   useEffect(() => {
+    if (autoDismissTimer.current) {
+      clearTimeout(autoDismissTimer.current);
+      autoDismissTimer.current = null;
+    }
+
     if (exitTimer.current) {
       clearTimeout(exitTimer.current);
       exitTimer.current = null;
     }
 
     if (banner) {
-      if (exitTimer.current) {
-        clearTimeout(exitTimer.current);
-        exitTimer.current = null;
-      }
-
       setRenderedBanner(banner);
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
+      opacity.setValue(0);
+      translateY.setValue(-18);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: ANIMATION_MS,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: ANIMATION_MS,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      autoDismissTimer.current = setTimeout(() => {
+        lastBannerKey.current = null;
+        setBanner(null);
+      }, AUTO_DISMISS_MS);
       return;
     }
 
-    Animated.timing(opacity, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-    Animated.timing(translateY, {
-      toValue: -10,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: ANIMATION_MS,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: -18,
+        duration: ANIMATION_MS,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     exitTimer.current = setTimeout(() => {
       setRenderedBanner(null);
-    }, 180);
+    }, ANIMATION_MS);
 
     return () => {
+      if (autoDismissTimer.current) {
+        clearTimeout(autoDismissTimer.current);
+        autoDismissTimer.current = null;
+      }
       if (exitTimer.current) {
         clearTimeout(exitTimer.current);
         exitTimer.current = null;
@@ -189,6 +235,13 @@ export function SyncStatusBanner() {
           accent: "#60A5FA",
           icon: "wifi-off" as const,
         }
+      : renderedBanner?.kind === "online"
+        ? {
+            background: colorScheme === "dark" ? "#0C2619" : "#ECFDF3",
+            border: colorScheme === "dark" ? "#34D399" : "#86EFAC",
+            accent: "#22C55E",
+            icon: "check-circle" as const,
+          }
         : renderedBanner?.kind === "error"
           ? {
               background:
@@ -204,9 +257,9 @@ export function SyncStatusBanner() {
               icon: "alert-circle" as const,
             }
           : {
-              background: colorScheme === "dark" ? "#082131" : "#E7F4FF",
-              border: "#60A5FA",
-              accent: colors.primary,
+              background: colorScheme === "dark" ? "#102131" : "#EAF5FF",
+              border: colorScheme === "dark" ? "#5B8FD6" : "#8AC0F7",
+              accent: "#60A5FA",
               icon: "wifi-off" as const,
             };
 
@@ -240,14 +293,28 @@ export function SyncStatusBanner() {
           </Text>
         </View>
 
-        {renderedBanner.kind === "error" ? (
+        <View style={styles.actions}>
+          {renderedBanner.kind === "error" ? (
+            <Pressable
+              style={[styles.button, { backgroundColor: palette.accent }]}
+              onPress={() => void syncNow()}
+            >
+              <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+            </Pressable>
+          ) : null}
+
           <Pressable
-            style={[styles.button, { backgroundColor: palette.accent }]}
-            onPress={() => void syncNow()}
+            accessibilityLabel="Dismiss connectivity banner"
+            hitSlop={8}
+            style={styles.closeButton}
+            onPress={() => {
+              lastBannerKey.current = null;
+              setBanner(null);
+            }}
           >
-            <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+            <Feather name="x" size={16} color={colors.mutedForeground} />
           </Pressable>
-        ) : null}
+        </View>
       </Animated.View>
     </SafeAreaView>
   );
@@ -259,23 +326,24 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
+    zIndex: 40,
     paddingHorizontal: 12,
     paddingTop: 8,
   },
   banner: {
     borderWidth: 1,
     borderRadius: 18,
-    paddingHorizontal: 12,
+    paddingLeft: 12,
+    paddingRight: 10,
     paddingVertical: 10,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     shadowColor: "#0F172A",
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 3,
   },
   iconWrap: {
     width: 28,
@@ -299,7 +367,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: 4,
+  },
   button: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeButton: {
     width: 30,
     height: 30,
     borderRadius: 15,

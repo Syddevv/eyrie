@@ -1,4 +1,4 @@
-import { AppState, NativeModules, type AppStateStatus } from "react-native";
+import { AppState, NativeModules, Platform, type AppStateStatus } from "react-native";
 import { type PropsWithChildren, useEffect, useRef } from "react";
 import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -17,10 +17,25 @@ type NetInfoModule = {
   addEventListener: (listener: (state: NetInfoState) => void) => () => void;
 };
 
-async function getNetInfoModule(): Promise<NetInfoModule | null> {
-  const nativeModule = (NativeModules as { RNCNetInfo?: unknown }).RNCNetInfo;
+const CONNECTIVITY_POLL_MS = 15000;
+const CONNECTIVITY_TIMEOUT_MS = 5000;
+const FALLBACK_CONNECTIVITY_URLS = [
+  process.env.EXPO_PUBLIC_SUPABASE_URL,
+  "https://clients3.google.com/generate_204",
+].filter((value): value is string => Boolean(value));
 
-  if (!nativeModule) {
+async function getNetInfoModule(): Promise<NetInfoModule | null> {
+  const nativeModules = NativeModules as {
+    RNCNetInfo?: unknown;
+    NetInfo?: unknown;
+  };
+  const hasNativeNetInfo =
+    nativeModules.RNCNetInfo != null || nativeModules.NetInfo != null;
+
+  if (!hasNativeNetInfo) {
+    console.warn(
+      `[sync] NetInfo native module is unavailable on ${Platform.OS}; falling back to always-online mode.`,
+    );
     return null;
   }
 
@@ -30,6 +45,31 @@ async function getNetInfoModule(): Promise<NetInfoModule | null> {
   } catch {
     return null;
   }
+}
+
+async function probeInternetConnection() {
+  for (const url of FALLBACK_CONNECTIVITY_URLS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, CONNECTIVITY_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        method: "HEAD",
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        return true;
+      }
+    } catch {
+      clearTimeout(timeout);
+    }
+  }
+
+  return false;
 }
 
 function useSyncTriggers() {
@@ -129,6 +169,7 @@ function useSyncTriggers() {
     let isMounted = true;
     let previousConnection: boolean | null = null;
     let unsubscribe = () => {};
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
     setNetworkReady(false);
 
@@ -140,8 +181,31 @@ function useSyncTriggers() {
       }
 
       if (!netInfo) {
-        setOnline(true);
-        setNetworkReady(true);
+        const applyFallbackState = async () => {
+          if (!isMounted) {
+            return;
+          }
+
+          const isOnline = await probeInternetConnection();
+
+          if (!isMounted) {
+            return;
+          }
+
+          const wasOnline = previousConnection;
+          previousConnection = isOnline;
+          setOnline(isOnline);
+          setNetworkReady(true);
+
+          if (userId && isOnline && wasOnline === false) {
+            void runSync({ userId, reason: "reconnect", force: true });
+          }
+        };
+
+        void applyFallbackState();
+        fallbackInterval = setInterval(() => {
+          void applyFallbackState();
+        }, CONNECTIVITY_POLL_MS);
         return;
       }
 
@@ -182,6 +246,10 @@ function useSyncTriggers() {
     return () => {
       isMounted = false;
       unsubscribe();
+
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
     };
   }, [setNetworkReady, setOnline, userId]);
 
