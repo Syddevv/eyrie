@@ -674,7 +674,12 @@ export default function NotificationsScreen() {
     if (isOffline && !isPreferencesLoading) {
       return (
         <View
-          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+          style={[
+            styles.emptyStateCard,
+            pageStyles.emptyCard,
+            shadows.soft,
+            { marginTop: 16 },
+          ]}
         >
           <Feather name="wifi-off" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
@@ -701,7 +706,17 @@ export default function NotificationsScreen() {
             Enable the notifications toggle in Settings to receive budget
             alerts, goal progress, and weekly insights here.
           </Text>
-          <Text style={[styles.emptyStateText, { fontSize: 12, marginTop: 12, fontStyle: "italic" }]}>
+          <Text
+            style={[
+              styles.emptyStateText,
+              pageStyles.subtitle,
+              {
+                fontSize: 12,
+                marginTop: 12,
+                fontStyle: "italic",
+              },
+            ]}
+          >
             Note: Notifications will not work in offline mode.
           </Text>
         </View>
