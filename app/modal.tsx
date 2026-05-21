@@ -218,6 +218,8 @@ export default function AddTransactionModal() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCategoryEditorVisible, setIsCategoryEditorVisible] = useState(false);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const expenseCategoryCarouselRef = useRef<ScrollView>(null);
+  const incomeCategoryCarouselRef = useRef<ScrollView>(null);
   const merchantCarouselRef = useRef<ScrollView>(null);
   const [budgetExceededWarning, setBudgetExceededWarning] = useState<{
     categoryName: string;
@@ -238,6 +240,17 @@ export default function AddTransactionModal() {
 
     merchantCarouselRef.current?.scrollTo({ x: 0, animated: false });
   }, [entryType, selectedExpenseCategoryId, merchantCarouselSignature]);
+
+  useEffect(() => {
+    const activeCategoryRef =
+      entryType === "expense"
+        ? expenseCategoryCarouselRef
+        : incomeCategoryCarouselRef;
+
+    requestAnimationFrame(() => {
+      activeCategoryRef.current?.scrollTo({ x: 0, animated: false });
+    });
+  }, [entryType]);
   const categoryEditorInitialValue = useMemo(
     () => ({
       type: entryType,
@@ -340,8 +353,6 @@ export default function AddTransactionModal() {
   const isIncomeFormValid =
     entryType !== "income" ||
     (Boolean(selectedIncomeCategory) && Boolean(selectedPaymentMethodId));
-  const activeCategories =
-    entryType === "expense" ? expensePrimaryCategories : incomeCategoryOptions;
   const activePaymentMethod = selectedPaymentMethod;
   const selectedMerchantOption =
     merchantOptions.find((merchant) => merchant.id === selectedMerchantId) ??
@@ -772,90 +783,137 @@ export default function AddTransactionModal() {
               <Text style={[styles.fieldHelper, ui.mutedValue]}>
                 Need another one? Tap Create New to add a category.
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryRow}
-              >
-                <Pressable
-                  style={[styles.categoryChip, ui.chip]}
-                  onPress={openQuickCreateCategory}
+              {entryType === "expense" ? (
+                <ScrollView
+                  key="expense-category-row"
+                  ref={expenseCategoryCarouselRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryRow}
                 >
-                  <Feather name="plus" size={14} color={ui.iconTint} />
-                  <Text style={[styles.categoryChipText, ui.chipText]}>
-                    Create New
-                  </Text>
-                </Pressable>
+                  <Pressable
+                    style={[styles.categoryChip, ui.chip]}
+                    onPress={openQuickCreateCategory}
+                  >
+                    <Feather name="plus" size={14} color={ui.iconTint} />
+                    <Text style={[styles.categoryChipText, ui.chipText]}>
+                      Create New
+                    </Text>
+                  </Pressable>
 
-                {activeCategories.map((option) => {
-                  const isActive =
-                    entryType === "expense"
-                      ? selectedExpenseCategoryId === option.id
-                      : selectedIncomeCategory === option.id;
+                  {expensePrimaryCategories.map((option) => {
+                    const isActive = selectedExpenseCategoryId === option.id;
 
-                  return (
-                    <Pressable
-                      key={option.id}
-                      style={[
-                        styles.categoryChip,
-                        ui.chip,
-                        isActive && ui.chipActive,
-                      ]}
-                      onPress={() => {
-                        if (entryType === "expense") {
+                    return (
+                      <Pressable
+                        key={option.id}
+                        style={[
+                          styles.categoryChip,
+                          ui.chip,
+                          isActive && ui.chipActive,
+                        ]}
+                        onPress={() => {
                           setSelectedExpenseCategoryId(option.id);
                           setSelectedExpenseCategoryLabel(option.label);
                           setShowAllExpenseCategories(false);
-                        } else {
-                          setSelectedIncomeCategory(option.id);
-                        }
-                      }}
+                        }}
+                      >
+                        <CategoryIcon
+                          option={option}
+                          color={isActive ? "#FFFFFF" : ui.iconTint}
+                        />
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            ui.chipText,
+                            isActive && ui.chipActiveText,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+
+                  {expenseOtherCategories.length ? (
+                    <Pressable
+                      style={[
+                        styles.categoryChip,
+                        ui.chip,
+                        showAllExpenseCategories && ui.chipActive,
+                      ]}
+                      onPress={() =>
+                        setShowAllExpenseCategories((current) => !current)
+                      }
                     >
-                      <CategoryIcon
-                        option={option}
-                        color={isActive ? "#FFFFFF" : ui.iconTint}
+                      <Feather
+                        name="more-horizontal"
+                        size={14}
+                        color={showAllExpenseCategories ? "#FFFFFF" : ui.iconTint}
                       />
                       <Text
                         style={[
                           styles.categoryChipText,
                           ui.chipText,
-                          isActive && ui.chipActiveText,
+                          showAllExpenseCategories && ui.chipActiveText,
                         ]}
                       >
-                        {option.label}
+                        {OTHER_CATEGORY_LABEL}
                       </Text>
                     </Pressable>
-                  );
-                })}
-
-                {entryType === "expense" && expenseOtherCategories.length ? (
+                  ) : null}
+                </ScrollView>
+              ) : (
+                <ScrollView
+                  key="income-category-row"
+                  ref={incomeCategoryCarouselRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoryRow}
+                >
                   <Pressable
-                    style={[
-                      styles.categoryChip,
-                      ui.chip,
-                      showAllExpenseCategories && ui.chipActive,
-                    ]}
-                    onPress={() =>
-                      setShowAllExpenseCategories((current) => !current)
-                    }
+                    style={[styles.categoryChip, ui.chip]}
+                    onPress={openQuickCreateCategory}
                   >
-                    <Feather
-                      name="more-horizontal"
-                      size={14}
-                      color={showAllExpenseCategories ? "#FFFFFF" : ui.iconTint}
-                    />
-                    <Text
-                      style={[
-                        styles.categoryChipText,
-                        ui.chipText,
-                        showAllExpenseCategories && ui.chipActiveText,
-                      ]}
-                    >
-                      {OTHER_CATEGORY_LABEL}
+                    <Feather name="plus" size={14} color={ui.iconTint} />
+                    <Text style={[styles.categoryChipText, ui.chipText]}>
+                      Create New
                     </Text>
                   </Pressable>
-                ) : null}
-              </ScrollView>
+
+                  {incomeCategoryOptions.map((option) => {
+                    const isActive = selectedIncomeCategory === option.id;
+
+                    return (
+                      <Pressable
+                        key={option.id}
+                        style={[
+                          styles.categoryChip,
+                          ui.chip,
+                          isActive && ui.chipActive,
+                        ]}
+                        onPress={() => {
+                          setSelectedIncomeCategory(option.id);
+                        }}
+                      >
+                        <CategoryIcon
+                          option={option}
+                          color={isActive ? "#FFFFFF" : ui.iconTint}
+                        />
+                        <Text
+                          style={[
+                            styles.categoryChipText,
+                            ui.chipText,
+                            isActive && ui.chipActiveText,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
 
               {entryType === "expense" &&
               showAllExpenseCategories &&
