@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
+import { AssistantChatPanel } from '@/components/assistant/AssistantChatPanel';
 import { themeColors } from '@/constants/colors';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { radius, shadows } from '@/constants/theme';
@@ -31,9 +32,9 @@ const analyticsFilters: readonly {
 ] as const;
 
 const quickPrompts = [
-  { icon: 'trending-up', text: 'Spending summary' },
-  { icon: 'shield', text: 'Savings tips' },
-  { icon: 'dollar-sign', text: 'Recent expenses' },
+  { icon: 'trending-up', text: 'Summarize my expenses' },
+  { icon: 'shield', text: 'How can I save more this month?' },
+  { icon: 'target', text: 'Give me a weekly budget plan' },
 ] as const;
 
 function categoryCountLabel(count: number) {
@@ -544,55 +545,7 @@ export default function AssistantScreen() {
             </View>
           </ScrollView>
         ) : (
-          <View style={styles.assistantWrap}>
-            <ScrollView
-              contentContainerStyle={styles.assistantContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled">
-              <View style={styles.messageRow}>
-                <View style={styles.messageAvatarFrame}>
-                  <Image
-                    contentFit="cover"
-                    source={require('@/assets/images/Eyrie_Mascot_3.png')}
-                    style={styles.messageAvatar}
-                  />
-                </View>
-
-                <View style={[styles.messageBubble, pageStyles.card]}>
-                  <Text style={[styles.messageText, pageStyles.title]}>
-                    Hello! I&apos;m your Eyrie financial assistant. I can help you track expenses, analyze spending patterns, and reach your savings goals. What would you like to know?
-                  </Text>
-                  <Text style={[styles.messageTime, pageStyles.subtitle]}>07:28 PM</Text>
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.assistantFooter}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.quickPromptRow}>
-                {quickPrompts.map((item) => (
-                  <Pressable key={item.text} style={[styles.quickPrompt, pageStyles.chip]}>
-                    <Feather name={item.icon as 'trending-up' | 'shield' | 'dollar-sign'} size={14} color="#1495FF" />
-                    <Text style={[styles.quickPromptText, pageStyles.promptText]}>{item.text}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              <View style={styles.inputRow}>
-                <View style={[styles.inputWrap, pageStyles.input]}>
-                  <Text style={[styles.inputPlaceholder, pageStyles.promptSubtle]}>Ask about your finances...</Text>
-                  <Pressable style={styles.inputIconWrap}>
-                    <Feather name="mic" size={18} color={pageStyles.promptSubtle.color} />
-                  </Pressable>
-                </View>
-                <Pressable style={[styles.sendButton, pageStyles.sendButton]}>
-                  <Ionicons name="paper-plane-outline" size={22} color={pageStyles.promptSubtle.color} />
-                </Pressable>
-              </View>
-            </View>
-          </View>
+          <AssistantChatPanel quickPrompts={quickPrompts} />
         )}
 
       </View>
@@ -938,114 +891,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
     fontWeight: fontWeights.medium,
-  },
-  assistantWrap: {
-    flex: 1,
-    paddingBottom: 118,
-  },
-  assistantContent: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 20,
-  },
-  messageRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  messageAvatarFrame: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.full,
-    backgroundColor: '#D8F7EC',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginTop: 2,
-  },
-  messageAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.full,
-  },
-  messageBubble: {
-    flex: 1,
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 12,
-  },
-  messageText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 16,
-    lineHeight: 36,
-    fontWeight: fontWeights.medium,
-  },
-  messageTime: {
-    marginTop: 8,
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  assistantFooter: {
-    paddingHorizontal: 12,
-    gap: 16,
-  },
-  quickPromptRow: {
-    gap: 10,
-    paddingRight: 18,
-  },
-  quickPrompt: {
-    height: 34,
-    borderRadius: radius.full,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  quickPromptText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: fontWeights.medium,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  inputWrap: {
-    flex: 1,
-    height: 44,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    paddingLeft: 16,
-    paddingRight: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  inputPlaceholder: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  inputIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
