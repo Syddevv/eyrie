@@ -19,11 +19,11 @@ import { Pressable as GestureHandlerPressable } from "react-native-gesture-handl
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-  LinearTransition,
-} from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import {
+  MOTION_DURATION,
+  createSpringLayoutTransition,
+} from "@/constants/motion";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import MerchantLogo from "@/components/merchant-logo";
@@ -219,9 +219,9 @@ const NotificationRow = memo(
 
     return (
       <Animated.View
-        entering={FadeInDown.duration(220)}
-        exiting={FadeOutUp.duration(180)}
-        layout={LinearTransition.springify()}
+        entering={FadeInDown.duration(MOTION_DURATION.BASE)}
+        exiting={FadeOutUp.duration(MOTION_DURATION.FAST)}
+        layout={createSpringLayoutTransition()}
       >
         <View
           style={[styles.notificationCardContainer, cardStyle, shadows.soft]}

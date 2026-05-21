@@ -1,6 +1,5 @@
 import { StyleSheet, View } from "react-native";
 import Animated, {
-  Easing,
   FadeIn,
   useAnimatedStyle,
   useSharedValue,
@@ -10,6 +9,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
+
 function Dot({ delay, color }: { delay: number; color: string }) {
   const opacity = useSharedValue(0.35);
 
@@ -17,8 +18,14 @@ function Dot({ delay, color }: { delay: number; color: string }) {
     delay,
     withRepeat(
       withSequence(
-        withTiming(1, { duration: 350, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.35, { duration: 350, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, {
+          duration: MOTION_DURATION.PULSE,
+          easing: MOTION_EASING.IN_OUT_QUAD,
+        }),
+        withTiming(0.35, {
+          duration: MOTION_DURATION.PULSE,
+          easing: MOTION_EASING.IN_OUT_QUAD,
+        }),
       ),
       -1,
       false,
@@ -30,7 +37,12 @@ function Dot({ delay, color }: { delay: number; color: string }) {
     transform: [{ translateY: opacity.value > 0.7 ? -2 : 0 }],
   }));
 
-  return <Animated.View entering={FadeIn.duration(140)} style={[styles.dot, { backgroundColor: color }, animatedStyle]} />;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(MOTION_DURATION.TINY)}
+      style={[styles.dot, { backgroundColor: color }, animatedStyle]}
+    />
+  );
 }
 
 export function AssistantTypingIndicator({ color }: { color: string }) {

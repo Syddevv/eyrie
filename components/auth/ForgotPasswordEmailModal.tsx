@@ -10,19 +10,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { ToastHost } from "@/components/ui/ToastHost";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows, spacing } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useModalMotion } from "@/hooks/useModalMotion";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   cancelPasswordResetFlow,
@@ -35,7 +30,10 @@ function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
     normalized.length === 3
-      ? normalized.split("").map((char) => char + char).join("")
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
       : normalized;
   const red = parseInt(full.slice(0, 2), 16);
   const green = parseInt(full.slice(2, 4), 16);
@@ -52,17 +50,20 @@ export function ForgotPasswordEmailModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const passwordResetFlow = useAuthStore((state) => state.passwordResetFlow);
-  const isSendingPasswordReset = useAuthStore((state) => state.isSendingPasswordReset);
+  const isSendingPasswordReset = useAuthStore(
+    (state) => state.isSendingPasswordReset,
+  );
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
   const [email, setEmail] = useState("");
-  const progress = useSharedValue(0);
+
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible: passwordResetFlow.phase === "email",
+    enteringOffset: 22,
+  });
 
   useEffect(() => {
-    progress.value = withTiming(passwordResetFlow.phase === "email" ? 1 : 0, {
-      duration: passwordResetFlow.phase === "email" ? 260 : 180,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [passwordResetFlow.phase, progress]);
+    return;
+  }, [passwordResetFlow.phase]);
 
   useEffect(() => {
     if (passwordResetFlow.phase === "email") {
@@ -70,31 +71,28 @@ export function ForgotPasswordEmailModal() {
     }
   }, [passwordResetFlow.email, passwordResetFlow.phase]);
 
-  const animatedBackdropStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      { translateY: interpolate(progress.value, [0, 1], [22, 0]) },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
-    ],
-  }));
-
   const surfaceStyles = useMemo(
     () => ({
       cardBackground:
         colorScheme === "light"
           ? "rgba(255, 255, 255, 0.84)"
           : "rgba(15, 23, 42, 0.9)",
-      cardBorder: withOpacity(colors.border, colorScheme === "light" ? 0.88 : 1),
-      iconBackground: withOpacity(colors.primary, colorScheme === "light" ? 0.12 : 0.2),
+      cardBorder: withOpacity(
+        colors.border,
+        colorScheme === "light" ? 0.88 : 1,
+      ),
+      iconBackground: withOpacity(
+        colors.primary,
+        colorScheme === "light" ? 0.12 : 0.2,
+      ),
       inputBackground:
         colorScheme === "light"
           ? "rgba(248, 250, 252, 0.92)"
           : "rgba(30, 41, 59, 0.82)",
-      inputBorder: withOpacity(colors.border, colorScheme === "light" ? 0.85 : 1),
+      inputBorder: withOpacity(
+        colors.border,
+        colorScheme === "light" ? 0.85 : 1,
+      ),
       buttonBackground: colorScheme === "light" ? "#75B1E8" : colors.primary,
       buttonDisabled: colorScheme === "light" ? "#A9CDED" : "#31577D",
     }),
@@ -149,7 +147,9 @@ export function ForgotPasswordEmailModal() {
             StyleSheet.absoluteFill,
             {
               backgroundColor:
-                colorScheme === "light" ? "rgba(15, 23, 42, 0.28)" : "rgba(2, 6, 23, 0.58)",
+                colorScheme === "light"
+                  ? "rgba(15, 23, 42, 0.28)"
+                  : "rgba(2, 6, 23, 0.58)",
             },
           ]}
         />
@@ -176,7 +176,11 @@ export function ForgotPasswordEmailModal() {
                     { backgroundColor: surfaceStyles.iconBackground },
                   ]}
                 >
-                  <Ionicons name="mail-open-outline" size={24} color={colors.primary} />
+                  <Ionicons
+                    name="mail-open-outline"
+                    size={24}
+                    color={colors.primary}
+                  />
                 </View>
                 <Pressable
                   accessibilityLabel="Close forgot password modal"
@@ -187,8 +191,14 @@ export function ForgotPasswordEmailModal() {
                   style={[
                     styles.closeButton,
                     {
-                      backgroundColor: withOpacity(colors.card, colorScheme === "light" ? 0.7 : 0.16),
-                      borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.72 : 1),
+                      backgroundColor: withOpacity(
+                        colors.card,
+                        colorScheme === "light" ? 0.7 : 0.16,
+                      ),
+                      borderColor: withOpacity(
+                        colors.border,
+                        colorScheme === "light" ? 0.72 : 1,
+                      ),
                     },
                   ]}
                 >
@@ -196,13 +206,22 @@ export function ForgotPasswordEmailModal() {
                 </Pressable>
               </View>
 
-              <Text style={[styles.title, { color: colors.foreground }]}>Forgot Password?</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                Enter the Gmail address linked to your account. We&apos;ll send a 6-digit reset code.
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Forgot Password?
+              </Text>
+              <Text
+                style={[styles.subtitle, { color: colors.mutedForeground }]}
+              >
+                Enter the Gmail address linked to your account. We&apos;ll send
+                a 6-digit reset code.
               </Text>
 
               <View style={styles.fieldGroup}>
-                <Text style={[styles.fieldLabel, { color: colors.cardForeground }]}>Gmail address</Text>
+                <Text
+                  style={[styles.fieldLabel, { color: colors.cardForeground }]}
+                >
+                  Gmail address
+                </Text>
                 <View
                   style={[
                     styles.inputShell,
@@ -212,14 +231,21 @@ export function ForgotPasswordEmailModal() {
                     },
                   ]}
                 >
-                  <Feather name="mail" size={18} color={colors.mutedForeground} />
+                  <Feather
+                    name="mail"
+                    size={18}
+                    color={colors.mutedForeground}
+                  />
                   <TextInput
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
                     onChangeText={setEmail}
                     placeholder="you@gmail.com"
-                    placeholderTextColor={withOpacity(colors.mutedForeground, 0.8)}
+                    placeholderTextColor={withOpacity(
+                      colors.mutedForeground,
+                      0.8,
+                    )}
                     selectionColor={colors.primary}
                     style={[styles.input, { color: colors.foreground }]}
                     value={email}

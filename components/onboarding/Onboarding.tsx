@@ -15,7 +15,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { Easing } from "react-native-reanimated";
 import {
   ArrowRight,
   BarChart3,
@@ -31,6 +30,7 @@ import {
 import Pagination from "./Pagination";
 import Slide, { type OnboardingSlideData } from "./Slide";
 
+import { MOTION_DURATION, RN_MOTION_EASING } from "@/constants/motion";
 import { setHasCompletedOnboarding as persistOnboardingCompletion } from "@/lib/onboarding-storage";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -193,8 +193,8 @@ const particles = [
 
 const pageTransition = {
   type: "timing" as const,
-  duration: 380,
-  easing: Easing.out(Easing.cubic),
+  duration: MOTION_DURATION.PAGE,
+  easing: RN_MOTION_EASING.OUT_CUBIC,
 };
 
 const PersistentBackground = memo(function PersistentBackground() {
@@ -406,8 +406,8 @@ export default function Onboarding() {
               animate={{ opacity: 1, translateY: 0 }}
               transition={{
                 type: "timing",
-                duration: 180,
-                easing: Easing.out(Easing.cubic),
+                duration: MOTION_DURATION.FAST,
+                easing: RN_MOTION_EASING.OUT_CUBIC,
               }}
             >
               <Pagination
@@ -423,8 +423,8 @@ export default function Onboarding() {
               animate={{ opacity: 1, translateY: 0, scale: 1 }}
               transition={{
                 type: "timing",
-                duration: 200,
-                easing: Easing.out(Easing.cubic),
+                duration: MOTION_DURATION.BASE,
+                easing: RN_MOTION_EASING.OUT_CUBIC,
               }}
             >
               <Pressable

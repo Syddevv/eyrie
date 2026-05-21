@@ -34,6 +34,7 @@ function AppShell() {
     <Stack
       screenOptions={{
         contentStyle: { backgroundColor: STARTUP_BACKGROUND_COLOR },
+        animation: "fade",
       }}
     >
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />

@@ -2,19 +2,13 @@ import { Feather, Ionicons, Octicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import { usePathname, useRouter } from "expo-router";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  Animated,
-  Easing,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View, Animated } from "react-native";
 import { useEffect, useRef } from "react";
 
 import { useBottomNavStore } from "@/store/useBottomNavStore";
 
 import { themeColors } from "@/constants/colors";
+import { MOTION_DURATION, RN_MOTION_EASING } from "@/constants/motion";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -264,8 +258,8 @@ function AnimatedView({
     const toValue = visible ? 0 : 1;
     Animated.timing(anim, {
       toValue,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
+      duration: MOTION_DURATION.BASE,
+      easing: RN_MOTION_EASING.OUT_CUBIC,
       useNativeDriver: true,
     }).start();
   }, [visible, anim]);

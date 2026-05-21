@@ -14,8 +14,6 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  Easing,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -23,9 +21,11 @@ import Animated, {
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { themeColors } from "@/constants/colors";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import { radius, shadows, spacing } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalMotion } from "@/hooks/useModalMotion";
 import {
   cancelPasswordResetFlow,
   resendPasswordResetCode,
@@ -39,7 +39,10 @@ function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
     normalized.length === 3
-      ? normalized.split("").map((char) => char + char).join("")
+      ? normalized
+          .split("")
+          .map((char) => char + char)
+          .join("")
       : normalized;
   const red = parseInt(full.slice(0, 2), 16);
   const green = parseInt(full.slice(2, 4), 16);
@@ -60,11 +63,15 @@ export function PasswordResetCodeModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const passwordResetFlow = useAuthStore((state) => state.passwordResetFlow);
-  const isSendingPasswordReset = useAuthStore((state) => state.isSendingPasswordReset);
+  const isSendingPasswordReset = useAuthStore(
+    (state) => state.isSendingPasswordReset,
+  );
   const isVerifyingPasswordResetCode = useAuthStore(
     (state) => state.isVerifyingPasswordResetCode,
   );
-  const [code, setCode] = useState<string[]>(Array.from({ length: OTP_LENGTH }, () => ""));
+  const [code, setCode] = useState<string[]>(
+    Array.from({ length: OTP_LENGTH }, () => ""),
+  );
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -74,20 +81,19 @@ export function PasswordResetCodeModal() {
   const refocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const verifyRequestIdRef = useRef(0);
   const lastSubmittedCodeRef = useRef("");
-  const progress = useSharedValue(0);
   const caretOpacity = useSharedValue(1);
 
-  useEffect(() => {
-    progress.value = withTiming(passwordResetFlow.phase === "code" ? 1 : 0, {
-      duration: passwordResetFlow.phase === "code" ? 280 : 180,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [passwordResetFlow.phase, progress]);
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible: passwordResetFlow.phase === "code",
+    enteringOffset: 24,
+    keyboardVisible: isKeyboardVisible,
+    keyboardHeight,
+  });
 
   useEffect(() => {
     caretOpacity.value = withTiming(isInputFocused ? 1 : 0, {
-      duration: 160,
-      easing: Easing.out(Easing.ease),
+      duration: MOTION_DURATION.CARET,
+      easing: MOTION_EASING.OUT_EASE,
     });
   }, [caretOpacity, isInputFocused]);
 
@@ -114,10 +120,13 @@ export function PasswordResetCodeModal() {
       return;
     }
 
-    const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
-      setIsKeyboardVisible(true);
-      setKeyboardHeight(event.endCoordinates.height);
-    });
+    const showSubscription = Keyboard.addListener(
+      "keyboardDidShow",
+      (event) => {
+        setIsKeyboardVisible(true);
+        setKeyboardHeight(event.endCoordinates.height);
+      },
+    );
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       hiddenInputRef.current?.blur();
       setIsKeyboardVisible(false);
@@ -179,27 +188,6 @@ export function PasswordResetCodeModal() {
     })();
   }, [isVerifyingPasswordResetCode, joinedCode, passwordResetFlow.phase]);
 
-  const animatedBackdropStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [0, 1]),
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(
-    () => ({
-      opacity: progress.value,
-      transform: [
-        {
-          translateY: interpolate(
-            progress.value,
-            [0, 1],
-            [24, isKeyboardVisible ? -Math.min(keyboardHeight * 0.22, 72) : 0],
-          ),
-        },
-        { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
-      ],
-    }),
-    [isKeyboardVisible, keyboardHeight],
-  );
-
   const animatedCaretStyle = useAnimatedStyle(() => ({
     opacity: caretOpacity.value,
   }));
@@ -207,18 +195,28 @@ export function PasswordResetCodeModal() {
   const visualState = useMemo(() => {
     if (passwordResetFlow.status === "error") {
       return {
-        borderColor: colorScheme === "light" ? "#F6B0B0" : "rgba(248, 113, 113, 0.42)",
+        borderColor:
+          colorScheme === "light" ? "#F6B0B0" : "rgba(248, 113, 113, 0.42)",
         glowColor: colors.destructive,
         badgeColor: colors.destructive,
       };
     }
 
     return {
-      borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.88 : 1),
+      borderColor: withOpacity(
+        colors.border,
+        colorScheme === "light" ? 0.88 : 1,
+      ),
       glowColor: colors.primary,
       badgeColor: colors.primary,
     };
-  }, [colorScheme, colors.border, colors.destructive, colors.primary, passwordResetFlow.status]);
+  }, [
+    colorScheme,
+    colors.border,
+    colors.destructive,
+    colors.primary,
+    passwordResetFlow.status,
+  ]);
 
   function focusHiddenInput() {
     if (refocusTimeoutRef.current) {
@@ -227,10 +225,13 @@ export function PasswordResetCodeModal() {
 
     hiddenInputRef.current?.blur();
 
-    refocusTimeoutRef.current = setTimeout(() => {
-      hiddenInputRef.current?.focus();
-      refocusTimeoutRef.current = null;
-    }, Platform.OS === "android" ? 60 : 0);
+    refocusTimeoutRef.current = setTimeout(
+      () => {
+        hiddenInputRef.current?.focus();
+        refocusTimeoutRef.current = null;
+      },
+      Platform.OS === "android" ? 60 : 0,
+    );
   }
 
   function handleCodeRowLayout(event: LayoutChangeEvent) {
@@ -249,7 +250,12 @@ export function PasswordResetCodeModal() {
 
     if (digits.length > 1) {
       const nextDigits = digits.split("");
-      setCode(Array.from({ length: OTP_LENGTH }, (_, index) => nextDigits[index] ?? ""));
+      setCode(
+        Array.from(
+          { length: OTP_LENGTH },
+          (_, index) => nextDigits[index] ?? "",
+        ),
+      );
       return;
     }
 
@@ -323,7 +329,9 @@ export function PasswordResetCodeModal() {
             StyleSheet.absoluteFill,
             {
               backgroundColor:
-                colorScheme === "light" ? "rgba(15, 23, 42, 0.28)" : "rgba(2, 6, 23, 0.58)",
+                colorScheme === "light"
+                  ? "rgba(15, 23, 42, 0.28)"
+                  : "rgba(2, 6, 23, 0.58)",
             },
           ]}
         />
@@ -362,10 +370,19 @@ export function PasswordResetCodeModal() {
                 <View
                   style={[
                     styles.iconBadge,
-                    { backgroundColor: withOpacity(visualState.badgeColor, 0.14) },
+                    {
+                      backgroundColor: withOpacity(
+                        visualState.badgeColor,
+                        0.14,
+                      ),
+                    },
                   ]}
                 >
-                  <Ionicons color={visualState.badgeColor} name="key-outline" size={24} />
+                  <Ionicons
+                    color={visualState.badgeColor}
+                    name="key-outline"
+                    size={24}
+                  />
                 </View>
 
                 <Pressable
@@ -377,8 +394,14 @@ export function PasswordResetCodeModal() {
                   style={[
                     styles.closeButton,
                     {
-                      backgroundColor: withOpacity(colors.card, colorScheme === "light" ? 0.7 : 0.16),
-                      borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.72 : 1),
+                      backgroundColor: withOpacity(
+                        colors.card,
+                        colorScheme === "light" ? 0.7 : 0.16,
+                      ),
+                      borderColor: withOpacity(
+                        colors.border,
+                        colorScheme === "light" ? 0.72 : 1,
+                      ),
                     },
                   ]}
                 >
@@ -386,12 +409,22 @@ export function PasswordResetCodeModal() {
                 </Pressable>
               </View>
 
-              <Text style={[styles.title, { color: colors.foreground }]}>Enter Reset Code</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                Enter the 6-digit code sent to {maskEmail(passwordResetFlow.email)} to continue resetting your password.
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Enter Reset Code
+              </Text>
+              <Text
+                style={[styles.subtitle, { color: colors.mutedForeground }]}
+              >
+                Enter the 6-digit code sent to{" "}
+                {maskEmail(passwordResetFlow.email)} to continue resetting your
+                password.
               </Text>
 
-              <Pressable onLayout={handleCodeRowLayout} onPress={focusHiddenInput} style={styles.codeRow}>
+              <Pressable
+                onLayout={handleCodeRowLayout}
+                onPress={focusHiddenInput}
+                style={styles.codeRow}
+              >
                 <TextInput
                   ref={hiddenInputRef}
                   autoCapitalize="none"
@@ -405,11 +438,19 @@ export function PasswordResetCodeModal() {
                   onBlur={() => setIsInputFocused(false)}
                   onChangeText={handleCodeChange}
                   onFocus={() => setIsInputFocused(true)}
-                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key)}
-                  selection={{ start: joinedCode.length, end: joinedCode.length }}
+                  onKeyPress={({ nativeEvent }) =>
+                    handleKeyPress(nativeEvent.key)
+                  }
+                  selection={{
+                    start: joinedCode.length,
+                    end: joinedCode.length,
+                  }}
                   selectionColor="transparent"
                   showSoftInputOnFocus
-                  style={[styles.hiddenInput, { width: codeRowWidth || "100%" }]}
+                  style={[
+                    styles.hiddenInput,
+                    { width: codeRowWidth || "100%" },
+                  ]}
                   value={joinedCode}
                 />
                 {code.map((digit, index) => {
@@ -417,7 +458,8 @@ export function PasswordResetCodeModal() {
                   const isActiveSlot =
                     isInputFocused &&
                     (index === joinedCode.length ||
-                      (joinedCode.length === OTP_LENGTH && index === OTP_LENGTH - 1)) &&
+                      (joinedCode.length === OTP_LENGTH &&
+                        index === OTP_LENGTH - 1)) &&
                     !digit;
 
                   return (
@@ -433,7 +475,10 @@ export function PasswordResetCodeModal() {
                               : "rgba(30, 41, 59, 0.72)",
                           borderColor: isError
                             ? withOpacity(colors.destructive, 0.62)
-                            : withOpacity(colors.border, colorScheme === "light" ? 0.84 : 1),
+                            : withOpacity(
+                                colors.border,
+                                colorScheme === "light" ? 0.84 : 1,
+                              ),
                         },
                         isActiveSlot
                           ? {
@@ -447,7 +492,14 @@ export function PasswordResetCodeModal() {
                       ]}
                     >
                       {digit ? (
-                        <Text style={[styles.codeDigit, { color: colors.foreground }]}>{digit}</Text>
+                        <Text
+                          style={[
+                            styles.codeDigit,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {digit}
+                        </Text>
                       ) : isActiveSlot ? (
                         <Animated.View
                           style={[
@@ -460,7 +512,9 @@ export function PasswordResetCodeModal() {
                         <Text
                           style={[
                             styles.codePlaceholder,
-                            { color: withOpacity(colors.mutedForeground, 0.48) },
+                            {
+                              color: withOpacity(colors.mutedForeground, 0.48),
+                            },
                           ]}
                         >
                           •
@@ -475,20 +529,38 @@ export function PasswordResetCodeModal() {
                 {isVerifyingPasswordResetCode ? (
                   <View style={styles.inlineState}>
                     <ActivityIndicator color={colors.primary} size="small" />
-                    <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[
+                        styles.helperText,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
                       Verifying code...
                     </Text>
                   </View>
                 ) : passwordResetFlow.status === "error" ? (
                   <View style={styles.inlineState}>
-                    <Ionicons name="alert-circle" size={16} color={colors.destructive} />
-                    <Text style={[styles.helperText, { color: colors.destructive }]}>
-                      The code was rejected or expired. Request another code if needed.
+                    <Ionicons
+                      name="alert-circle"
+                      size={16}
+                      color={colors.destructive}
+                    />
+                    <Text
+                      style={[styles.helperText, { color: colors.destructive }]}
+                    >
+                      The code was rejected or expired. Request another code if
+                      needed.
                     </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-                    For security, reset codes expire quickly and too many failed attempts will require a new code.
+                  <Text
+                    style={[
+                      styles.helperText,
+                      { color: colors.mutedForeground },
+                    ]}
+                  >
+                    For security, reset codes expire quickly and too many failed
+                    attempts will require a new code.
                   </Text>
                 )}
               </View>
@@ -503,22 +575,40 @@ export function PasswordResetCodeModal() {
                   style={[
                     styles.resendButton,
                     {
-                      opacity: remainingSeconds > 0 || isSendingPasswordReset ? 0.55 : 1,
-                      backgroundColor: withOpacity(colors.primary, colorScheme === "light" ? 0.12 : 0.18),
-                      borderColor: withOpacity(colors.primary, colorScheme === "light" ? 0.16 : 0.28),
+                      opacity:
+                        remainingSeconds > 0 || isSendingPasswordReset
+                          ? 0.55
+                          : 1,
+                      backgroundColor: withOpacity(
+                        colors.primary,
+                        colorScheme === "light" ? 0.12 : 0.18,
+                      ),
+                      borderColor: withOpacity(
+                        colors.primary,
+                        colorScheme === "light" ? 0.16 : 0.28,
+                      ),
                     },
                   ]}
                 >
                   {isSendingPasswordReset ? (
                     <ActivityIndicator color={colors.primary} size="small" />
                   ) : (
-                    <Text style={[styles.resendText, { color: colors.primary }]}>Resend code</Text>
+                    <Text
+                      style={[styles.resendText, { color: colors.primary }]}
+                    >
+                      Resend code
+                    </Text>
                   )}
                 </Pressable>
                 <Text
                   style={[
                     styles.timerLabel,
-                    { color: withOpacity(colors.mutedForeground, colorScheme === "light" ? 0.82 : 0.9) },
+                    {
+                      color: withOpacity(
+                        colors.mutedForeground,
+                        colorScheme === "light" ? 0.82 : 0.9,
+                      ),
+                    },
                   ]}
                 >
                   {remainingSeconds > 0

@@ -15,6 +15,11 @@ import {
 } from "react-native";
 import Animated, { FadeInUp, LinearTransition } from "react-native-reanimated";
 import {
+  MOTION_DURATION,
+  createStaggerDelay,
+  createSpringLayoutTransition,
+} from "@/constants/motion";
+import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
@@ -615,10 +620,10 @@ export default function CategoriesSettingsScreen() {
               {activeCategories.map((category, index) => (
                 <Animated.View
                   key={category.id}
-                  entering={FadeInUp.delay(index * 24).duration(180)}
-                  layout={LinearTransition.springify()
-                    .damping(18)
-                    .stiffness(180)}
+                  entering={FadeInUp.delay(
+                    createStaggerDelay(index, 0, 24),
+                  ).duration(MOTION_DURATION.FAST)}
+                  layout={createSpringLayoutTransition()}
                 >
                   <View style={[styles.categoryCard, ui.card, shadows.soft]}>
                     <View style={styles.cardTopRow}>

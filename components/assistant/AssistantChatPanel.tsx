@@ -24,6 +24,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { themeColors } from "@/constants/colors";
+import { MOTION_DURATION, createStaggerDelay } from "@/constants/motion";
 import { radius } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -280,8 +281,8 @@ export function AssistantChatPanel({
         >
           {!hasUserMessages ? (
             <Animated.View
-              entering={FadeIn.duration(180)}
-              exiting={FadeOut.duration(160)}
+              entering={FadeIn.duration(MOTION_DURATION.FAST)}
+              exiting={FadeOut.duration(MOTION_DURATION.TINY + 20)}
               style={styles.promptsWrap}
             >
               <FlatList
@@ -290,7 +291,9 @@ export function AssistantChatPanel({
                 keyExtractor={(item) => item.text}
                 renderItem={({ item, index }) => (
                   <Animated.View
-                    entering={FadeInRight.duration(240).delay(index * 55)}
+                    entering={FadeInRight.duration(MOTION_DURATION.BASE).delay(
+                      createStaggerDelay(index, 0, 55),
+                    )}
                   >
                     <View
                       style={[

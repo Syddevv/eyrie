@@ -11,19 +11,14 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { LoadingActionButton } from "@/components/loading-action-button";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows, spacing } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useModalMotion } from "@/hooks/useModalMotion";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   cancelPasswordResetFlow,
@@ -137,38 +132,20 @@ export function CreateNewPasswordModal() {
     (state) => state.isUpdatingPasswordReset,
   );
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
-  const progress = useSharedValue(
-    passwordResetFlow.phase === "password" ? 1 : 0,
-  );
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  useEffect(() => {
-    progress.value = withTiming(
-      passwordResetFlow.phase === "password" ? 1 : 0,
-      {
-        duration: passwordResetFlow.phase === "password" ? 260 : 180,
-        easing: Easing.out(Easing.cubic),
-      },
-    );
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible: passwordResetFlow.phase === "password",
+    enteringOffset: 22,
+  });
 
+  useEffect(() => {
     if (passwordResetFlow.phase !== "password") {
       setNewPassword("");
       setConfirmPassword("");
     }
-  }, [passwordResetFlow.phase, progress]);
-
-  const animatedBackdropStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      { translateY: interpolate(progress.value, [0, 1], [22, 0]) },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
-    ],
-  }));
+  }, [passwordResetFlow.phase]);
 
   const surfaceStyles = useMemo(
     () => ({

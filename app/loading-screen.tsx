@@ -10,7 +10,6 @@ import Svg, {
   Stop,
 } from "react-native-svg";
 import Animated, {
-  Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -19,7 +18,12 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { fontFamilies, fontWeights, letterSpacings } from "@/constants/typography";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
+import {
+  fontFamilies,
+  fontWeights,
+  letterSpacings,
+} from "@/constants/typography";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const MASCOT_SIZE = Math.min(Math.max(SCREEN_WIDTH * 0.46, 168), 232);
@@ -44,29 +48,29 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
 
   useEffect(() => {
     contentOpacity.value = withTiming(1, {
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
+      duration: MOTION_DURATION.INTRO,
+      easing: MOTION_EASING.OUT_CUBIC,
     });
     contentTranslateY.value = withTiming(0, {
-      duration: 700,
-      easing: Easing.out(Easing.cubic),
+      duration: MOTION_DURATION.INTRO,
+      easing: MOTION_EASING.OUT_CUBIC,
     });
     mascotScale.value = withDelay(
       120,
       withSequence(
         withTiming(1.02, {
           duration: 1100,
-          easing: Easing.inOut(Easing.quad),
+          easing: MOTION_EASING.IN_OUT_QUAD,
         }),
         withRepeat(
           withSequence(
             withTiming(0.985, {
               duration: 1700,
-              easing: Easing.inOut(Easing.quad),
+              easing: MOTION_EASING.IN_OUT_QUAD,
             }),
             withTiming(1.02, {
               duration: 1700,
-              easing: Easing.inOut(Easing.quad),
+              easing: MOTION_EASING.IN_OUT_QUAD,
             }),
           ),
           -1,
@@ -77,7 +81,7 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
     spinnerRotation.value = withRepeat(
       withTiming(360, {
         duration: 1150,
-        easing: Easing.linear,
+        easing: MOTION_EASING.LINEAR,
       }),
       -1,
       false,
@@ -118,7 +122,11 @@ export function LoadingScreen({ onReady }: LoadingScreenProps) {
       <SafeAreaView style={styles.safeArea}>
         <Animated.View style={[styles.content, contentAnimatedStyle]}>
           <AnimatedLinearGradient
-            colors={["rgba(255,255,255,0.88)", "rgba(231,236,255,0.62)", "rgba(255,255,255,0.18)"]}
+            colors={[
+              "rgba(255,255,255,0.88)",
+              "rgba(231,236,255,0.62)",
+              "rgba(255,255,255,0.18)",
+            ]}
             start={{ x: 0.15, y: 0.1 }}
             end={{ x: 0.85, y: 0.95 }}
             style={[styles.mascotHalo, mascotAnimatedStyle]}

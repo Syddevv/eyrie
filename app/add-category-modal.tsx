@@ -20,6 +20,10 @@ import Animated, {
 
 import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
+import {
+  MOTION_DURATION,
+  createSpringLayoutTransition,
+} from "@/constants/motion";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -111,9 +115,7 @@ export default function AddCategoryModal() {
       expenseCategories.filter(
         (category) =>
           !categoryIdsWithActiveBudget.has(category.id) &&
-          !activeBudgetCategoryKeys.has(
-            normalizeCategoryLabel(category.label),
-          ),
+          !activeBudgetCategoryKeys.has(normalizeCategoryLabel(category.label)),
       ),
     [activeBudgetCategoryKeys, categoryIdsWithActiveBudget, expenseCategories],
   );
@@ -455,12 +457,12 @@ export default function AddCategoryModal() {
 
             {hasBudgetAmount ? (
               <Animated.View
-                entering={FadeInDown.duration(220)}
-                layout={LinearTransition.springify().damping(18).stiffness(180)}
+                entering={FadeInDown.duration(MOTION_DURATION.BASE)}
+                layout={createSpringLayoutTransition()}
                 style={styles.section}
               >
                 <Animated.View
-                  layout={LinearTransition.springify().damping(18).stiffness(180)}
+                  layout={createSpringLayoutTransition()}
                   style={[
                     styles.overviewCard,
                     ui.overviewCard,
@@ -574,10 +576,8 @@ export default function AddCategoryModal() {
 
                 {planningOverview.status === "warning" ? (
                   <Animated.View
-                    entering={FadeInDown.duration(240)}
-                    layout={LinearTransition.springify()
-                      .damping(18)
-                      .stiffness(180)}
+                    entering={FadeInDown.duration(MOTION_DURATION.BASE)}
+                    layout={createSpringLayoutTransition()}
                     style={[styles.insightCard, ui.insightCard]}
                   >
                     <View style={styles.insightHeader}>

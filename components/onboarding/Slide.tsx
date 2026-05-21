@@ -9,7 +9,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
-import { Easing } from "react-native-reanimated";
+import { RN_MOTION_EASING, MOTION_DURATION } from "@/constants/motion";
 import type { LucideIcon } from "lucide-react-native";
 
 export type AccentAnchor =
@@ -178,9 +178,9 @@ function FloatingAccentCard({
       animate={{ opacity: 1, translateY: 0, scale: 1 }}
       transition={{
         type: "timing",
-        duration: 360,
+        duration: MOTION_DURATION.LIST_ENTRY,
         delay: 40 + index * 25,
-        easing: Easing.out(Easing.cubic),
+        easing: RN_MOTION_EASING.OUT_CUBIC,
       }}
       style={[styles.accentBase, anchorStyle]}
     >
@@ -311,9 +311,9 @@ function Slide({
               animate={{ opacity: 1, translateY: 0 }}
               transition={{
                 type: "timing",
-                duration: 220,
+                duration: MOTION_DURATION.BASE,
                 delay: 10 + sparkle.size,
-                easing: Easing.out(Easing.cubic),
+                easing: RN_MOTION_EASING.OUT_CUBIC,
               }}
               style={[
                 {
@@ -401,9 +401,8 @@ function Slide({
             }}
             transition={{
               type: "timing",
-              duration: 380,
-              delay: 70,
-              easing: Easing.out(Easing.cubic),
+              duration: MOTION_DURATION.FAST,
+              easing: RN_MOTION_EASING.OUT_CUBIC,
             }}
             style={[
               styles.mascotWrap,
@@ -445,9 +444,8 @@ function Slide({
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 210,
-            delay: 12,
-            easing: Easing.out(Easing.cubic),
+            duration: MOTION_DURATION.BASE,
+            easing: RN_MOTION_EASING.OUT_CUBIC,
           }}
         >
           <View style={[styles.stepChip, { backgroundColor: slide.stepColor }]}>
@@ -461,9 +459,9 @@ function Slide({
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 230,
+            duration: MOTION_DURATION.BASE,
             delay: 34,
-            easing: Easing.out(Easing.cubic),
+            easing: RN_MOTION_EASING.OUT_CUBIC,
           }}
         >
           <Text style={styles.title} numberOfLines={2}>
@@ -477,9 +475,9 @@ function Slide({
           animate={{ opacity: 1, translateY: 0 }}
           transition={{
             type: "timing",
-            duration: 230,
+            duration: MOTION_DURATION.BASE,
             delay: 54,
-            easing: Easing.out(Easing.cubic),
+            easing: RN_MOTION_EASING.OUT_CUBIC,
           }}
         >
           <Text style={styles.description}>{slide.description}</Text>

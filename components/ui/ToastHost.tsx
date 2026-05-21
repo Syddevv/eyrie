@@ -1,14 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  FadeInDown,
-  FadeOutUp,
-  LinearTransition,
-} from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
 import { useEffect } from "react";
 
 import { themeColors } from "@/constants/colors";
+import {
+  MOTION_DURATION,
+  createSpringLayoutTransition,
+} from "@/constants/motion";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -82,9 +82,9 @@ function ToastCard({ toast, index }: { toast: ToastRecord; index: number }) {
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(220)}
-      exiting={FadeOutUp.duration(180)}
-      layout={LinearTransition.springify().damping(17).stiffness(180)}
+      entering={FadeInDown.duration(MOTION_DURATION.BASE)}
+      exiting={FadeOutUp.duration(MOTION_DURATION.FAST)}
+      layout={createSpringLayoutTransition()}
       style={[
         styles.cardWrap,
         index > 0 && styles.cardWrapStacked,

@@ -14,8 +14,6 @@ import {
   View,
 } from "react-native";
 import Animated, {
-  Easing,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -23,10 +21,12 @@ import Animated, {
 import { Feather, Ionicons } from "@expo/vector-icons";
 
 import { themeColors } from "@/constants/colors";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import { radius, shadows, spacing } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useAuth } from "@/hooks/useAuth";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalMotion } from "@/hooks/useModalMotion";
 import { resendSignupOtp, verifySignupOtp } from "@/services/auth";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -61,7 +61,9 @@ export function OtpVerificationModal() {
   const colors = themeColors[colorScheme];
   const { otpModal, isSendingOtp, isVerifyingOtp, closeOtpModal } = useAuth();
   const setOtpModalStatus = useAuthStore((state) => state.setOtpModalStatus);
-  const [code, setCode] = useState<string[]>(Array.from({ length: OTP_LENGTH }, () => ""));
+  const [code, setCode] = useState<string[]>(
+    Array.from({ length: OTP_LENGTH }, () => ""),
+  );
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -71,20 +73,19 @@ export function OtpVerificationModal() {
   const refocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const verifyRequestIdRef = useRef(0);
   const lastSubmittedCodeRef = useRef("");
-  const progress = useSharedValue(0);
   const caretOpacity = useSharedValue(1);
 
-  useEffect(() => {
-    progress.value = withTiming(otpModal.visible ? 1 : 0, {
-      duration: otpModal.visible ? 280 : 180,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [otpModal.visible, progress]);
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible: otpModal.visible,
+    enteringOffset: 24,
+    keyboardVisible: isKeyboardVisible,
+    keyboardHeight,
+  });
 
   useEffect(() => {
     caretOpacity.value = withTiming(isInputFocused ? 1 : 0, {
-      duration: 160,
-      easing: Easing.out(Easing.ease),
+      duration: MOTION_DURATION.CARET,
+      easing: MOTION_EASING.OUT_EASE,
     });
   }, [caretOpacity, isInputFocused]);
 
@@ -111,10 +112,13 @@ export function OtpVerificationModal() {
       return;
     }
 
-    const showSubscription = Keyboard.addListener("keyboardDidShow", (event) => {
-      setIsKeyboardVisible(true);
-      setKeyboardHeight(event.endCoordinates.height);
-    });
+    const showSubscription = Keyboard.addListener(
+      "keyboardDidShow",
+      (event) => {
+        setIsKeyboardVisible(true);
+        setKeyboardHeight(event.endCoordinates.height);
+      },
+    );
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       hiddenInputRef.current?.blur();
       setIsKeyboardVisible(false);
@@ -179,20 +183,6 @@ export function OtpVerificationModal() {
     })();
   }, [isVerifyingOtp, joinedCode, otpModal.email, otpModal.visible]);
 
-  const animatedBackdropStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [0, 1]),
-  }));
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [
-      {
-        translateY: interpolate(progress.value, [0, 1], [24, isKeyboardVisible ? -Math.min(keyboardHeight * 0.22, 72) : 0]),
-      },
-      { scale: interpolate(progress.value, [0, 1], [0.96, 1]) },
-    ],
-  }), [isKeyboardVisible, keyboardHeight]);
-
   const animatedCaretStyle = useAnimatedStyle(() => ({
     opacity: caretOpacity.value,
   }));
@@ -200,7 +190,8 @@ export function OtpVerificationModal() {
   const visualState = useMemo(() => {
     if (otpModal.status === "error") {
       return {
-        borderColor: colorScheme === "light" ? "#F6B0B0" : "rgba(248, 113, 113, 0.42)",
+        borderColor:
+          colorScheme === "light" ? "#F6B0B0" : "rgba(248, 113, 113, 0.42)",
         glowColor: colors.destructive,
         badgeColor: colors.destructive,
       };
@@ -208,18 +199,29 @@ export function OtpVerificationModal() {
 
     if (otpModal.status === "success") {
       return {
-        borderColor: colorScheme === "light" ? "#A7E3BE" : "rgba(74, 222, 128, 0.34)",
+        borderColor:
+          colorScheme === "light" ? "#A7E3BE" : "rgba(74, 222, 128, 0.34)",
         glowColor: colors.success,
         badgeColor: colors.success,
       };
     }
 
     return {
-      borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.88 : 1),
+      borderColor: withOpacity(
+        colors.border,
+        colorScheme === "light" ? 0.88 : 1,
+      ),
       glowColor: colors.primary,
       badgeColor: colors.primary,
     };
-  }, [colorScheme, colors.border, colors.destructive, colors.primary, colors.success, otpModal.status]);
+  }, [
+    colorScheme,
+    colors.border,
+    colors.destructive,
+    colors.primary,
+    colors.success,
+    otpModal.status,
+  ]);
 
   function focusHiddenInput() {
     if (refocusTimeoutRef.current) {
@@ -228,10 +230,13 @@ export function OtpVerificationModal() {
 
     hiddenInputRef.current?.blur();
 
-    refocusTimeoutRef.current = setTimeout(() => {
-      hiddenInputRef.current?.focus();
-      refocusTimeoutRef.current = null;
-    }, Platform.OS === "android" ? 60 : 0);
+    refocusTimeoutRef.current = setTimeout(
+      () => {
+        hiddenInputRef.current?.focus();
+        refocusTimeoutRef.current = null;
+      },
+      Platform.OS === "android" ? 60 : 0,
+    );
   }
 
   function handleCodeRowLayout(event: LayoutChangeEvent) {
@@ -250,7 +255,12 @@ export function OtpVerificationModal() {
 
     if (digits.length > 1) {
       const nextDigits = digits.split("");
-      setCode(Array.from({ length: OTP_LENGTH }, (_, index) => nextDigits[index] ?? ""));
+      setCode(
+        Array.from(
+          { length: OTP_LENGTH },
+          (_, index) => nextDigits[index] ?? "",
+        ),
+      );
     } else {
       setCode((current) => {
         const next = [...current];
@@ -308,7 +318,8 @@ export function OtpVerificationModal() {
       presentationStyle="overFullScreen"
       statusBarTranslucent
       transparent
-      visible={otpModal.visible}>
+      visible={otpModal.visible}
+    >
       <Animated.View style={[styles.overlay, animatedBackdropStyle]}>
         <BlurView
           intensity={colorScheme === "light" ? 42 : 56}
@@ -320,7 +331,9 @@ export function OtpVerificationModal() {
             StyleSheet.absoluteFill,
             {
               backgroundColor:
-                colorScheme === "light" ? "rgba(15, 23, 42, 0.28)" : "rgba(2, 6, 23, 0.58)",
+                colorScheme === "light"
+                  ? "rgba(15, 23, 42, 0.28)"
+                  : "rgba(2, 6, 23, 0.58)",
             },
           ]}
         />
@@ -328,13 +341,15 @@ export function OtpVerificationModal() {
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
-          style={styles.centerWrap}>
+          style={styles.centerWrap}
+        >
           <Animated.View
             style={[
               styles.cardWrap,
               animatedCardStyle,
               isKeyboardVisible ? styles.cardWrapKeyboard : null,
-            ]}>
+            ]}
+          >
             <View
               style={[
                 styles.cardGlow,
@@ -352,12 +367,27 @@ export function OtpVerificationModal() {
                       : "rgba(15, 23, 42, 0.88)",
                   borderColor: visualState.borderColor,
                 },
-              ]}>
+              ]}
+            >
               <View style={styles.headerRow}>
-                <View style={[styles.iconBadge, { backgroundColor: withOpacity(visualState.badgeColor, 0.14) }]}>
+                <View
+                  style={[
+                    styles.iconBadge,
+                    {
+                      backgroundColor: withOpacity(
+                        visualState.badgeColor,
+                        0.14,
+                      ),
+                    },
+                  ]}
+                >
                   <Ionicons
                     color={visualState.badgeColor}
-                    name={otpModal.status === "success" ? "checkmark-circle" : "mail-outline"}
+                    name={
+                      otpModal.status === "success"
+                        ? "checkmark-circle"
+                        : "mail-outline"
+                    }
                     size={24}
                   />
                 </View>
@@ -369,21 +399,39 @@ export function OtpVerificationModal() {
                   style={[
                     styles.closeButton,
                     {
-                      backgroundColor: withOpacity(colors.card, colorScheme === "light" ? 0.7 : 0.16),
-                      borderColor: withOpacity(colors.border, colorScheme === "light" ? 0.72 : 1),
+                      backgroundColor: withOpacity(
+                        colors.card,
+                        colorScheme === "light" ? 0.7 : 0.16,
+                      ),
+                      borderColor: withOpacity(
+                        colors.border,
+                        colorScheme === "light" ? 0.72 : 1,
+                      ),
                     },
-                  ]}>
+                  ]}
+                >
                   <Feather color={colors.mutedForeground} name="x" size={16} />
                 </Pressable>
               </View>
 
-              <Text style={[styles.title, { color: colors.foreground }]}>Verify Your Email</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                Enter the 6-digit code sent to {maskEmail(otpModal.email)} to finish{" "}
-                {otpModal.mode === "sign-up" ? "creating your account." : "signing in."}
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Verify Your Email
+              </Text>
+              <Text
+                style={[styles.subtitle, { color: colors.mutedForeground }]}
+              >
+                Enter the 6-digit code sent to {maskEmail(otpModal.email)} to
+                finish{" "}
+                {otpModal.mode === "sign-up"
+                  ? "creating your account."
+                  : "signing in."}
               </Text>
 
-              <Pressable onLayout={handleCodeRowLayout} onPress={focusHiddenInput} style={styles.codeRow}>
+              <Pressable
+                onLayout={handleCodeRowLayout}
+                onPress={focusHiddenInput}
+                style={styles.codeRow}
+              >
                 <TextInput
                   ref={hiddenInputRef}
                   autoCapitalize="none"
@@ -397,18 +445,28 @@ export function OtpVerificationModal() {
                   onBlur={() => setIsInputFocused(false)}
                   onChangeText={handleCodeChange}
                   onFocus={() => setIsInputFocused(true)}
-                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key)}
-                  selection={{ start: joinedCode.length, end: joinedCode.length }}
+                  onKeyPress={({ nativeEvent }) =>
+                    handleKeyPress(nativeEvent.key)
+                  }
+                  selection={{
+                    start: joinedCode.length,
+                    end: joinedCode.length,
+                  }}
                   selectionColor="transparent"
                   showSoftInputOnFocus
-                  style={[styles.hiddenInput, { width: codeRowWidth || "100%" }]}
+                  style={[
+                    styles.hiddenInput,
+                    { width: codeRowWidth || "100%" },
+                  ]}
                   value={joinedCode}
                 />
                 {code.map((digit, index) => {
                   const isError = otpModal.status === "error";
                   const isActiveSlot =
                     isInputFocused &&
-                    (index === joinedCode.length || (joinedCode.length === OTP_LENGTH && index === OTP_LENGTH - 1)) &&
+                    (index === joinedCode.length ||
+                      (joinedCode.length === OTP_LENGTH &&
+                        index === OTP_LENGTH - 1)) &&
                     !digit;
 
                   return (
@@ -424,7 +482,10 @@ export function OtpVerificationModal() {
                               : "rgba(30, 41, 59, 0.72)",
                           borderColor: isError
                             ? withOpacity(colors.destructive, 0.62)
-                            : withOpacity(colors.border, colorScheme === "light" ? 0.84 : 1),
+                            : withOpacity(
+                                colors.border,
+                                colorScheme === "light" ? 0.84 : 1,
+                              ),
                         },
                         isActiveSlot
                           ? {
@@ -435,9 +496,17 @@ export function OtpVerificationModal() {
                                   : "rgba(30, 41, 59, 0.86)",
                             }
                           : null,
-                      ]}>
+                      ]}
+                    >
                       {digit ? (
-                        <Text style={[styles.codeDigit, { color: colors.foreground }]}>{digit}</Text>
+                        <Text
+                          style={[
+                            styles.codeDigit,
+                            { color: colors.foreground },
+                          ]}
+                        >
+                          {digit}
+                        </Text>
                       ) : isActiveSlot ? (
                         <Animated.View
                           style={[
@@ -450,8 +519,11 @@ export function OtpVerificationModal() {
                         <Text
                           style={[
                             styles.codePlaceholder,
-                            { color: withOpacity(colors.mutedForeground, 0.48) },
-                          ]}>
+                            {
+                              color: withOpacity(colors.mutedForeground, 0.48),
+                            },
+                          ]}
+                        >
                           •
                         </Text>
                       )}
@@ -464,20 +536,37 @@ export function OtpVerificationModal() {
                 {isVerifyingOtp ? (
                   <View style={styles.inlineState}>
                     <ActivityIndicator color={colors.primary} size="small" />
-                    <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[
+                        styles.helperText,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
                       Verifying code...
                     </Text>
                   </View>
                 ) : otpModal.status === "error" ? (
                   <View style={styles.inlineState}>
-                    <Ionicons name="alert-circle" size={16} color={colors.destructive} />
-                    <Text style={[styles.helperText, { color: colors.destructive }]}>
+                    <Ionicons
+                      name="alert-circle"
+                      size={16}
+                      color={colors.destructive}
+                    />
+                    <Text
+                      style={[styles.helperText, { color: colors.destructive }]}
+                    >
                       The code was rejected. Request another code if needed.
                     </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-                    Codes expire quickly for security. Keep this screen open while checking your inbox.
+                  <Text
+                    style={[
+                      styles.helperText,
+                      { color: colors.mutedForeground },
+                    ]}
+                  >
+                    Codes expire quickly for security. Keep this screen open
+                    while checking your inbox.
                   </Text>
                 )}
               </View>
@@ -491,21 +580,38 @@ export function OtpVerificationModal() {
                     styles.resendButton,
                     {
                       opacity: remainingSeconds > 0 || isSendingOtp ? 0.55 : 1,
-                      backgroundColor: withOpacity(colors.primary, colorScheme === "light" ? 0.12 : 0.18),
-                      borderColor: withOpacity(colors.primary, colorScheme === "light" ? 0.16 : 0.28),
+                      backgroundColor: withOpacity(
+                        colors.primary,
+                        colorScheme === "light" ? 0.12 : 0.18,
+                      ),
+                      borderColor: withOpacity(
+                        colors.primary,
+                        colorScheme === "light" ? 0.16 : 0.28,
+                      ),
                     },
-                  ]}>
+                  ]}
+                >
                   {isSendingOtp ? (
                     <ActivityIndicator color={colors.primary} size="small" />
                   ) : (
-                    <Text style={[styles.resendText, { color: colors.primary }]}>Resend code</Text>
+                    <Text
+                      style={[styles.resendText, { color: colors.primary }]}
+                    >
+                      Resend code
+                    </Text>
                   )}
                 </Pressable>
                 <Text
                   style={[
                     styles.timerLabel,
-                    { color: withOpacity(colors.mutedForeground, colorScheme === "light" ? 0.82 : 0.9) },
-                  ]}>
+                    {
+                      color: withOpacity(
+                        colors.mutedForeground,
+                        colorScheme === "light" ? 0.82 : 0.9,
+                      ),
+                    },
+                  ]}
+                >
                   {remainingSeconds > 0
                     ? `Available again in 00:${String(remainingSeconds).padStart(2, "0")}`
                     : "Didn’t receive a code?"}

@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState, type PropsWithChildren } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import { StyleSheet, Text, View } from "react-native";
 import * as Linking from "expo-linking";
 import { useRootNavigationState, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import Animated, {
-  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -16,6 +20,7 @@ import { CreateNewPasswordModal } from "@/components/auth/CreateNewPasswordModal
 import { ForgotPasswordEmailModal } from "@/components/auth/ForgotPasswordEmailModal";
 import { OtpVerificationModal } from "@/components/auth/OtpVerificationModal";
 import { PasswordResetCodeModal } from "@/components/auth/PasswordResetCodeModal";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import { getHasCompletedOnboarding } from "@/lib/onboarding-storage";
 import { supabase } from "@/lib/supabase";
 import {
@@ -51,7 +56,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     (state) => state.setHasCompletedOnboarding,
   );
   const closeOtpModal = useAuthStore((state) => state.closeOtpModal);
-  const passwordResetPhase = useAuthStore((state) => state.passwordResetFlow.phase);
+  const passwordResetPhase = useAuthStore(
+    (state) => state.passwordResetFlow.phase,
+  );
   const [hasMinimumElapsed, setHasMinimumElapsed] = useState(false);
   const [hasHiddenNativeSplash, setHasHiddenNativeSplash] = useState(false);
   const [isLoadingScreenReady, setIsLoadingScreenReady] = useState(false);
@@ -264,8 +271,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     startupOpacity.value = withTiming(
       0,
       {
-        duration: 420,
-        easing: Easing.out(Easing.cubic),
+        duration: MOTION_DURATION.STARTUP_FADE,
+        easing: MOTION_EASING.OUT_CUBIC,
       },
       (finished) => {
         if (finished) {
@@ -273,11 +280,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       },
     );
-  }, [
-    canDismissStartupScreen,
-    showStartupScreen,
-    startupOpacity,
-  ]);
+  }, [canDismissStartupScreen, showStartupScreen, startupOpacity]);
 
   useEffect(() => {
     if (

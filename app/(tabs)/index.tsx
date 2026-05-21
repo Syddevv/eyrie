@@ -21,7 +21,11 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeInDown, FadeOutUp } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOutUp,
+} from "react-native-reanimated";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -30,6 +34,7 @@ import {
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
+import { MOTION_DURATION, createStaggerDelay } from "@/constants/motion";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useBudgets } from "@/hooks/useBudgets";
 import { WALLETS } from "@/constants/wallets";
@@ -672,7 +677,7 @@ const PremiumEmptyState = memo(function PremiumEmptyState({
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(360).delay(delay)}
+      entering={FadeInDown.duration(MOTION_DURATION.LIST_ENTRY).delay(delay)}
       style={[
         styles.premiumEmptyCardWrap,
         styles.premiumEmptyCardShadow,
@@ -1157,7 +1162,12 @@ export default function HomeScreen() {
             : "Track activity to unlock personalized goal, budget, savings, and spending insights.",
       ctaLabel: "See Insights",
       route: "/assistant" as const,
-      pill: isLoading && !summary ? "Live sync" : error && !summary ? "Retrying" : "Ready",
+      pill:
+        isLoading && !summary
+          ? "Live sync"
+          : error && !summary
+            ? "Retrying"
+            : "Ready",
       icon: {
         library: "material" as const,
         name: isLoading && !summary ? "progress-clock" : "sparkles-outline",
@@ -1316,8 +1326,8 @@ export default function HomeScreen() {
                 <View style={styles.insightContent}>
                   <Animated.View
                     key={displayedInsight.id ?? displayedInsight.headline}
-                    entering={FadeIn.duration(220)}
-                    exiting={FadeOutUp.duration(180)}
+                    entering={FadeIn.duration(MOTION_DURATION.BASE)}
+                    exiting={FadeOutUp.duration(MOTION_DURATION.FAST)}
                     style={styles.insightTextBlock}
                   >
                     <View style={styles.insightTitleRow}>
@@ -2045,178 +2055,188 @@ export default function HomeScreen() {
                     const isZeroBudget = item.budgetLimit <= 0;
 
                     return (
-                    <Animated.View
-                      key={item.id}
-                      entering={FadeInDown.duration(320).delay(80 + index * 45)}
-                      style={[
-                        styles.budgetCard,
-                        pageStyles.whiteCard,
-                        visualState === "warning"
-                          ? pageStyles.budgetWarningCard
-                          : null,
-                        visualState === "over"
-                          ? pageStyles.budgetDangerCard
-                          : null,
-                        shadows.soft,
-                      ]}
+                      <Animated.View
+                        key={item.id}
+                        entering={FadeInDown.duration(
+                          MOTION_DURATION.LIST_ENTRY,
+                        ).delay(createStaggerDelay(index))}
+                        style={[
+                          styles.budgetCard,
+                          pageStyles.whiteCard,
+                          visualState === "warning"
+                            ? pageStyles.budgetWarningCard
+                            : null,
+                          visualState === "over"
+                            ? pageStyles.budgetDangerCard
+                            : null,
+                          shadows.soft,
+                        ]}
                       >
-                      <View style={styles.budgetTopRow}>
-                        <View style={styles.budgetIdentity}>
-                          <View
-                            style={[
-                              styles.budgetIconWrap,
-                              {
-                                backgroundColor: withOpacity(
-                                  item.categoryColor,
-                                  0.16,
-                                ),
-                              },
-                            ]}
-                          >
-                            <CategoryAvatar
-                              category={{
-                                iconType: item.categoryIconType,
-                                iconName: item.categoryIcon,
-                                iconImageUri: item.categoryIconImageUri,
-                                emoji: item.categoryEmoji,
-                                color: item.categoryColor,
-                              }}
-                              size={22}
-                            />
-                          </View>
-                          <View style={styles.budgetTextBlock}>
-                            <Text
+                        <View style={styles.budgetTopRow}>
+                          <View style={styles.budgetIdentity}>
+                            <View
                               style={[
-                                styles.budgetTitle,
-                                { color: colors.foreground },
-                              ]}
-                            >
-                              {item.categoryName}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.budgetTransactions,
-                                pageStyles.mutedText,
-                              ]}
-                            >
-                              {item.transactionCount} transaction
-                              {item.transactionCount === 1 ? "" : "s"}
-                            </Text>
-                            {visualState !== "safe" && !isZeroBudget ? (
-                              <Animated.View
-                                entering={FadeIn.duration(220)}
-                                exiting={FadeOutUp.duration(180)}
-                                style={[
-                                  styles.budgetBadge,
-                                  visualState === "over"
-                                    ? styles.budgetBadgeDanger
-                                    : styles.budgetBadgeWarning,
-                                ]}
-                              >
-                                <Feather
-                                  name={statusCopy.icon}
-                                  size={12}
-                                  color={
-                                    visualState === "over" ? "#B91C1C" : "#B45309"
-                                  }
-                                />
-                                <Text
-                                  style={[
-                                    styles.budgetBadgeText,
-                                    visualState === "over"
-                                      ? styles.budgetBadgeTextDanger
-                                      : styles.budgetBadgeTextWarning,
-                                  ]}
-                                >
-                                  {statusCopy.short}
-                                </Text>
-                              </Animated.View>
-                            ) : null}
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={styles.budgetBody}>
-                        <View style={styles.budgetAmountsRow}>
-                          <Text style={[styles.budgetSpent, pageStyles.mutedText]}>
-                            {isZeroBudget
-                              ? "No budget created yet"
-                              : `${formatCurrency(item.amountSpent)} / ${formatCurrency(item.budgetLimit)}`}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.budgetRemaining,
-                              { color: progressColor },
-                            ]}
-                          >
-                            {remainingLabel.value}{" "}
-                            <Text
-                              style={[
-                                styles.budgetRemainingLabel,
-                                pageStyles.mutedText,
-                              ]}
-                            >
-                              {remainingLabel.suffix === "remaining"
-                                ? "left"
-                                : remainingLabel.suffix}
-                            </Text>
-                          </Text>
-                        </View>
-
-                        {!isZeroBudget && visualState !== "safe" ? (
-                          <Animated.View
-                            entering={FadeIn.duration(220)}
-                            exiting={FadeOutUp.duration(180)}
-                            style={[
-                              styles.budgetAlertRow,
-                              visualState === "over"
-                                ? styles.budgetAlertRowDanger
-                                : styles.budgetAlertRowWarning,
-                            ]}
-                          >
-                            <Feather
-                              name={statusCopy.icon}
-                              size={12}
-                              color={
-                                visualState === "over" ? "#DC2626" : "#D97706"
-                              }
-                            />
-                            <Text
-                              style={[
-                                styles.budgetAlertText,
+                                styles.budgetIconWrap,
                                 {
-                                  color:
-                                    visualState === "over"
-                                      ? "#DC2626"
-                                      : "#D97706",
+                                  backgroundColor: withOpacity(
+                                    item.categoryColor,
+                                    0.16,
+                                  ),
                                 },
                               ]}
                             >
-                              {visualState === "over"
-                                ? statusCopy.long
-                                : statusCopy.usageLabel}
-                            </Text>
-                          </Animated.View>
-                        ) : null}
+                              <CategoryAvatar
+                                category={{
+                                  iconType: item.categoryIconType,
+                                  iconName: item.categoryIcon,
+                                  iconImageUri: item.categoryIconImageUri,
+                                  emoji: item.categoryEmoji,
+                                  color: item.categoryColor,
+                                }}
+                                size={22}
+                              />
+                            </View>
+                            <View style={styles.budgetTextBlock}>
+                              <Text
+                                style={[
+                                  styles.budgetTitle,
+                                  { color: colors.foreground },
+                                ]}
+                              >
+                                {item.categoryName}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.budgetTransactions,
+                                  pageStyles.mutedText,
+                                ]}
+                              >
+                                {item.transactionCount} transaction
+                                {item.transactionCount === 1 ? "" : "s"}
+                              </Text>
+                              {visualState !== "safe" && !isZeroBudget ? (
+                                <Animated.View
+                                  entering={FadeIn.duration(
+                                    MOTION_DURATION.BASE,
+                                  )}
+                                  exiting={FadeOutUp.duration(
+                                    MOTION_DURATION.FAST,
+                                  )}
+                                  style={[
+                                    styles.budgetBadge,
+                                    visualState === "over"
+                                      ? styles.budgetBadgeDanger
+                                      : styles.budgetBadgeWarning,
+                                  ]}
+                                >
+                                  <Feather
+                                    name={statusCopy.icon}
+                                    size={12}
+                                    color={
+                                      visualState === "over"
+                                        ? "#B91C1C"
+                                        : "#B45309"
+                                    }
+                                  />
+                                  <Text
+                                    style={[
+                                      styles.budgetBadgeText,
+                                      visualState === "over"
+                                        ? styles.budgetBadgeTextDanger
+                                        : styles.budgetBadgeTextWarning,
+                                    ]}
+                                  >
+                                    {statusCopy.short}
+                                  </Text>
+                                </Animated.View>
+                              ) : null}
+                            </View>
+                          </View>
+                        </View>
 
-                        <View
-                          style={[
-                            styles.progressTrack,
-                            pageStyles.budgetProgressTrack,
-                          ]}
-                        >
+                        <View style={styles.budgetBody}>
+                          <View style={styles.budgetAmountsRow}>
+                            <Text
+                              style={[styles.budgetSpent, pageStyles.mutedText]}
+                            >
+                              {isZeroBudget
+                                ? "No budget created yet"
+                                : `${formatCurrency(item.amountSpent)} / ${formatCurrency(item.budgetLimit)}`}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.budgetRemaining,
+                                { color: progressColor },
+                              ]}
+                            >
+                              {remainingLabel.value}{" "}
+                              <Text
+                                style={[
+                                  styles.budgetRemainingLabel,
+                                  pageStyles.mutedText,
+                                ]}
+                              >
+                                {remainingLabel.suffix === "remaining"
+                                  ? "left"
+                                  : remainingLabel.suffix}
+                              </Text>
+                            </Text>
+                          </View>
+
+                          {!isZeroBudget && visualState !== "safe" ? (
+                            <Animated.View
+                              entering={FadeIn.duration(MOTION_DURATION.BASE)}
+                              exiting={FadeOutUp.duration(MOTION_DURATION.FAST)}
+                              style={[
+                                styles.budgetAlertRow,
+                                visualState === "over"
+                                  ? styles.budgetAlertRowDanger
+                                  : styles.budgetAlertRowWarning,
+                              ]}
+                            >
+                              <Feather
+                                name={statusCopy.icon}
+                                size={12}
+                                color={
+                                  visualState === "over" ? "#DC2626" : "#D97706"
+                                }
+                              />
+                              <Text
+                                style={[
+                                  styles.budgetAlertText,
+                                  {
+                                    color:
+                                      visualState === "over"
+                                        ? "#DC2626"
+                                        : "#D97706",
+                                  },
+                                ]}
+                              >
+                                {visualState === "over"
+                                  ? statusCopy.long
+                                  : statusCopy.usageLabel}
+                              </Text>
+                            </Animated.View>
+                          ) : null}
+
                           <View
                             style={[
-                              styles.progressFill,
-                              {
-                                width: progressWidth,
-                                backgroundColor: progressColor,
-                              },
+                              styles.progressTrack,
+                              pageStyles.budgetProgressTrack,
                             ]}
-                          />
+                          >
+                            <View
+                              style={[
+                                styles.progressFill,
+                                {
+                                  width: progressWidth,
+                                  backgroundColor: progressColor,
+                                },
+                              ]}
+                            />
+                          </View>
                         </View>
-                      </View>
-                    </Animated.View>
+                      </Animated.View>
                     );
                   })
                 ) : isLoading ? (
@@ -2286,79 +2306,81 @@ export default function HomeScreen() {
               <View style={styles.transactionList}>
                 {visibleRecentTransactions.length ? (
                   visibleRecentTransactions.map((item) => {
-                    const hasMerchantLogo = Boolean(getMerchantLogo(item.merchant));
+                    const hasMerchantLogo = Boolean(
+                      getMerchantLogo(item.merchant),
+                    );
 
                     return (
-                    <View key={item.id} style={styles.transactionRow}>
-                      <View
-                        style={[
-                          styles.transactionIconWrap,
-                          {
-                            backgroundColor: hasMerchantLogo
-                              ? "transparent"
-                              : item.iconBackground,
-                          },
-                        ]}
-                      >
-                        <MerchantLogo
-                          merchant={item.merchant}
-                          size={46}
-                          fallbackIcon={{
-                            library: item.iconLibrary,
-                            name: item.iconName,
-                            color: item.iconColor,
-                          }}
-                        />
-                      </View>
-                      <View style={styles.transactionContent}>
-                        <View style={styles.transactionDetails}>
-                          <Text
-                            style={[
-                              styles.transactionTitle,
-                              { color: colors.foreground },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {item.merchant}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.transactionCategory,
-                              pageStyles.mutedText,
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {item.category} · {item.typeLabel}
-                          </Text>
+                      <View key={item.id} style={styles.transactionRow}>
+                        <View
+                          style={[
+                            styles.transactionIconWrap,
+                            {
+                              backgroundColor: hasMerchantLogo
+                                ? "transparent"
+                                : item.iconBackground,
+                            },
+                          ]}
+                        >
+                          <MerchantLogo
+                            merchant={item.merchant}
+                            size={46}
+                            fallbackIcon={{
+                              library: item.iconLibrary,
+                              name: item.iconName,
+                              color: item.iconColor,
+                            }}
+                          />
                         </View>
-                        <View style={styles.transactionAmountBlock}>
-                          <Text
-                            style={[
-                              styles.transactionAmount,
-                              {
-                                color: item.isIncome
-                                  ? "#00A76F"
-                                  : colors.foreground,
-                              },
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                          >
-                            {item.amountLabel}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.transactionDate,
-                              pageStyles.mutedText,
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                          >
-                            {item.dateLabel}
-                          </Text>
+                        <View style={styles.transactionContent}>
+                          <View style={styles.transactionDetails}>
+                            <Text
+                              style={[
+                                styles.transactionTitle,
+                                { color: colors.foreground },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.merchant}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.transactionCategory,
+                                pageStyles.mutedText,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.category} · {item.typeLabel}
+                            </Text>
+                          </View>
+                          <View style={styles.transactionAmountBlock}>
+                            <Text
+                              style={[
+                                styles.transactionAmount,
+                                {
+                                  color: item.isIncome
+                                    ? "#00A76F"
+                                    : colors.foreground,
+                                },
+                              ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                            >
+                              {item.amountLabel}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.transactionDate,
+                                pageStyles.mutedText,
+                              ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                            >
+                              {item.dateLabel}
+                            </Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
                     );
                   })
                 ) : isLoading ? (

@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
+import { MOTION_DURATION } from "@/constants/motion";
 import { radius } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import type { AssistantChatMessage } from "@/services/assistant";
@@ -41,11 +42,8 @@ export function AssistantMessageBubble({
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(220)}
-      style={[
-        styles.row,
-        isAssistant ? styles.rowAssistant : styles.rowUser,
-      ]}
+      entering={FadeInDown.duration(MOTION_DURATION.BASE)}
+      style={[styles.row, isAssistant ? styles.rowAssistant : styles.rowUser]}
     >
       {isAssistant ? (
         <View style={styles.avatarFrame}>
@@ -76,7 +74,9 @@ export function AssistantMessageBubble({
         )}
 
         <Text style={[styles.time, { color: subtleColor }]}>
-          {message.status === "loading" ? "Thinking..." : formatTime(message.createdAt)}
+          {message.status === "loading"
+            ? "Thinking..."
+            : formatTime(message.createdAt)}
         </Text>
       </View>
     </Animated.View>
