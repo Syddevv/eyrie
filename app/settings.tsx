@@ -25,6 +25,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useProfileStats } from "@/hooks/useProfileStats";
 import { setThemePreference } from "@/hooks/theme-preference";
+import { useOfflineState } from "@/src/sync/hooks";
 import { signOut } from "@/services/auth";
 
 type AccountItem = {
@@ -95,6 +96,7 @@ export default function SettingsScreen() {
   const { isSigningOut } = useAuth();
   const { user: currentUser, isLoading: isUserLoading } = useCurrentUser();
   const { accounts } = useAccounts();
+  const { isOffline } = useOfflineState();
   const {
     currentStreak,
     transactionCount,
@@ -392,7 +394,11 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={notificationToggleValue}
-                disabled={isNotificationPrefsLoading || isNotificationSaving}
+                disabled={
+                  isOffline ||
+                  isNotificationPrefsLoading ||
+                  isNotificationSaving
+                }
                 onValueChange={(enabled) => {
                   setNotificationToggleValue(enabled);
                   setIsNotificationSaving(true);
@@ -414,6 +420,20 @@ export default function SettingsScreen() {
                 ios_backgroundColor={pageStyles.switchTrackOff}
               />
             </View>
+
+            {isOffline && (
+              <View style={{ paddingHorizontal: 18, paddingVertical: 8 }}>
+                <Text
+                  style={[
+                    styles.rowValue,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  Notifications require an internet connection. Please connect
+                  to receive updates.
+                </Text>
+              </View>
+            )}
 
             <View style={[styles.rowDivider, pageStyles.rowDivider]} />
 

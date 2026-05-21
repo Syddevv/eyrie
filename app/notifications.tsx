@@ -35,6 +35,7 @@ import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useNotifications } from "@/hooks/useNotifications";
 import type { AppNotification } from "@/services/notifications";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
+import { useOfflineState } from "@/src/sync/hooks";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
@@ -85,243 +86,260 @@ function formatRelativeTime(value: string) {
   }).format(date);
 }
 
-const NotificationRow = memo(function NotificationRow({
-  item,
-  titleColor,
-  bodyColor,
-  cardStyle,
-  unreadDotStyle,
-  onPressItem,
-  onToggleReadItem,
-  onDeleteItem,
-  pendingAction,
-}: {
-  item: AppNotification;
-  titleColor: string;
-  bodyColor: string;
-  cardStyle: object;
-  unreadDotStyle: object;
-  onPressItem: (item: AppNotification) => void;
-  onToggleReadItem: (item: AppNotification) => Promise<void>;
-  onDeleteItem: (item: AppNotification) => Promise<void>;
-  pendingAction: "toggleRead" | "delete" | null;
-}) {
-  const swipeableRef = useRef<SwipeableMethods | null>(null);
-  const [localPendingAction, setLocalPendingAction] = useState<
-    "toggleRead" | "delete" | null
-  >(null);
-  const effectivePendingAction = localPendingAction ?? pendingAction;
-  const isBusy = effectivePendingAction !== null;
-  const merchantName =
-    typeof item.data?.merchantName === "string" ? item.data.merchantName : null;
-  const hasMerchantLogo = Boolean(getMerchantLogo(merchantName));
+const NotificationRow = memo(
+  function NotificationRow({
+    item,
+    titleColor,
+    bodyColor,
+    cardStyle,
+    unreadDotStyle,
+    onPressItem,
+    onToggleReadItem,
+    onDeleteItem,
+    pendingAction,
+  }: {
+    item: AppNotification;
+    titleColor: string;
+    bodyColor: string;
+    cardStyle: object;
+    unreadDotStyle: object;
+    onPressItem: (item: AppNotification) => void;
+    onToggleReadItem: (item: AppNotification) => Promise<void>;
+    onDeleteItem: (item: AppNotification) => Promise<void>;
+    pendingAction: "toggleRead" | "delete" | null;
+  }) {
+    const swipeableRef = useRef<SwipeableMethods | null>(null);
+    const [localPendingAction, setLocalPendingAction] = useState<
+      "toggleRead" | "delete" | null
+    >(null);
+    const effectivePendingAction = localPendingAction ?? pendingAction;
+    const isBusy = effectivePendingAction !== null;
+    const merchantName =
+      typeof item.data?.merchantName === "string"
+        ? item.data.merchantName
+        : null;
+    const hasMerchantLogo = Boolean(getMerchantLogo(merchantName));
 
-  useEffect(() => {
-    if (!pendingAction) {
-      setLocalPendingAction(null);
-    }
-  }, [pendingAction]);
+    useEffect(() => {
+      if (!pendingAction) {
+        setLocalPendingAction(null);
+      }
+    }, [pendingAction]);
 
-  const handleToggleRead = async (swipeable: SwipeableMethods) => {
-    if (isBusy) {
-      return;
-    }
+    const handleToggleRead = async (swipeable: SwipeableMethods) => {
+      if (isBusy) {
+        return;
+      }
 
-    setLocalPendingAction("toggleRead");
+      setLocalPendingAction("toggleRead");
 
-    try {
-      await onToggleReadItem(item);
-    } catch {
-      // Optimistic state rollback is handled by the notification hook.
-    } finally {
-      swipeable.close();
-      swipeable.reset();
-    }
-  };
+      try {
+        await onToggleReadItem(item);
+      } catch {
+        // Optimistic state rollback is handled by the notification hook.
+      } finally {
+        swipeable.close();
+        swipeable.reset();
+      }
+    };
 
-  const handleDelete = async (swipeable: SwipeableMethods) => {
-    if (isBusy) {
-      return;
-    }
+    const handleDelete = async (swipeable: SwipeableMethods) => {
+      if (isBusy) {
+        return;
+      }
 
-    setLocalPendingAction("delete");
+      setLocalPendingAction("delete");
 
-    try {
-      await onDeleteItem(item);
-    } catch {
-      // Optimistic state rollback is handled by the notification hook.
-    } finally {
-      swipeable.close();
-      swipeable.reset();
-    }
-  };
+      try {
+        await onDeleteItem(item);
+      } catch {
+        // Optimistic state rollback is handled by the notification hook.
+      } finally {
+        swipeable.close();
+        swipeable.reset();
+      }
+    };
 
-  const rightAction = (
-    _progress: unknown,
-    _translation: unknown,
-    swipeable: SwipeableMethods,
-  ) => (
-    <GestureHandlerPressable
-      style={[styles.swipeAction, styles.swipeDelete]}
-      onPressIn={() => {
-        if (!isBusy) {
-          setLocalPendingAction("delete");
-        }
-      }}
-      onPress={() => void handleDelete(swipeable)}
-    >
-      {effectivePendingAction === "delete" ? (
-        <ActivityIndicator color="#FFFFFF" size="small" />
-      ) : (
-        <>
-          <Feather name="trash-2" size={18} color="#FFFFFF" />
-          <Text style={styles.swipeActionText}>Delete</Text>
-        </>
-      )}
-    </GestureHandlerPressable>
-  );
+    const rightAction = (
+      _progress: unknown,
+      _translation: unknown,
+      swipeable: SwipeableMethods,
+    ) => (
+      <GestureHandlerPressable
+        style={[styles.swipeAction, styles.swipeDelete]}
+        onPressIn={() => {
+          if (!isBusy) {
+            setLocalPendingAction("delete");
+          }
+        }}
+        onPress={() => void handleDelete(swipeable)}
+      >
+        {effectivePendingAction === "delete" ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <>
+            <Feather name="trash-2" size={18} color="#FFFFFF" />
+            <Text style={styles.swipeActionText}>Delete</Text>
+          </>
+        )}
+      </GestureHandlerPressable>
+    );
 
-  const leftAction = (
-    _progress: unknown,
-    _translation: unknown,
-    swipeable: SwipeableMethods,
-  ) => (
-    <GestureHandlerPressable
-      style={[styles.swipeAction, styles.swipeRead]}
-      onPressIn={() => {
-        if (!isBusy) {
-          setLocalPendingAction("toggleRead");
-        }
-      }}
-      onPress={() => void handleToggleRead(swipeable)}
-    >
-      {effectivePendingAction === "toggleRead" ? (
-        <ActivityIndicator color="#FFFFFF" size="small" />
-      ) : (
-        <>
-          <Feather
-            name={item.is_read ? "mail" : "check-circle"}
-            size={18}
-            color="#FFFFFF"
-          />
-          <Text style={styles.swipeActionText}>
-            {item.is_read ? "Mark unread" : "Mark read"}
-          </Text>
-        </>
-      )}
-    </GestureHandlerPressable>
-  );
+    const leftAction = (
+      _progress: unknown,
+      _translation: unknown,
+      swipeable: SwipeableMethods,
+    ) => (
+      <GestureHandlerPressable
+        style={[styles.swipeAction, styles.swipeRead]}
+        onPressIn={() => {
+          if (!isBusy) {
+            setLocalPendingAction("toggleRead");
+          }
+        }}
+        onPress={() => void handleToggleRead(swipeable)}
+      >
+        {effectivePendingAction === "toggleRead" ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <>
+            <Feather
+              name={item.is_read ? "mail" : "check-circle"}
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={styles.swipeActionText}>
+              {item.is_read ? "Mark unread" : "Mark read"}
+            </Text>
+          </>
+        )}
+      </GestureHandlerPressable>
+    );
 
-  return (
-    <Animated.View
-      entering={FadeInDown.duration(220)}
-      exiting={FadeOutUp.duration(180)}
-      layout={LinearTransition.springify()}
-    >
-      <View style={[styles.notificationCardContainer, cardStyle, shadows.soft]}>
-        <Swipeable
-          ref={swipeableRef}
-          renderLeftActions={leftAction}
-          renderRightActions={rightAction}
-          overshootLeft={false}
-          overshootRight={false}
+    return (
+      <Animated.View
+        entering={FadeInDown.duration(220)}
+        exiting={FadeOutUp.duration(180)}
+        layout={LinearTransition.springify()}
+      >
+        <View
+          style={[styles.notificationCardContainer, cardStyle, shadows.soft]}
         >
-          <Pressable
-            disabled={effectivePendingAction === "delete"}
-            onPress={() => onPressItem(item)}
-            style={({ pressed }) => [
-              styles.notificationCardInner,
-              pressed &&
-                effectivePendingAction !== "delete" &&
-                styles.notificationCardPressed,
-              effectivePendingAction === "delete" && styles.notificationCardBusy,
-            ]}
+          <Swipeable
+            ref={swipeableRef}
+            renderLeftActions={leftAction}
+            renderRightActions={rightAction}
+            overshootLeft={false}
+            overshootRight={false}
           >
-            <View style={styles.notificationCardContent}>
-              <View
-                style={[
-                  styles.notificationIconContainer,
-                  {
-                    backgroundColor: hasMerchantLogo
-                      ? "transparent"
-                      : withOpacity(item.color, item.is_read ? 0.1 : 0.14),
-                    borderColor: hasMerchantLogo
-                      ? "transparent"
-                      : withOpacity(item.color, item.is_read ? 0.08 : 0.12),
-                  },
-                ]}
-              >
-                {merchantName ? (
-                  <MerchantLogo
-                    merchant={merchantName}
-                    size={56}
-                    fallbackIcon={{
-                      library: "feather",
-                      name: item.icon,
-                      color: item.color,
-                    }}
-                  />
-                ) : (
-                  <Feather name={item.icon as any} size={22} color={item.color} />
-                )}
-              </View>
-
-              <View style={styles.contentSection}>
-                <View style={styles.titleRow}>
-                  <Text
-                    style={[
-                      styles.notificationTitle,
-                      {
-                        color: titleColor,
-                        fontWeight: item.is_read ? "600" : "700",
-                        opacity: item.is_read ? 0.7 : 1,
-                      },
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
-                  {!item.is_read ? (
-                    <View style={[styles.unreadIndicator, unreadDotStyle]} />
-                  ) : null}
-                </View>
-
-                <Text
+            <Pressable
+              disabled={effectivePendingAction === "delete"}
+              onPress={() => onPressItem(item)}
+              style={({ pressed }) => [
+                styles.notificationCardInner,
+                pressed &&
+                  effectivePendingAction !== "delete" &&
+                  styles.notificationCardPressed,
+                effectivePendingAction === "delete" &&
+                  styles.notificationCardBusy,
+              ]}
+            >
+              <View style={styles.notificationCardContent}>
+                <View
                   style={[
-                    styles.notificationBody,
+                    styles.notificationIconContainer,
                     {
-                      color: bodyColor,
-                      opacity: item.is_read ? 0.6 : 0.8,
+                      backgroundColor: hasMerchantLogo
+                        ? "transparent"
+                        : withOpacity(item.color, item.is_read ? 0.1 : 0.14),
+                      borderColor: hasMerchantLogo
+                        ? "transparent"
+                        : withOpacity(item.color, item.is_read ? 0.08 : 0.12),
                     },
                   ]}
                 >
-                  {item.message}
-                </Text>
+                  {merchantName ? (
+                    <MerchantLogo
+                      merchant={merchantName}
+                      size={56}
+                      fallbackIcon={{
+                        library: "feather",
+                        name: item.icon,
+                        color: item.color,
+                      }}
+                    />
+                  ) : (
+                    <Feather
+                      name={item.icon as any}
+                      size={22}
+                      color={item.color}
+                    />
+                  )}
+                </View>
 
-                <View style={styles.metadataRow}>
-                  <Text style={[styles.notificationTime, { color: bodyColor }]}>
-                    {formatRelativeTime(item.created_at)}
-                  </Text>
+                <View style={styles.contentSection}>
+                  <View style={styles.titleRow}>
+                    <Text
+                      style={[
+                        styles.notificationTitle,
+                        {
+                          color: titleColor,
+                          fontWeight: item.is_read ? "600" : "700",
+                          opacity: item.is_read ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      {item.title}
+                    </Text>
+                    {!item.is_read ? (
+                      <View style={[styles.unreadIndicator, unreadDotStyle]} />
+                    ) : null}
+                  </View>
+
                   <Text
-                    style={[styles.notificationCategory, { color: item.color }]}
+                    style={[
+                      styles.notificationBody,
+                      {
+                        color: bodyColor,
+                        opacity: item.is_read ? 0.6 : 0.8,
+                      },
+                    ]}
                   >
-                    {item.category.replace(/^\w/, (char) => char.toUpperCase())}
+                    {item.message}
                   </Text>
+
+                  <View style={styles.metadataRow}>
+                    <Text
+                      style={[styles.notificationTime, { color: bodyColor }]}
+                    >
+                      {formatRelativeTime(item.created_at)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.notificationCategory,
+                        { color: item.color },
+                      ]}
+                    >
+                      {item.category.replace(/^\w/, (char) =>
+                        char.toUpperCase(),
+                      )}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Pressable>
-        </Swipeable>
-      </View>
-    </Animated.View>
-  );
-},
-(previous, next) =>
-  previous.item === next.item &&
-  previous.pendingAction === next.pendingAction &&
-  previous.titleColor === next.titleColor &&
-  previous.bodyColor === next.bodyColor &&
-  previous.cardStyle === next.cardStyle &&
-  previous.unreadDotStyle === next.unreadDotStyle,
+            </Pressable>
+          </Swipeable>
+        </View>
+      </Animated.View>
+    );
+  },
+  (previous, next) =>
+    previous.item === next.item &&
+    previous.pendingAction === next.pendingAction &&
+    previous.titleColor === next.titleColor &&
+    previous.bodyColor === next.bodyColor &&
+    previous.cardStyle === next.cardStyle &&
+    previous.unreadDotStyle === next.unreadDotStyle,
 );
 
 export default function NotificationsScreen() {
@@ -335,6 +353,7 @@ export default function NotificationsScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const { isOffline } = useOfflineState();
   const [isMarkAllPending, setIsMarkAllPending] = useState(false);
   const [pendingActionsById, setPendingActionsById] = useState<
     Record<string, "toggleRead" | "delete">
@@ -362,7 +381,8 @@ export default function NotificationsScreen() {
   );
   const initialScrollOffsetRef = useRef(
     userId
-      ? (useNotificationStore.getState().getCacheForUser(userId)?.scrollOffset ?? 0)
+      ? (useNotificationStore.getState().getCacheForUser(userId)
+          ?.scrollOffset ?? 0)
       : 0,
   );
 
@@ -593,16 +613,18 @@ export default function NotificationsScreen() {
               Intelligent finance alerts
             </Text>
             <Text style={[styles.infoText, pageStyles.infoText]}>
-              {!notificationsEnabled && !isPreferencesLoading
-                ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
-                : preferences?.push_enabled
-                  ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
-                  : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
+              {isOffline
+                ? "Notifications are unavailable while offline. Please connect to the internet to receive updates."
+                : !notificationsEnabled && !isPreferencesLoading
+                  ? "Notifications are off. Turn them back on in Settings to receive alerts here again."
+                  : preferences?.push_enabled
+                    ? "Alerts, summaries, and goal milestones are now synced and will appear here in realtime."
+                    : "In-app notifications are active. Enable system notification permission to receive local push alerts too."}
             </Text>
           </View>
         </View>
 
-        {notificationsEnabled && !!notifications.length ? (
+        {notificationsEnabled && !!notifications.length && !isOffline ? (
           <View style={[styles.swipeHintChip, pageStyles.swipeHintChip]}>
             <Feather
               name="move"
@@ -632,6 +654,7 @@ export default function NotificationsScreen() {
     ),
     [
       error,
+      isOffline,
       isPreferencesLoading,
       notifications.length,
       notificationsEnabled,
@@ -648,9 +671,28 @@ export default function NotificationsScreen() {
   );
 
   const listEmptyComponent = useMemo(() => {
+    if (isOffline && !isPreferencesLoading) {
+      return (
+        <View
+          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+        >
+          <Feather name="wifi-off" size={22} color={colors.mutedForeground} />
+          <Text style={[styles.emptyStateTitle, pageStyles.title]}>
+            You're offline
+          </Text>
+          <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
+            Notifications are unavailable without an internet connection.
+            Connect to the internet to receive and view your alerts.
+          </Text>
+        </View>
+      );
+    }
+
     if (!notificationsEnabled && !isPreferencesLoading) {
       return (
-        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+        <View
+          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft, { marginTop: 16 }]}
+        >
           <Feather name="bell-off" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
             Notifications are off
@@ -659,13 +701,18 @@ export default function NotificationsScreen() {
             Enable the notifications toggle in Settings to receive budget
             alerts, goal progress, and weekly insights here.
           </Text>
+          <Text style={[styles.emptyStateText, { fontSize: 12, marginTop: 12, fontStyle: "italic" }]}>
+            Note: Notifications will not work in offline mode.
+          </Text>
         </View>
       );
     }
 
     if (shouldShowBlockingLoadingState) {
       return (
-        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+        <View
+          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+        >
           <ActivityIndicator color={colors.primary} size="small" />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
             Loading notifications...
@@ -679,7 +726,9 @@ export default function NotificationsScreen() {
 
     if (notificationsEnabled && !error) {
       return (
-        <View style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}>
+        <View
+          style={[styles.emptyStateCard, pageStyles.emptyCard, shadows.soft]}
+        >
           <Feather name="bell" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
             No notifications yet
@@ -697,6 +746,7 @@ export default function NotificationsScreen() {
     colors.mutedForeground,
     colors.primary,
     error,
+    isOffline,
     isPreferencesLoading,
     notificationsEnabled,
     pageStyles.emptyCard,
