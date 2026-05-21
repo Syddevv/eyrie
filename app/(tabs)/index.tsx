@@ -1,9 +1,16 @@
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { memo, useEffect, useMemo, useState, type ComponentProps } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+} from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -14,7 +21,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeOutUp } from "react-native-reanimated";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -23,6 +30,7 @@ import {
 import { PremiumCardGradient } from "@/components/premium-card-gradient";
 import { themeColors } from "@/constants/colors";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useBudgets } from "@/hooks/useBudgets";
 import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
@@ -33,7 +41,9 @@ import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 import { useNotificationStore } from "@/store/useNotificationStore";
+import { useTransactions } from "@/hooks/useTransactions";
 import {
   formatCurrency,
   useBudgetProgress,
@@ -42,10 +52,10 @@ import {
   useDashboardLoading,
   useDashboardStatus,
   useDashboardSummary,
-  useGoalsProgress,
   useRecentTransactions,
   useSpendingBreakdown,
 } from "@/hooks/use-dashboard";
+import { buildHomeInsights } from "@/src/lib/home-insights";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
@@ -816,7 +826,6 @@ export default function HomeScreen() {
   const recentTransactions = useRecentTransactions();
   const activeBudgets = useBudgetProgress();
   const spendingBreakdown = useSpendingBreakdown();
-  const goalsProgress = useGoalsProgress();
   const dashboardStatus = useDashboardStatus();
   const isLoading = useDashboardLoading();
   const error = useDashboardError();
@@ -825,6 +834,9 @@ export default function HomeScreen() {
     isInitialLoading: accountsInitialLoading,
     hasResolved: accountsResolved,
   } = useAccounts();
+  const { transactions } = useTransactions();
+  const { budgets: monthlyBudgets } = useBudgets("monthly");
+  const { goals } = useSavingsGoals();
   const [showCardsSwipeHint, setShowCardsSwipeHint] = useState(true);
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
   const [showTotalBalance, setShowTotalBalance] = useState(false);
@@ -832,9 +844,13 @@ export default function HomeScreen() {
   const [hasHydratedVisibilityPrefs, setHasHydratedVisibilityPrefs] =
     useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [insightIndex, setInsightIndex] = useState(0);
   const unreadNotificationCount = useNotificationStore(
     (state) => state.unreadCount,
   );
+  const deferredTransactions = useDeferredValue(transactions);
+  const deferredBudgets = useDeferredValue(monthlyBudgets);
+  const deferredGoals = useDeferredValue(goals);
 
   useDashboardBootstrap(currentUser?.id);
 
@@ -1062,8 +1078,6 @@ export default function HomeScreen() {
             : withOpacity(colors.secondary, 0.36),
         borderColor: withOpacity(colors.border, 0.72),
       },
-      insightGradient: ["#37D3C2", "#2DBBBA"] as const,
-      insightBubble: withOpacity("#FFFFFF", 0.1),
       navBar: {
         backgroundColor: colors.card,
         borderColor: withOpacity(colors.border, 0.86),
@@ -1072,39 +1086,117 @@ export default function HomeScreen() {
     [colorScheme, colors],
   );
 
-  const insightContent = useMemo(() => {
-    const topCategory = spendingBreakdown[0];
-    const topGoal = goalsProgress[0];
-
-    if (isLoading && !summary) {
-      return {
-        headline: "Loading your dashboard",
-        body: "Fetching your latest balance, budgets, and transactions from SQLite.",
-        pill: "Live sync",
-      };
+  const generatedInsights = useMemo(
+    () =>
+      buildHomeInsights({
+        summary,
+        currentUser,
+        transactions: deferredTransactions.map((item) => ({
+          id: item.id,
+          amount: item.amount,
+          category: item.category,
+          transactionDate: item.transactionDate,
+          typeValue: item.typeValue,
+        })),
+        budgets: deferredBudgets.map((item) => ({
+          id: item.id,
+          title: item.categoryName,
+          budgetLimit: item.budgetLimit,
+          amountSpent: item.amountSpent,
+          remainingAmount: item.remainingAmount,
+          progress: item.progress,
+        })),
+        goals: deferredGoals.map((goal) => ({
+          id: goal.id,
+          title: goal.title,
+          targetAmount: goal.targetAmount,
+          currentAmount: goal.currentAmount,
+          isCompleted: goal.isCompleted,
+          isArchived: goal.isArchived,
+          metrics: goal.metrics,
+        })),
+        spendingBreakdown,
+        referenceDate: currentTime,
+      }),
+    [
+      currentTime,
+      currentUser,
+      deferredBudgets,
+      deferredGoals,
+      deferredTransactions,
+      spendingBreakdown,
+      summary,
+    ],
+  );
+  const activeInsight = generatedInsights[insightIndex] ?? null;
+  const insightMascotSource = useMemo(() => {
+    if (!activeInsight) {
+      return require("@/assets/images/Eyrie_Mascot_1.png");
     }
 
-    if (error && !summary) {
-      return {
-        headline: "Dashboard unavailable",
-        body: "Your data will appear as soon as the local finance database is ready again.",
-        pill: "Retrying",
-      };
+    if (activeInsight.mascot === 3) {
+      return require("@/assets/images/Eyrie_Mascot_3.png");
     }
 
-    const spendingLabel = topCategory?.categoryName ?? "No spending yet";
-    const goalLabel = topGoal
-      ? `${Math.round(topGoal.progress)}% to ${topGoal.title}`
-      : "No goals yet";
+    if (activeInsight.mascot === 2) {
+      return require("@/assets/images/Eyrie_Mascot_2.png");
+    }
 
-    return {
-      headline: topCategory
-        ? `${spendingLabel} is your top spend`
-        : "Your dashboard is ready",
-      body: `${goalLabel}. ${topCategory ? formatCurrency(topCategory.total) + " spent there this month." : "Start adding transactions to fill this month's view."}`,
-      pill: topCategory ? "Spending pulse" : "Ready",
+    return require("@/assets/images/Eyrie_Mascot_1.png");
+  }, [activeInsight]);
+  const fallbackInsight = useMemo(
+    () => ({
+      title: isLoading && !summary ? "Syncing Insight" : "Eyrie Insight",
+      headline:
+        isLoading && !summary
+          ? "Loading your financial story"
+          : error && !summary
+            ? "Dashboard unavailable"
+            : "Your dashboard is ready",
+      body:
+        isLoading && !summary
+          ? "Fetching your latest budgets, goals, balances, and transactions from local data."
+          : error && !summary
+            ? "Your data will appear as soon as the local finance database is ready again."
+            : "Track activity to unlock personalized goal, budget, savings, and spending insights.",
+      ctaLabel: "See Insights",
+      route: "/assistant" as const,
+      pill: isLoading && !summary ? "Live sync" : error && !summary ? "Retrying" : "Ready",
+      icon: {
+        library: "material" as const,
+        name: isLoading && !summary ? "progress-clock" : "sparkles-outline",
+      },
+      gradient: ["#37D3C2", "#2DBBBA"] as const,
+      pillBackground: "#D8FFF4",
+      pillTextColor: "#0E7C74",
+      bubble: withOpacity("#FFFFFF", 0.1),
+    }),
+    [error, isLoading, summary],
+  );
+  const displayedInsight = activeInsight ?? fallbackInsight;
+
+  const handleInsightPress = () => {
+    void triggerNavigationHaptic();
+    router.push(displayedInsight.route);
+  };
+
+  useEffect(() => {
+    setInsightIndex(0);
+  }, [generatedInsights]);
+
+  useEffect(() => {
+    if (generatedInsights.length <= 1) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setInsightIndex((current) => (current + 1) % generatedInsights.length);
+    }, 8000);
+
+    return () => {
+      clearInterval(timer);
     };
-  }, [error, goalsProgress, isLoading, spendingBreakdown, summary]);
+  }, [generatedInsights.length]);
 
   return (
     <SafeAreaView
@@ -1220,51 +1312,90 @@ export default function HomeScreen() {
           ) : (
             <>
               <LinearGradient
-                colors={pageStyles.insightGradient}
+                colors={displayedInsight.gradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.insightCard}
               >
                 <View style={styles.insightContent}>
-                  <View style={styles.insightTextBlock}>
+                  <Animated.View
+                    key={displayedInsight.id ?? displayedInsight.headline}
+                    entering={FadeIn.duration(220)}
+                    exiting={FadeOutUp.duration(180)}
+                    style={styles.insightTextBlock}
+                  >
                     <View style={styles.insightTitleRow}>
                       <View style={styles.insightIconWrap}>
-                        <Ionicons
-                          name="sparkles-outline"
-                          size={13}
-                          color="#FFFFFF"
-                        />
+                        {displayedInsight.icon.library === "material" ? (
+                          <MaterialCommunityIcons
+                            name={
+                              displayedInsight.icon.name as ComponentProps<
+                                typeof MaterialCommunityIcons
+                              >["name"]
+                            }
+                            size={13}
+                            color="#FFFFFF"
+                          />
+                        ) : (
+                          <Feather
+                            name={
+                              displayedInsight.icon.name as ComponentProps<
+                                typeof Feather
+                              >["name"]
+                            }
+                            size={13}
+                            color="#FFFFFF"
+                          />
+                        )}
                       </View>
-                      <Text style={styles.insightTitle}>Eyrie Insight</Text>
+                      <Text style={styles.insightTitle}>
+                        {displayedInsight.title}
+                      </Text>
                     </View>
                     <Text style={styles.insightHeadline}>
-                      {insightContent.headline}
+                      {displayedInsight.headline}
                     </Text>
                     <Text style={styles.insightBody}>
-                      {insightContent.body}
+                      {displayedInsight.body}
                     </Text>
                     <View style={styles.insightFooterRow}>
-                      <View style={styles.insightPill}>
+                      <Pressable
+                        style={[
+                          styles.insightPill,
+                          {
+                            backgroundColor: displayedInsight.pillBackground,
+                          },
+                        ]}
+                        onPress={handleInsightPress}
+                      >
                         <Feather
-                          name="trending-down"
+                          name="arrow-up-right"
                           size={12}
-                          color="#0E7C74"
+                          color={displayedInsight.pillTextColor}
                         />
-                        <Text style={styles.insightPillText}>
-                          {insightContent.pill}
+                        <Text
+                          style={[
+                            styles.insightPillText,
+                            { color: displayedInsight.pillTextColor },
+                          ]}
+                        >
+                          {displayedInsight.ctaLabel}
                         </Text>
-                      </View>
+                      </Pressable>
+                      <Text style={styles.insightMetaText}>
+                        {displayedInsight.pill}
+                      </Text>
                     </View>
-                  </View>
+                  </Animated.View>
                   <View
                     style={[
                       styles.insightMascotWrap,
-                      { backgroundColor: pageStyles.insightBubble },
+                      { backgroundColor: displayedInsight.bubble },
                     ]}
                   >
                     <Image
                       contentFit="cover"
-                      source={require("@/assets/images/Eyrie_Mascot_2.png")}
+                      source={insightMascotSource}
                       style={styles.insightMascot}
                     />
                   </View>
@@ -2256,6 +2387,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     overflow: "hidden",
+    minHeight: 206,
   },
   insightContent: {
     flexDirection: "row",
@@ -2264,6 +2396,7 @@ const styles = StyleSheet.create({
   insightTextBlock: {
     flex: 1,
     paddingRight: 10,
+    minHeight: 182,
   },
   insightTitleRow: {
     flexDirection: "row",
@@ -2305,7 +2438,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
+    flexWrap: "wrap",
   },
   insightPill: {
     flexDirection: "row",
@@ -2322,6 +2456,13 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: fontWeights.medium,
     color: "#0E7C74",
+  },
+  insightMetaText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+    color: withOpacity("#FFFFFF", 0.84),
   },
   insightMascotWrap: {
     width: 82,

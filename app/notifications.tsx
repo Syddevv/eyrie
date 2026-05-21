@@ -683,7 +683,7 @@ export default function NotificationsScreen() {
         >
           <Feather name="wifi-off" size={22} color={colors.mutedForeground} />
           <Text style={[styles.emptyStateTitle, pageStyles.title]}>
-            You're offline
+            You&apos;re offline
           </Text>
           <Text style={[styles.emptyStateText, pageStyles.subtitle]}>
             Notifications are unavailable without an internet connection.
