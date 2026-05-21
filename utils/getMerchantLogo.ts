@@ -29,6 +29,8 @@ const MERCHANT_LOGO_ALIASES: Record<string, string> = {
   shopeepay: "shopee",
   "shopee pay": "shopee",
   "lazada wallet": "lazada",
+  "disney+": "disney plus",
+  "disney plus": "disney plus",
 };
 
 const NORMALIZED_MERCHANT_LOGOS = Object.entries(MERCHANT_LOGOS).reduce<
@@ -53,15 +55,4 @@ export function getMerchantLogo(name?: string | null) {
   const aliased = MERCHANT_LOGO_ALIASES[normalized] ?? normalized;
 
   return NORMALIZED_MERCHANT_LOGOS[aliased] ?? null;
-}
-
-export function getMerchantLogoScale(name?: string | null) {
-  const normalized = normalizeMerchantLogoName(name);
-  const aliased = MERCHANT_LOGO_ALIASES[normalized] ?? normalized;
-
-  if (aliased === "spotify") {
-    return 1.18;
-  }
-
-  return 1;
 }

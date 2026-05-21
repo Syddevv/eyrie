@@ -1,11 +1,15 @@
 import React, { memo, useMemo } from "react";
-import { View, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import {
+  View,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { Image } from "expo-image";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Logo from "@/components/logo";
 import {
   getMerchantLogo,
-  getMerchantLogoScale,
   normalizeMerchantLogoName,
 } from "@/utils/getMerchantLogo";
 
@@ -35,7 +39,6 @@ function MerchantLogo({
     [merchant],
   );
   const asset = useMemo(() => getMerchantLogo(merchant), [merchant]);
-  const assetScale = useMemo(() => getMerchantLogoScale(merchant), [merchant]);
   const borderRadius = Math.max(6, Math.round(size / 2));
 
   const contentStyle = {
@@ -46,14 +49,22 @@ function MerchantLogo({
 
   if (asset) {
     return (
-      <View style={[styles.assetContainer, contentStyle, style]}>
+      <View
+        style={[
+          styles.assetContainer,
+          contentStyle,
+          backgroundColor && { backgroundColor },
+          style,
+        ]}
+      >
         <Image
           source={asset}
-          style={[styles.assetImage, { transform: [{ scale: assetScale }] }]}
+          style={styles.assetImage}
           contentFit="cover"
           contentPosition="center"
-          transition={0}
+          transition={200}
           recyclingKey={normalizedMerchant || "merchant-logo"}
+          cachePolicy="memory-disk"
         />
       </View>
     );
@@ -62,7 +73,14 @@ function MerchantLogo({
   if (fallbackIcon && fallbackIcon.name) {
     if (fallbackIcon.library === "material") {
       return (
-        <View style={[styles.container, contentStyle, style]}>
+        <View
+          style={[
+            styles.container,
+            contentStyle,
+            backgroundColor && { backgroundColor },
+            style,
+          ]}
+        >
           <MaterialCommunityIcons
             name={fallbackIcon.name as any}
             size={Math.floor(size * 0.55)}
@@ -73,7 +91,14 @@ function MerchantLogo({
     }
 
     return (
-      <View style={[styles.container, contentStyle, style]}>
+      <View
+        style={[
+          styles.container,
+          contentStyle,
+          backgroundColor && { backgroundColor },
+          style,
+        ]}
+      >
         <Feather
           name={fallbackIcon.name as any}
           size={Math.floor(size * 0.55)}
@@ -101,11 +126,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   assetContainer: {
-    borderRadius: 999,
     overflow: "hidden",
     backgroundColor: "transparent",
   },
   assetImage: {
     ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
   },
 });

@@ -1003,10 +1003,6 @@ export default function AddTransactionModal() {
                           <MerchantLogo
                             merchant={merchant.label}
                             size={24}
-                            style={[
-                              styles.merchantBadge,
-                              { backgroundColor: merchant.color },
-                            ]}
                             backgroundColor={merchant.color}
                             fallbackIcon={{
                               library: "material",
@@ -1707,20 +1703,6 @@ const styles = StyleSheet.create({
   },
   merchantChipActive: {
     borderWidth: 1,
-  },
-  merchantBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  merchantBadgeText: {
-    fontFamily: fontFamilies.sans,
-    fontSize: 9,
-    lineHeight: 10,
-    fontWeight: fontWeights.bold,
   },
   merchantText: {
     fontFamily: fontFamilies.sans,

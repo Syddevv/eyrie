@@ -17,6 +17,7 @@ const FEATHER_CATEGORY_ICONS = new Set([
   "home",
   "heart",
   "zap",
+  "shopping-bag",
 ]);
 
 const LEGACY_CATEGORY_ICON_ALIASES: Record<string, string> = {
