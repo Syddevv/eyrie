@@ -47,23 +47,23 @@ export function AssistantSuggestionChip({
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 40,
+    minHeight: 38,
     borderRadius: radius.full,
-    paddingHorizontal: 15,
-    paddingVertical: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 7,
   },
   icon: {
     alignSelf: "center",
   },
   label: {
     fontFamily: fontFamilies.sans,
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12.5,
+    lineHeight: 16,
     fontWeight: fontWeights.medium,
     includeFontPadding: false,
   },

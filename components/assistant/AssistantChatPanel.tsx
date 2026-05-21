@@ -1,9 +1,11 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  KeyboardEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -68,6 +71,7 @@ export function AssistantChatPanel({
     isSending,
     isOffline,
   } = useAssistantSession();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const pageStyles = useMemo(
     () => ({
@@ -143,16 +147,65 @@ export function AssistantChatPanel({
     20,
     insets.bottom + BOTTOM_NAV_RESERVED_HEIGHT,
   );
+  const hasUserMessages = useMemo(
+    () => messages.some((message) => message.role === "user"),
+    [messages],
+  );
+  const footerBottomOffset =
+    keyboardHeight > 0 ? keyboardHeight : composerBottomInset;
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({ animated: true });
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      });
     });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (keyboardHeight > 0) {
+      scrollToBottom();
+    }
+  }, [keyboardHeight, scrollToBottom]);
+
+  useEffect(() => {
+    const handleKeyboardShow = (event: KeyboardEvent) => {
+      const nextHeight = Math.max(
+        0,
+        event.endCoordinates.height -
+          (Platform.OS === "ios" ? insets.bottom : 0),
+      );
+      setKeyboardHeight(nextHeight);
+    };
+
+    const handleKeyboardHide = () => {
+      setKeyboardHeight(0);
+    };
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(
+      showEvent,
+      handleKeyboardShow,
+    );
+    const hideSubscription = Keyboard.addListener(
+      hideEvent,
+      handleKeyboardHide,
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [insets.bottom]);
 
   const handleSend = useCallback(() => {
     void sendMessage();
@@ -186,7 +239,11 @@ export function AssistantChatPanel({
           style={styles.flex}
           contentContainerStyle={[
             styles.messagesContent,
-            { paddingBottom: composerBottomInset + 122 },
+            {
+              paddingBottom:
+                Math.max(footerBottomOffset, composerBottomInset) +
+                (hasUserMessages ? 92 : 138),
+            },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -207,47 +264,51 @@ export function AssistantChatPanel({
           style={[
             styles.footerWrap,
             {
-              bottom: composerBottomInset,
+              bottom: footerBottomOffset,
               paddingBottom: 2,
             },
           ]}
         >
-          <View style={styles.promptsWrap}>
-            <FlatList
-              horizontal
-              data={quickPrompts as QuickPrompt[]}
-              keyExtractor={(item) => item.text}
-              renderItem={({ item }) => (
-                <View
-                  style={[
-                    styles.suggestionItemCard,
-                    pageStyles.suggestionsCard,
-                  ]}
-                >
-                  <AssistantSuggestionChip
-                    disabled={isOffline || isSending}
-                    label={item.text}
-                    icon={item.icon}
-                    onPress={() => void sendSuggestion(item.text)}
-                    backgroundColor="transparent"
-                    borderColor="transparent"
-                    textColor={pageStyles.title.color}
-                    iconColor="#1495FF"
-                  />
-                </View>
-              )}
-              contentContainerStyle={styles.quickPromptRow}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
-
-          {isOffline ? (
-            <View style={styles.composerMeta}>
-              <Text style={[styles.helperText, pageStyles.helper]}>
-                AI Assistant requires an internet connection.
-              </Text>
-            </View>
+          {!hasUserMessages ? (
+            <Animated.View
+              entering={FadeIn.duration(180)}
+              exiting={FadeOut.duration(160)}
+              style={styles.promptsWrap}
+            >
+              <FlatList
+                horizontal
+                data={quickPrompts as QuickPrompt[]}
+                keyExtractor={(item) => item.text}
+                renderItem={({ item }) => (
+                  <View
+                    style={[
+                      styles.suggestionItemCard,
+                      pageStyles.suggestionsCard,
+                    ]}
+                  >
+                    <AssistantSuggestionChip
+                      disabled={isOffline || isSending}
+                      label={item.text}
+                      icon={item.icon}
+                      onPress={() => void sendSuggestion(item.text)}
+                      backgroundColor="transparent"
+                      borderColor="transparent"
+                      textColor={pageStyles.title.color}
+                      iconColor="#1495FF"
+                    />
+                  </View>
+                )}
+                contentContainerStyle={styles.quickPromptRow}
+                showsHorizontalScrollIndicator={false}
+              />
+            </Animated.View>
           ) : null}
+
+          <View style={styles.composerMeta}>
+            <Text style={[styles.helperText, pageStyles.helper]}>
+              AI Assistant requires an internet connection.
+            </Text>
+          </View>
 
           <View
             style={[
@@ -329,11 +390,11 @@ const styles = StyleSheet.create({
   suggestionItemCard: {
     borderRadius: 18,
     borderWidth: 1,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: 3,
+    paddingVertical: 3,
   },
   quickPromptRow: {
-    gap: 8,
+    gap: 7,
     paddingLeft: 2,
     paddingRight: 8,
   },
