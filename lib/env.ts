@@ -3,7 +3,6 @@ type EnvConfig = {
   SUPABASE_ANON_KEY: string;
   SUPABASE_PUBLISHABLE_KEY: string;
   SUPABASE_KEY: string;
-  GROQ_API_KEY: string;
 };
 
 function normalizeEnvValue(value: string | undefined) {
@@ -12,14 +11,15 @@ function normalizeEnvValue(value: string | undefined) {
 
 export const ENV: EnvConfig = {
   SUPABASE_URL: normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_URL),
-  SUPABASE_ANON_KEY: normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+  SUPABASE_ANON_KEY: normalizeEnvValue(
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  ),
   SUPABASE_PUBLISHABLE_KEY: normalizeEnvValue(
     process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   ),
   SUPABASE_KEY:
     normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ||
     normalizeEnvValue(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
-  GROQ_API_KEY: normalizeEnvValue(process.env.EXPO_PUBLIC_GROQ_API_KEY),
 };
 
 const envIssues: string[] = [];
@@ -39,7 +39,6 @@ export const envConfigError =
 
 console.log("SUPABASE URL:", ENV.SUPABASE_URL || "(missing)");
 console.log("SUPABASE KEY EXISTS:", Boolean(ENV.SUPABASE_KEY));
-console.log("GROQ API KEY EXISTS:", Boolean(ENV.GROQ_API_KEY));
 
 export function getEnvErrorMessage(feature = "This feature") {
   if (!envConfigError) {
@@ -56,4 +55,3 @@ export function assertEnvReady(feature = "This feature") {
     throw new Error(message);
   }
 }
-

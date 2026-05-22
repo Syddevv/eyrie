@@ -75,4 +75,7 @@ export type AssistantRequestInput = {
 
 export type AssistantResponse = {
   reply: string;
+  remainingMessages?: number;
+  dailyLimit?: number;
+  cooldownRemaining?: number;
 };

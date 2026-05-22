@@ -75,6 +75,10 @@ export function AssistantChatPanel({
     sendSuggestion,
     isSending,
     isOffline,
+    remainingMessages,
+    dailyLimit,
+    cooldownRemaining,
+    assistantStatusMessage,
   } = useAssistantSession();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -163,6 +167,18 @@ export function AssistantChatPanel({
   );
   const footerBottomOffset =
     keyboardHeight > 0 ? keyboardHeight : composerBottomInset;
+  const showUsageSummary =
+    typeof remainingMessages === "number" && typeof dailyLimit === "number";
+  const usageSummaryText = showUsageSummary
+    ? `${remainingMessages} / ${dailyLimit} AI messages remaining today`
+    : "AI usage is limited each day.";
+  const cooldownText =
+    cooldownRemaining > 0
+      ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
+      : remainingMessages === 0
+        ? assistantStatusMessage ||
+          "You've reached today's AI assistant limit. Please try again tomorrow."
+        : null;
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -252,7 +268,7 @@ export function AssistantChatPanel({
             {
               paddingBottom:
                 Math.max(footerBottomOffset, composerBottomInset) +
-                (hasUserMessages ? 92 : 138),
+                (hasUserMessages ? 112 : 158),
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -324,6 +340,20 @@ export function AssistantChatPanel({
 
           <View style={styles.composerMeta}>
             <Text style={[styles.helperText, pageStyles.helper]}>
+              {usageSummaryText}
+            </Text>
+            {cooldownText ? (
+              <Text
+                style={[
+                  styles.helperText,
+                  styles.cooldownText,
+                  pageStyles.subtitle,
+                ]}
+              >
+                {cooldownText}
+              </Text>
+            ) : null}
+            <Text style={[styles.helperText, pageStyles.helper]}>
               AI Assistant requires an internet connection.
             </Text>
           </View>
@@ -357,10 +387,20 @@ export function AssistantChatPanel({
             </View>
 
             <Pressable
-              disabled={isOffline || isSending || !input.trim()}
+              disabled={
+                isOffline ||
+                isSending ||
+                !input.trim() ||
+                cooldownRemaining > 0 ||
+                remainingMessages === 0
+              }
               style={({ pressed }) => [
                 styles.sendButton,
-                isOffline || isSending || !input.trim()
+                isOffline ||
+                isSending ||
+                !input.trim() ||
+                cooldownRemaining > 0 ||
+                remainingMessages === 0
                   ? pageStyles.sendButtonDisabled
                   : pageStyles.sendButton,
                 { opacity: pressed ? 0.82 : 1 },
@@ -420,11 +460,16 @@ const styles = StyleSheet.create({
   },
   composerMeta: {
     minHeight: 0,
+    marginTop: 8,
+    marginBottom: 2,
   },
   helperText: {
     fontFamily: fontFamilies.sans,
     fontSize: 12,
     lineHeight: 16,
+  },
+  cooldownText: {
+    marginTop: 2,
   },
   inputRow: {
     flexDirection: "row",

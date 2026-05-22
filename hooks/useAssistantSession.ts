@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalytics } from "@/hooks/useAnalytics";
 import {
@@ -12,6 +12,7 @@ import {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   ASSISTANT_FALLBACK_ERROR_MESSAGE,
+  AssistantFunctionError,
   askAssistant,
   buildAssistantContext,
   sanitizeAssistantInput,
@@ -22,6 +23,7 @@ import { useAssistantSessionStore } from "@/store/useAssistantSessionStore";
 import { useOfflineState } from "@/src/sync/hooks";
 
 const MAX_CONVERSATION_MESSAGES = 12;
+const DEFAULT_DAILY_LIMIT = 25;
 const EMPTY_SESSION = {
   messages: [],
   input: "",
@@ -29,6 +31,13 @@ const EMPTY_SESSION = {
   error: null,
   initialized: false,
 } as const;
+
+type AssistantUsageState = {
+  remainingMessages: number | null;
+  dailyLimit: number | null;
+  cooldownUntil: number | null;
+  statusMessage: string | null;
+};
 
 function createMessageId(prefix: string) {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -85,12 +94,20 @@ export function useAssistantSession() {
   const recentTransactions = useRecentTransactions();
   const goals = useGoalsProgress();
   const { analytics } = useAnalytics("thisMonth");
+  const [usageState, setUsageState] = useState<AssistantUsageState>({
+    remainingMessages: null,
+    dailyLimit: DEFAULT_DAILY_LIMIT,
+    cooldownUntil: null,
+    statusMessage: null,
+  });
+  const [clockTick, setClockTick] = useState(() => Date.now());
 
   useDashboardBootstrap(userId);
 
   const session = useAssistantSessionStore(
     useCallback(
-      (state) => (userId ? state.sessions[userId] ?? EMPTY_SESSION : EMPTY_SESSION),
+      (state) =>
+        userId ? (state.sessions[userId] ?? EMPTY_SESSION) : EMPTY_SESSION,
       [userId],
     ),
   );
@@ -107,7 +124,9 @@ export function useAssistantSession() {
   const replaceMessage = useAssistantSessionStore(
     (state) => state.replaceMessage,
   );
-  const removeMessage = useAssistantSessionStore((state) => state.removeMessage);
+  const removeMessage = useAssistantSessionStore(
+    (state) => state.removeMessage,
+  );
   const resetSession = useAssistantSessionStore((state) => state.resetSession);
 
   useEffect(() => {
@@ -117,6 +136,42 @@ export function useAssistantSession() {
 
     initializeSession(userId, buildInitialGreeting(user?.first_name));
   }, [initializeSession, user?.first_name, userId]);
+
+  useEffect(() => {
+    if (!usageState.cooldownUntil) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setClockTick(Date.now());
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [usageState.cooldownUntil]);
+
+  const cooldownRemaining = usageState.cooldownUntil
+    ? Math.max(Math.ceil((usageState.cooldownUntil - clockTick) / 1000), 0)
+    : 0;
+  const remainingMessages = usageState.remainingMessages;
+  const dailyLimit = usageState.dailyLimit;
+  const assistantStatusMessage = usageState.statusMessage;
+
+  useEffect(() => {
+    if (!usageState.cooldownUntil || cooldownRemaining > 0) {
+      return;
+    }
+
+    setUsageState((current) =>
+      current.cooldownUntil
+        ? {
+            ...current,
+            cooldownUntil: null,
+          }
+        : current,
+    );
+  }, [cooldownRemaining, usageState.cooldownUntil]);
 
   const financialContext = useMemo(
     () =>
@@ -165,7 +220,7 @@ export function useAssistantSession() {
       appendMessages(userId, [userMessage, loadingMessage]);
 
       try {
-        const { reply } = await askAssistant({
+        const result = await askAssistant({
           messages: toConversationWindow([...session.messages, userMessage]),
           financialContext,
           requestMeta: {
@@ -175,22 +230,57 @@ export function useAssistantSession() {
           },
         });
 
+        setUsageState((current) => ({
+          remainingMessages:
+            typeof result.remainingMessages === "number"
+              ? result.remainingMessages
+              : current.remainingMessages,
+          dailyLimit:
+            typeof result.dailyLimit === "number"
+              ? result.dailyLimit
+              : current.dailyLimit,
+          cooldownUntil: null,
+          statusMessage: null,
+        }));
+
         replaceMessage(
           userId,
           loadingMessage.id,
           createMessage(
             "assistant",
-            sanitizeAssistantInput(reply, 1_500) || ASSISTANT_FALLBACK_ERROR_MESSAGE,
+            sanitizeAssistantInput(result.reply, 1_500) ||
+              ASSISTANT_FALLBACK_ERROR_MESSAGE,
             "sent",
             "system",
           ),
         );
       } catch (error) {
         removeMessage(userId, loadingMessage.id);
+        const assistantError =
+          error instanceof AssistantFunctionError ? error : null;
         const message =
-          error instanceof Error && error.message.trim()
+          assistantError?.message?.trim() ||
+          (error instanceof Error && error.message.trim()
             ? error.message
-            : ASSISTANT_FALLBACK_ERROR_MESSAGE;
+            : ASSISTANT_FALLBACK_ERROR_MESSAGE);
+
+        setUsageState((current) => ({
+          remainingMessages:
+            typeof assistantError?.remainingMessages === "number"
+              ? assistantError.remainingMessages
+              : current.remainingMessages,
+          dailyLimit:
+            typeof assistantError?.dailyLimit === "number"
+              ? assistantError.dailyLimit
+              : current.dailyLimit,
+          cooldownUntil:
+            typeof assistantError?.cooldownRemaining === "number" &&
+            assistantError.cooldownRemaining > 0
+              ? Date.now() + assistantError.cooldownRemaining * 1000
+              : current.cooldownUntil,
+          statusMessage: message,
+        }));
+
         appendMessages(userId, [
           createMessage("assistant", message, "error", "system"),
         ]);
@@ -256,6 +346,10 @@ export function useAssistantSession() {
     isSending: session.isSending,
     isOffline,
     error: session.error,
+    remainingMessages,
+    dailyLimit,
+    cooldownRemaining,
+    assistantStatusMessage,
     resetSession: reset,
   } as const;
 }
