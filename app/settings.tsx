@@ -3,6 +3,8 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -73,6 +75,8 @@ const supportItems: readonly SupportItem[] = [
   },
 ] as const;
 
+const RATE_EYRIE_URL = "https://apkpure.com/reviews/com.sydu.eyrie";
+
 function withOpacity(hex: string, opacity: number) {
   const normalized = hex.replace("#", "");
   const full =
@@ -140,7 +144,8 @@ export default function SettingsScreen() {
               !account.isHidden &&
               (account.type === "bank" ||
                 account.type === "credit" ||
-                account.type === "ewallet"),
+                account.type === "ewallet" ||
+                account.type === "cash"),
           ).length;
 
           return {
@@ -211,6 +216,26 @@ export default function SettingsScreen() {
     }),
     [colors, isDark],
   );
+
+  const openRateEyrie = async () => {
+    try {
+      const supported = await Linking.canOpenURL(RATE_EYRIE_URL);
+      if (!supported) {
+        Alert.alert(
+          "Unable to open page",
+          "Your device could not open the Eyrie review page right now.",
+        );
+        return;
+      }
+
+      await Linking.openURL(RATE_EYRIE_URL);
+    } catch {
+      Alert.alert(
+        "Unable to open page",
+        "Your device could not open the Eyrie review page right now.",
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -475,6 +500,8 @@ export default function SettingsScreen() {
                       router.push("/help-center-modal");
                     } else if (item.title === "Privacy Policy") {
                       router.push("/privacy-policy-modal");
+                    } else if (item.title === "Rate Eyrie") {
+                      void openRateEyrie();
                     }
                   }}
                 >
@@ -553,7 +580,7 @@ export default function SettingsScreen() {
               Eyrie
             </Text>
             <Text style={[styles.footerVersion, pageStyles.footerText]}>
-              Version 1.0.0
+              Version 1.0.1
             </Text>
             <Text style={[styles.footerNote, pageStyles.footerText]}>
               Made with care in the Philippines
