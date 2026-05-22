@@ -1170,7 +1170,7 @@ export default function HomeScreen() {
             : "Ready",
       icon: {
         library: "material" as const,
-        name: isLoading && !summary ? "progress-clock" : "sparkles-outline",
+        name: isLoading && !summary ? "progress-clock" : "star-outline",
       },
       gradient: ["#37D3C2", "#2DBBBA"] as const,
       pillBackground: "#D8FFF4",

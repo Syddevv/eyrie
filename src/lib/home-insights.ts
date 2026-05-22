@@ -1,7 +1,13 @@
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
 
 type IconLibrary = "feather" | "material";
-type InsightTone = "critical" | "goal" | "budget" | "savings" | "activity" | "onboarding";
+type InsightTone =
+  | "critical"
+  | "goal"
+  | "budget"
+  | "savings"
+  | "activity"
+  | "onboarding";
 type MascotVariant = 1 | 2 | 3;
 
 type InsightIcon = {
@@ -9,11 +15,7 @@ type InsightIcon = {
   name: string;
 };
 
-type InsightAction =
-  | "/transactions"
-  | "/goals"
-  | "/explore"
-  | "/assistant";
+type InsightAction = "/transactions" | "/goals" | "/explore" | "/assistant";
 
 type TransactionSnapshot = {
   id: string;
@@ -128,9 +130,14 @@ export function buildHomeInsights(input: {
   const mostUsedBudget = budgets
     .filter((budget) => budget.budgetLimit > 0)
     .sort((left, right) => right.progress - left.progress)[0];
-  const overBudget = budgets.find((budget) => budget.amountSpent > budget.budgetLimit);
+  const overBudget = budgets.find(
+    (budget) => budget.amountSpent > budget.budgetLimit,
+  );
   const nearGoal = activeGoals
-    .filter((goal) => (goal.metrics?.progressPercentage ?? getGoalProgress(goal)) >= 75)
+    .filter(
+      (goal) =>
+        (goal.metrics?.progressPercentage ?? getGoalProgress(goal)) >= 75,
+    )
     .sort(
       (left, right) =>
         (right.metrics?.progressPercentage ?? getGoalProgress(right)) -
@@ -307,7 +314,10 @@ export function buildHomeInsights(input: {
       pillTextColor: "#1D4ED8",
       bubble: "rgba(255,255,255,0.12)",
     });
-  } else if (weeklyChange <= -15 && yesterdaySummary.expenses + todaySummary.expenses > 0) {
+  } else if (
+    weeklyChange <= -15 &&
+    yesterdaySummary.expenses + todaySummary.expenses > 0
+  ) {
     insights.push({
       id: "weekly-spending-down",
       priority: 64,
@@ -369,7 +379,10 @@ export function buildHomeInsights(input: {
     });
   }
 
-  if (todaySummary.expenses > 0 && yesterdaySummary.expenses > todaySummary.expenses) {
+  if (
+    todaySummary.expenses > 0 &&
+    yesterdaySummary.expenses > todaySummary.expenses
+  ) {
     insights.push({
       id: "spent-less-than-yesterday",
       priority: 57,
@@ -440,7 +453,7 @@ export function buildHomeInsights(input: {
       ctaLabel: "Add Expense",
       route: "/transactions",
       pill: "Ready",
-      icon: { library: "material", name: "sparkles-outline" },
+      icon: { library: "material", name: "star-outline" },
       mascot: 1,
       gradient: ["#37D3C2", "#2DBBBA"],
       pillBackground: "#D8FFF4",
@@ -518,16 +531,12 @@ function addDays(value: Date, amount: number) {
 
 function getMonthRange(referenceDate: Date) {
   return {
-    start: new Date(
-      referenceDate.getFullYear(),
-      referenceDate.getMonth(),
-      1,
-    ).toISOString().slice(0, 10),
-    end: new Date(
-      referenceDate.getFullYear(),
-      referenceDate.getMonth() + 1,
-      0,
-    ).toISOString().slice(0, 10),
+    start: new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1)
+      .toISOString()
+      .slice(0, 10),
+    end: new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0)
+      .toISOString()
+      .slice(0, 10),
   };
 }
 
@@ -537,12 +546,12 @@ function getPreviousMonthRange(referenceDate: Date) {
       referenceDate.getFullYear(),
       referenceDate.getMonth() - 1,
       1,
-    ).toISOString().slice(0, 10),
-    end: new Date(
-      referenceDate.getFullYear(),
-      referenceDate.getMonth(),
-      0,
-    ).toISOString().slice(0, 10),
+    )
+      .toISOString()
+      .slice(0, 10),
+    end: new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 0)
+      .toISOString()
+      .slice(0, 10),
   };
 }
 
