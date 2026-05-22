@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Logos/eyrie-logo-remove-bg.png",
+        "foregroundImage": "./assets/Logos/eyrie-logo-remove-bg-final.png",
         "backgroundColor": "#019042"
       },
       "package": "com.sydu.eyrie"
