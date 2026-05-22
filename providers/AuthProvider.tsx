@@ -15,14 +15,14 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import LoadingScreen from "@/app/loading-screen";
+import { LoadingScreen } from "@/app/loading-screen";
 import { CreateNewPasswordModal } from "@/components/auth/CreateNewPasswordModal";
 import { ForgotPasswordEmailModal } from "@/components/auth/ForgotPasswordEmailModal";
 import { OtpVerificationModal } from "@/components/auth/OtpVerificationModal";
 import { PasswordResetCodeModal } from "@/components/auth/PasswordResetCodeModal";
 import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import { getHasCompletedOnboarding } from "@/lib/onboarding-storage";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseConfigError } from "@/lib/supabase";
 import {
   beginPasswordResetFromRecoveryUrl,
   clearPasswordResetFlow,
@@ -101,6 +101,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [setHasCompletedOnboarding]);
 
   useEffect(() => {
+    if (!supabase) {
+      setSession(null);
+      setReady(true);
+      setIsAuthStateValidating(false);
+      return;
+    }
+
     let isMounted = true;
 
     const reconcileSession = async () => {
@@ -344,10 +351,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   return (
     <>
-      {databaseError ? (
+      {databaseError || supabaseConfigError ? (
         <View style={styles.errorScreen}>
           <Text style={styles.errorTitle}>Startup failed</Text>
-          <Text style={styles.errorMessage}>{databaseError.message}</Text>
+          <Text style={styles.errorMessage}>
+            {(databaseError ?? supabaseConfigError)?.message}
+          </Text>
         </View>
       ) : canRenderAppContent ? (
         <>

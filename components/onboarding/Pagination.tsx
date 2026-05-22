@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { MotiView } from "moti";
 
-import { MOTION_DURATION, RN_MOTION_EASING } from "@/constants/motion";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 
 type PaginationProps = {
   count: number;
@@ -36,7 +36,7 @@ export default function Pagination({
               transition={{
                 type: "timing",
                 duration: MOTION_DURATION.BASE,
-                easing: RN_MOTION_EASING.OUT_CUBIC,
+                easing: MOTION_EASING.OUT_CUBIC,
               }}
               style={styles.dot}
             />

@@ -3,6 +3,9 @@ module.exports = function (api) {
 
   return {
     presets: ["babel-preset-expo", "nativewind/babel"],
-    plugins: [["inline-import", { extensions: [".sql"] }]],
+    plugins: [
+      ["inline-import", { extensions: [".sql"] }],
+      "react-native-worklets/plugin",
+    ],
   };
 };

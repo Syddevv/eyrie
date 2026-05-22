@@ -1,11 +1,13 @@
 import { ThemeProvider } from "@react-navigation/native";
 import * as SystemUI from "expo-system-ui";
-import { Stack } from "expo-router";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import "../global.css";
 import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { STARTUP_BACKGROUND_COLOR } from "@/app/loading-screen";
 import { ToastHost } from "@/components/ui/ToastHost";
@@ -277,6 +279,24 @@ function GlobalToastLayer() {
   return <ToastHost disabled={passwordResetPhase === "email"} />;
 }
 
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <GestureHandlerRootView style={styles.errorRoot}>
+      <SafeAreaProvider>
+        <View style={styles.errorContent}>
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorMessage}>
+            {error?.message ?? "Unexpected startup error."}
+          </Text>
+          <Pressable onPress={retry} style={styles.retryButton}>
+            <Text style={styles.retryLabel}>Try again</Text>
+          </Pressable>
+        </View>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme() ?? "light";
 
@@ -290,18 +310,63 @@ export default function RootLayout() {
     <GestureHandlerRootView
       style={{ flex: 1, backgroundColor: STARTUP_BACKGROUND_COLOR }}
     >
-      <ThemeProvider value={navigationThemes[colorScheme]}>
-        <DatabaseProvider>
-          <AuthProvider>
-            <SyncProvider>
-              <AppShell />
-              <GlobalToastLayer />
-              <SyncStatusBanner />
-            </SyncProvider>
-          </AuthProvider>
-        </DatabaseProvider>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      </ThemeProvider>
+      <SafeAreaProvider>
+        <ThemeProvider value={navigationThemes[colorScheme]}>
+          <DatabaseProvider>
+            <AuthProvider>
+              <SyncProvider>
+                <AppShell />
+                <GlobalToastLayer />
+                <SyncStatusBanner />
+              </SyncProvider>
+            </AuthProvider>
+          </DatabaseProvider>
+          <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+        </ThemeProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  errorRoot: {
+    flex: 1,
+    backgroundColor: STARTUP_BACKGROUND_COLOR,
+  },
+  errorContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: STARTUP_BACKGROUND_COLOR,
+  },
+  errorTitle: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "700",
+    color: "#101A78",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  errorMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    minWidth: 132,
+    alignItems: "center",
+    borderRadius: 999,
+    backgroundColor: "#1495FF",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  retryLabel: {
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+});

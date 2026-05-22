@@ -9,7 +9,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
-import { RN_MOTION_EASING, MOTION_DURATION } from "@/constants/motion";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import type { LucideIcon } from "lucide-react-native";
 
 export type AccentAnchor =
@@ -180,7 +180,7 @@ function FloatingAccentCard({
         type: "timing",
         duration: MOTION_DURATION.LIST_ENTRY,
         delay: 40 + index * 25,
-        easing: RN_MOTION_EASING.OUT_CUBIC,
+        easing: MOTION_EASING.OUT_CUBIC,
       }}
       style={[styles.accentBase, anchorStyle]}
     >
@@ -313,7 +313,7 @@ function Slide({
                 type: "timing",
                 duration: MOTION_DURATION.BASE,
                 delay: 10 + sparkle.size,
-                easing: RN_MOTION_EASING.OUT_CUBIC,
+                easing: MOTION_EASING.OUT_CUBIC,
               }}
               style={[
                 {
@@ -402,7 +402,7 @@ function Slide({
             transition={{
               type: "timing",
               duration: MOTION_DURATION.FAST,
-              easing: RN_MOTION_EASING.OUT_CUBIC,
+              easing: MOTION_EASING.OUT_CUBIC,
             }}
             style={[
               styles.mascotWrap,
@@ -445,7 +445,7 @@ function Slide({
           transition={{
             type: "timing",
             duration: MOTION_DURATION.BASE,
-            easing: RN_MOTION_EASING.OUT_CUBIC,
+            easing: MOTION_EASING.OUT_CUBIC,
           }}
         >
           <View style={[styles.stepChip, { backgroundColor: slide.stepColor }]}>
@@ -461,7 +461,7 @@ function Slide({
             type: "timing",
             duration: MOTION_DURATION.BASE,
             delay: 34,
-            easing: RN_MOTION_EASING.OUT_CUBIC,
+            easing: MOTION_EASING.OUT_CUBIC,
           }}
         >
           <Text style={styles.title} numberOfLines={2}>
@@ -477,7 +477,7 @@ function Slide({
             type: "timing",
             duration: MOTION_DURATION.BASE,
             delay: 54,
-            easing: RN_MOTION_EASING.OUT_CUBIC,
+            easing: MOTION_EASING.OUT_CUBIC,
           }}
         >
           <Text style={styles.description}>{slide.description}</Text>

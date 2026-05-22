@@ -30,7 +30,7 @@ import {
 import Pagination from "./Pagination";
 import Slide, { type OnboardingSlideData } from "./Slide";
 
-import { MOTION_DURATION, RN_MOTION_EASING } from "@/constants/motion";
+import { MOTION_DURATION, MOTION_EASING } from "@/constants/motion";
 import { setHasCompletedOnboarding as persistOnboardingCompletion } from "@/lib/onboarding-storage";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -194,7 +194,7 @@ const particles = [
 const pageTransition = {
   type: "timing" as const,
   duration: MOTION_DURATION.PAGE,
-  easing: RN_MOTION_EASING.OUT_CUBIC,
+  easing: MOTION_EASING.OUT_CUBIC,
 };
 
 const PersistentBackground = memo(function PersistentBackground() {
@@ -407,7 +407,7 @@ export default function Onboarding() {
               transition={{
                 type: "timing",
                 duration: MOTION_DURATION.FAST,
-                easing: RN_MOTION_EASING.OUT_CUBIC,
+                easing: MOTION_EASING.OUT_CUBIC,
               }}
             >
               <Pagination
@@ -424,7 +424,7 @@ export default function Onboarding() {
               transition={{
                 type: "timing",
                 duration: MOTION_DURATION.BASE,
-                easing: RN_MOTION_EASING.OUT_CUBIC,
+                easing: MOTION_EASING.OUT_CUBIC,
               }}
             >
               <Pressable
