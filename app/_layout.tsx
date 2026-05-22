@@ -1,5 +1,6 @@
 import { ThemeProvider } from "@react-navigation/native";
 import * as SystemUI from "expo-system-ui";
+import * as WebBrowser from "expo-web-browser";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -27,6 +28,7 @@ export const unstable_settings = {
 SystemUI.setBackgroundColorAsync(STARTUP_BACKGROUND_COLOR).catch(() => {
   // Ignore unsupported platforms during boot.
 });
+WebBrowser.maybeCompleteAuthSession();
 
 function AppShell() {
   useNotificationBootstrap();

@@ -2,21 +2,25 @@
   "expo": {
     "name": "Eyrie",
     "slug": "eyrie",
-
+    "scheme": "eyrie",
     "icon": "./assets/Logos/eyrie-logo.png",
-
     "splash": {
       "image": "./assets/Logos/eyrie-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#F7F7FF"
     },
-
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "package": "com.sydu.eyrie"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "94d94149-f973-4cec-bb7a-230a1cda5ca2"
       }
     }
   }

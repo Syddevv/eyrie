@@ -25,8 +25,6 @@ type EmailRegistrationStatus = {
   recommended_provider: string | null;
 };
 
-WebBrowser.maybeCompleteAuthSession();
-
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
