@@ -6,7 +6,6 @@ import { budgetsRepository } from "../repositories/budgetsRepository";
 import type { NewBudget } from "../types";
 import { createId } from "../utils/ids";
 import {
-  calculateNextResetDate,
   getBudgetCycleRange,
   resetBudgetIfNeeded,
   nowIso,
@@ -57,7 +56,7 @@ export class BudgetsService {
     assertBudgetPeriod(input.period);
     assertPositiveAmount(input.amount, "budget amount");
 
-    const cycleRange = getBudgetCycleRange(input.period, input.startDate);
+    const timestamp = nowIso();
     const existingBudget =
       (
         await budgetsRepository.findByUserAndCategory(
@@ -67,6 +66,23 @@ export class BudgetsService {
       )[0] ?? null;
 
     if (existingBudget) {
+      const cycleRange = getBudgetCycleRange({
+        createdAt: existingBudget.createdAt,
+        cycle: input.period,
+        currentDate: timestamp,
+      });
+
+      if (__DEV__) {
+        console.log("[budgets] update existing budget from original anchor", {
+          budgetId: existingBudget.id,
+          categoryId: existingBudget.categoryId,
+          createdAt: existingBudget.createdAt,
+          previousCycle: existingBudget.period,
+          nextCycle: input.period,
+          nextResetDate: cycleRange.endDate,
+        });
+      }
+
       const updated = await this.update(
         existingBudget.id,
         prepareUpdateForSync({
@@ -74,7 +90,7 @@ export class BudgetsService {
           period: input.period,
           startDate: cycleRange.startDate,
           endDate: cycleRange.endDate,
-          updatedAt: nowIso(),
+          updatedAt: timestamp,
         }),
         { notifySuccess: false },
       );
@@ -93,14 +109,28 @@ export class BudgetsService {
       return updated;
     }
 
-    const timestamp = nowIso();
+    const cycleRange = getBudgetCycleRange({
+      createdAt: timestamp,
+      cycle: input.period,
+      currentDate: timestamp,
+    });
+
+    if (__DEV__) {
+      console.log("[budgets] create budget with original anchor", {
+        categoryId: input.categoryId,
+        cycle: input.period,
+        createdAt: timestamp,
+        nextResetDate: cycleRange.endDate,
+      });
+    }
+
     const budget = await budgetsRepository.create({
       ...prepareCreateForSync({
         ...input,
         id: input.id ?? createId("budget"),
         spent: input.spent ?? 0,
         startDate: cycleRange.startDate,
-        endDate: calculateNextResetDate(input.period, input.startDate),
+        endDate: cycleRange.endDate,
         createdAt: timestamp,
         updatedAt: timestamp,
       }),
@@ -159,21 +189,53 @@ export class BudgetsService {
     options: BudgetMutationOptions = {},
   ) {
     const { notifySuccess = true } = options;
-    if (input.period) {
-      assertBudgetPeriod(input.period);
+    const nextInput = { ...input };
+    delete nextInput.createdAt;
+
+    const existingBudget =
+      nextInput.period || nextInput.startDate || nextInput.endDate
+        ? await budgetsRepository.findById(id)
+        : null;
+
+    if (nextInput.period) {
+      assertBudgetPeriod(nextInput.period);
+
+      if (!existingBudget) {
+        return null;
+      }
+
+      const cycleRange = getBudgetCycleRange({
+        createdAt: existingBudget.createdAt,
+        cycle: nextInput.period,
+        currentDate: nextInput.updatedAt ?? nowIso(),
+      });
+
+      nextInput.startDate = cycleRange.startDate;
+      nextInput.endDate = cycleRange.endDate;
+
+      if (__DEV__) {
+        console.log("[budgets] recalculate cycle from original anchor", {
+          budgetId: id,
+          createdAt: existingBudget.createdAt,
+          previousCycle: existingBudget.period,
+          nextCycle: nextInput.period,
+          startDate: cycleRange.startDate,
+          nextResetDate: cycleRange.endDate,
+        });
+      }
     }
 
-    if (typeof input.amount === "number") {
-      assertPositiveAmount(input.amount, "budget amount");
+    if (typeof nextInput.amount === "number") {
+      assertPositiveAmount(nextInput.amount, "budget amount");
     }
 
-    if (typeof input.spent === "number") {
-      assertNonNegativeAmount(input.spent, "spent amount");
+    if (typeof nextInput.spent === "number") {
+      assertNonNegativeAmount(nextInput.spent, "spent amount");
     }
 
     const budget = await budgetsRepository.update(
       id,
-      prepareUpdateForSync(input),
+      prepareUpdateForSync(nextInput),
     );
 
     if (budget) {
@@ -204,19 +266,35 @@ export class BudgetsService {
     assertRequiredText(userId, "userId");
     assertBudgetPeriod(period);
 
-    const cycleRange = getBudgetCycleRange(period, anchorDate);
     const budgets = await budgetsRepository.findAllByUser(userId);
     const updatedBudgets = [] as Awaited<
       ReturnType<typeof budgetsRepository.update>
     >[];
 
     for (const budget of budgets) {
+      const cycleRange = getBudgetCycleRange({
+        createdAt: budget.createdAt,
+        cycle: period,
+        currentDate: anchorDate,
+      });
+
       if (
         budget.period === period &&
         budget.startDate === cycleRange.startDate &&
         budget.endDate === cycleRange.endDate
       ) {
         continue;
+      }
+
+      if (__DEV__) {
+        console.log("[budgets] sync budget cycle from original anchor", {
+          budgetId: budget.id,
+          createdAt: budget.createdAt,
+          previousCycle: budget.period,
+          nextCycle: period,
+          startDate: cycleRange.startDate,
+          nextResetDate: cycleRange.endDate,
+        });
       }
 
       const updated = await budgetsRepository.update(budget.id, {
@@ -250,7 +328,15 @@ export class BudgetsService {
     >[];
 
     for (const budget of budgets) {
-      const resetState = resetBudgetIfNeeded(budget, anchorDate);
+      assertBudgetPeriod(budget.period);
+      const resetState = resetBudgetIfNeeded(
+        {
+          period: budget.period,
+          endDate: budget.endDate,
+          createdAt: budget.createdAt,
+        },
+        anchorDate,
+      );
       if (!resetState.shouldReset || !resetState.cycleRange) {
         continue;
       }
@@ -258,7 +344,11 @@ export class BudgetsService {
       console.log("[budgets] resetting budget", {
         budgetId: budget.id,
         categoryId: budget.categoryId,
+        createdAt: budget.createdAt,
         cycle: budget.period,
+        currentDate:
+          anchorDate instanceof Date ? anchorDate.toISOString() : anchorDate,
+        previousResetDate: budget.endDate,
         nextResetDate: resetState.nextResetDate,
       });
 

@@ -1,23 +1,66 @@
 import type { BudgetPeriod } from "./constants";
 
+const DAY_IN_MS = 86_400_000;
+
+function asDate(value: string | Date) {
+  return value instanceof Date ? new Date(value) : new Date(value);
+}
+
+function startOfUtcDay(value: string | Date) {
+  const date = asDate(value);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
+function endOfUtcDay(value: string | Date) {
+  const date = asDate(value);
+  date.setUTCHours(23, 59, 59, 999);
+  return date;
+}
+
+function getMonthlyOccurrence(
+  createdAt: string | Date,
+  monthOffset: number,
+  mode: "start" | "end",
+) {
+  const created = asDate(createdAt);
+  const baseMonthIndex = created.getUTCFullYear() * 12 + created.getUTCMonth();
+  const targetMonthIndex = baseMonthIndex + monthOffset;
+  const targetYear = Math.floor(targetMonthIndex / 12);
+  const targetMonth = targetMonthIndex % 12;
+  const targetDay = created.getUTCDate();
+  const lastDayOfMonth = new Date(
+    Date.UTC(targetYear, targetMonth + 1, 0),
+  ).getUTCDate();
+  const clampedDay = Math.min(targetDay, lastDayOfMonth);
+
+  return new Date(
+    Date.UTC(
+      targetYear,
+      targetMonth,
+      clampedDay,
+      mode === "start" ? 0 : 23,
+      mode === "start" ? 0 : 59,
+      mode === "start" ? 0 : 59,
+      mode === "start" ? 0 : 999,
+    ),
+  );
+}
+
 export function nowIso() {
   return new Date().toISOString();
 }
 
 export function startOfDayIso(date: string | Date) {
-  const value = typeof date === "string" ? new Date(date) : new Date(date);
-  value.setUTCHours(0, 0, 0, 0);
-  return value.toISOString();
+  return startOfUtcDay(date).toISOString();
 }
 
 export function endOfDayIso(date: string | Date) {
-  const value = typeof date === "string" ? new Date(date) : new Date(date);
-  value.setUTCHours(23, 59, 59, 999);
-  return value.toISOString();
+  return endOfUtcDay(date).toISOString();
 }
 
 export function addDaysIso(date: string | Date, days: number) {
-  const value = typeof date === "string" ? new Date(date) : new Date(date);
+  const value = asDate(date);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString();
 }
@@ -37,71 +80,134 @@ export function toTransactionIso(
   return value.toISOString();
 }
 
-export function getBudgetCycleRange(
-  period: BudgetPeriod,
-  anchorDate: string | Date = new Date(),
-) {
-  const value =
-    typeof anchorDate === "string"
-      ? new Date(anchorDate)
-      : new Date(anchorDate);
+export function calculateNextResetDate(input: {
+  createdAt: string | Date;
+  cycle: BudgetPeriod;
+  currentDate: string | Date;
+}) {
+  const created = asDate(input.createdAt);
+  const current = asDate(input.currentDate);
+  let nextResetDate: Date;
 
-  if (period === "monthly") {
-    const start = new Date(
-      Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 0, 0, 0, 0),
-    );
-    const end = new Date(
-      Date.UTC(
-        value.getUTCFullYear(),
-        value.getUTCMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-        999,
-      ),
-    );
-    return { startDate: start.toISOString(), endDate: end.toISOString() };
+  if (input.cycle === "monthly") {
+    const monthsSinceCreation =
+      (current.getUTCFullYear() - created.getUTCFullYear()) * 12 +
+      (current.getUTCMonth() - created.getUTCMonth());
+    let monthOffset = Math.max(1, monthsSinceCreation);
+    nextResetDate = getMonthlyOccurrence(created, monthOffset, "end");
+
+    while (nextResetDate.getTime() <= current.getTime()) {
+      monthOffset += 1;
+      nextResetDate = getMonthlyOccurrence(created, monthOffset, "end");
+    }
+  } else {
+    const daysInterval = input.cycle === "biweekly" ? 14 : 7;
+    const firstResetDate = endOfUtcDay(created);
+    firstResetDate.setUTCDate(firstResetDate.getUTCDate() + daysInterval);
+
+    if (current.getTime() < firstResetDate.getTime()) {
+      nextResetDate = firstResetDate;
+    } else {
+      const diffMs = current.getTime() - firstResetDate.getTime();
+      const cyclesPassed = Math.floor(diffMs / (daysInterval * DAY_IN_MS));
+      nextResetDate = new Date(
+        firstResetDate.getTime() + (cyclesPassed + 1) * daysInterval * DAY_IN_MS,
+      );
+    }
   }
-
-  const start = new Date(value);
-  start.setUTCHours(0, 0, 0, 0);
-  start.setUTCDate(start.getUTCDate() - start.getUTCDay());
-
-  if (period === "biweekly") {
-    const base = new Date(Date.UTC(start.getUTCFullYear(), 0, 7, 0, 0, 0, 0));
-    const diffDays = Math.floor((start.getTime() - base.getTime()) / 86400000);
-    const offset = ((diffDays % 14) + 14) % 14;
-    start.setUTCDate(start.getUTCDate() - offset);
-  }
-
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + (period === "weekly" ? 6 : 13));
-  end.setUTCHours(23, 59, 59, 999);
-
-  return { startDate: start.toISOString(), endDate: end.toISOString() };
+  return nextResetDate.toISOString();
 }
 
-export function calculateNextResetDate(
-  period: BudgetPeriod,
-  anchorDate: string | Date = new Date(),
+export function getBudgetCycleRange(input: {
+  createdAt: string | Date;
+  cycle: BudgetPeriod;
+  currentDate: string | Date;
+}) {
+  const created = asDate(input.createdAt);
+  const endDate = calculateNextResetDate(input);
+  const end = asDate(endDate);
+  let start: Date;
+
+  if (input.cycle === "monthly") {
+    const monthsSinceCreation =
+      (end.getUTCFullYear() - created.getUTCFullYear()) * 12 +
+      (end.getUTCMonth() - created.getUTCMonth());
+    start =
+      monthsSinceCreation <= 1
+        ? startOfUtcDay(created)
+        : getMonthlyOccurrence(created, monthsSinceCreation - 1, "start");
+  } else {
+    const daysInterval = input.cycle === "biweekly" ? 14 : 7;
+    start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - daysInterval);
+    start.setUTCHours(0, 0, 0, 0);
+  }
+
+  const cycleRange = {
+    startDate: start.toISOString(),
+    endDate,
+  };
+  return cycleRange;
+}
+
+export function formatResetDateLabel(input: {
+  createdAt: string | Date;
+  cycle: BudgetPeriod;
+  currentDate: string | Date;
+}) {
+  return formatResetDateLabelFromNextResetDate(
+    calculateNextResetDate(input),
+    input.currentDate,
+    input.cycle,
+  );
+}
+
+export function formatResetDateLabelFromNextResetDate(
+  nextResetDate: string | Date,
+  currentDate: string | Date = new Date(),
+  cycle?: BudgetPeriod,
 ) {
-  return getBudgetCycleRange(period, anchorDate).endDate;
+  const current = asDate(currentDate);
+  const resetDate = asDate(nextResetDate);
+
+  if (cycle === "biweekly") {
+    const diffDays = Math.max(
+      0,
+      Math.ceil((resetDate.getTime() - current.getTime()) / DAY_IN_MS),
+    );
+
+    return diffDays === 1 ? "Resets in 1 day" : `Resets in ${diffDays} days`;
+  }
+
+  const formattedDate = new Intl.DateTimeFormat("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(resetDate);
+
+  return `Resets on ${formattedDate}`;
+}
+
+export function formatNextResetDate(value: string | Date) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(asDate(value));
 }
 
 export function shouldResetBudget(
   nextResetDate: string,
   anchorDate: string | Date = new Date(),
 ) {
-  const value =
-    typeof anchorDate === "string"
-      ? new Date(anchorDate)
-      : new Date(anchorDate);
-  return value.getTime() >= new Date(nextResetDate).getTime();
+  const value = asDate(anchorDate);
+  return value.getTime() >= asDate(nextResetDate).getTime();
 }
 
 export function resetBudgetIfNeeded(
-  budget: { period: BudgetPeriod; endDate: string },
+  budget: { period: BudgetPeriod; endDate: string; createdAt: string },
   anchorDate: string | Date = new Date(),
 ) {
   if (!shouldResetBudget(budget.endDate, anchorDate)) {
@@ -112,7 +218,11 @@ export function resetBudgetIfNeeded(
     };
   }
 
-  const cycleRange = getBudgetCycleRange(budget.period, anchorDate);
+  const cycleRange = getBudgetCycleRange({
+    createdAt: budget.createdAt,
+    cycle: budget.period,
+    currentDate: anchorDate,
+  });
 
   return {
     shouldReset: true as const,

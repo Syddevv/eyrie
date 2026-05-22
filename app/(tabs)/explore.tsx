@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,6 +30,11 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
+import {
+  formatNextResetDate,
+  formatResetDateLabel,
+  formatResetDateLabelFromNextResetDate,
+} from "@/src/db/utils/time";
 import {
   formatBudgetBalanceLabel,
   getBudgetProgressRatio,
@@ -88,15 +94,8 @@ function cycleLabel(value: BudgetCycle) {
   return "Monthly";
 }
 
-function formatNextResetDate(value: string) {
-  return new Intl.DateTimeFormat("en-PH", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
-}
-
 const FLOATING_TAB_BAR_CLEARANCE = 104;
+const BUDGET_CYCLE_STORAGE_KEY = "eyrie:budget-cycle-selection";
 
 export default function BudgetScreen() {
   const router = useRouter();
@@ -104,8 +103,8 @@ export default function BudgetScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const [selectedCycle, setSelectedCycle] = useState<BudgetCycle>("monthly");
-  const { budgets, summary, isLoading, refresh, cycleRange } =
-    useBudgets(selectedCycle);
+  const { budgets, summary, isLoading, refresh, nextResetDate } =
+    useBudgets(selectedCycle, undefined, { syncCycle: true });
   const [editingBudget, setEditingBudget] = useState<BudgetCard | null>(null);
   const [draftBudgetValue, setDraftBudgetValue] = useState("");
   const [budgetPendingDelete, setBudgetPendingDelete] =
@@ -206,6 +205,12 @@ export default function BudgetScreen() {
             ? "rgba(255,255,255,0.22)"
             : "rgba(255,255,255,0.18)",
       },
+      totalResetHelper: {
+        color:
+          colorScheme === "light"
+            ? "rgba(255,255,255,0.82)"
+            : "rgba(255,255,255,0.76)",
+      },
       modalOverlay: {
         backgroundColor:
           colorScheme === "light"
@@ -252,6 +257,26 @@ export default function BudgetScreen() {
   );
 
   const styles = useMemo(() => createStyles(), []);
+
+  useEffect(() => {
+    AsyncStorage.getItem(BUDGET_CYCLE_STORAGE_KEY)
+      .then((storedValue) => {
+        if (
+          storedValue === "weekly" ||
+          storedValue === "biweekly" ||
+          storedValue === "monthly"
+        ) {
+          setSelectedCycle(storedValue);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(BUDGET_CYCLE_STORAGE_KEY, selectedCycle).catch(
+      () => undefined,
+    );
+  }, [selectedCycle]);
 
   useEffect(() => {
     const showEvent =
@@ -392,6 +417,17 @@ export default function BudgetScreen() {
       : totalVisualState === "warning"
         ? "#FDE68A"
         : "#FFC21A";
+  const totalResetLabel = budgets.length
+    ? formatResetDateLabelFromNextResetDate(
+        nextResetDate,
+        new Date(),
+        selectedCycle,
+      )
+    : formatResetDateLabel({
+        createdAt: new Date(),
+        cycle: selectedCycle,
+        currentDate: new Date(),
+      });
 
   return (
     <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
@@ -449,6 +485,12 @@ export default function BudgetScreen() {
                 ]}
               />
             </View>
+
+            <Text
+              style={[styles.totalResetHelper, pageStyles.totalResetHelper]}
+            >
+              {totalResetLabel}
+            </Text>
 
             {totalVisualState !== "safe" ? (
               <View style={styles.totalAlertRow}>
@@ -538,7 +580,7 @@ export default function BudgetScreen() {
               while transactions stay in history.
             </Text>
             <Text style={[styles.cycleHint, pageStyles.mutedText]}>
-              Next reset: {formatNextResetDate(cycleRange.endDate)}
+              Next reset: {formatNextResetDate(nextResetDate)}
             </Text>
           </View>
 
@@ -1084,6 +1126,13 @@ function createStyles() {
       borderRadius: radius.full,
       backgroundColor: "rgba(255,255,255,0.18)",
       overflow: "hidden",
+    },
+    totalResetHelper: {
+      marginTop: 10,
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: fontWeights.medium,
     },
     totalProgressFill: {
       height: "100%",

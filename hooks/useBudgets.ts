@@ -41,6 +41,10 @@ export type BudgetPlanningSnapshot = {
   status: "healthy" | "warning";
 };
 
+type UseBudgetsOptions = {
+  syncCycle?: boolean;
+};
+
 function inRange(anchorDate: string, startDate: string, endDate: string) {
   return startDate <= anchorDate && anchorDate <= endDate;
 }
@@ -49,17 +53,26 @@ function describeError(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-function getActiveBudgets<
-  T extends { period: string; startDate: string; endDate: string },
->(rows: T[], selectedCycle: BudgetCycle, anchorIso: string) {
-  return rows.filter(
-    (budget) =>
-      budget.period === selectedCycle &&
-      inRange(anchorIso, budget.startDate, budget.endDate),
-  );
+function getSharedBudgets<T extends { startDate: string; endDate: string }>(
+  rows: T[],
+  anchorIso: string,
+) {
+  return rows.filter((budget) => inRange(anchorIso, budget.startDate, budget.endDate));
 }
 
 type BudgetProgressRow = Awaited<ReturnType<typeof getBudgetProgress>>[number];
+
+function getSoonestResetDate(rows: { endDate: string }[]) {
+  return rows.reduce<string | null>((soonest, row) => {
+    if (!soonest) {
+      return row.endDate;
+    }
+
+    return new Date(row.endDate).getTime() < new Date(soonest).getTime()
+      ? row.endDate
+      : soonest;
+  }, null);
+}
 
 export function calculateBudgetPlanningSnapshot(input: {
   availableFunds: number;
@@ -89,9 +102,14 @@ export function calculateBudgetPlanningSnapshot(input: {
   };
 }
 
-export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
+export function useBudgets(
+  selectedCycle: BudgetCycle,
+  anchorDate?: Date,
+  options: UseBudgetsOptions = {},
+) {
   const { user } = useCurrentUser();
   const userId = user?.id ?? null;
+  const { syncCycle = false } = options;
   const fallbackAnchorDateRef = useRef(new Date());
   const resolvedAnchorDate = anchorDate ?? fallbackAnchorDateRef.current;
   const anchorIso = resolvedAnchorDate.toISOString();
@@ -127,16 +145,16 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
       setIsRefreshing(shouldRefreshInBackground);
       setError(null);
 
-      if (__DEV__) {
-        console.log("[budgets] refresh", {
-          force,
-          userId,
-          cycle: selectedCycleRef.current,
-          cachedRows: budgetRowsRef.current.length,
-        });
-      }
-
       try {
+        if (syncCycle) {
+          await budgetsService
+            .ensureActiveCycleBudgets(
+              userId,
+              selectedCycleRef.current,
+              resolvedAnchorDate,
+            )
+            .catch(() => undefined);
+        }
         const rows = await getBudgetProgress(userId);
         budgetRowsRef.current = rows;
         setBudgetRows(rows);
@@ -149,8 +167,16 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         setIsRefreshing(false);
       }
     },
-    [userId],
+    [resolvedAnchorDate, syncCycle, userId],
   );
+
+  useEffect(() => {
+    if (!syncCycle || !userId || !hasResolved) {
+      return;
+    }
+
+    void refresh(true);
+  }, [hasResolved, refresh, selectedCycle, syncCycle, userId]);
 
   useEffect(() => {
     const offAccounts = onAccountsChanged(() => {
@@ -188,7 +214,23 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
     }, [hasResolved, lastLoadedAt, refresh, resolvedAnchorDate, userId]),
   );
 
-  const activeBudgetRows = useMemo(() => budgetRows, [budgetRows]);
+  const activeBudgetRows = useMemo(
+    () => getSharedBudgets(budgetRows, anchorIso),
+    [anchorIso, budgetRows],
+  );
+
+  useEffect(() => {
+    if (__DEV__ && hasResolved) {
+      console.log("[budgets] shared budget hydration", {
+        selectedCycle,
+        rowCount: activeBudgetRows.length,
+        totalBudget: activeBudgetRows.reduce(
+          (sum, budget) => sum + (Number(budget.amount) || 0),
+          0,
+        ),
+      });
+    }
+  }, [activeBudgetRows, hasResolved, selectedCycle]);
 
   const budgets = useMemo(
     () =>
@@ -208,17 +250,27 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         remainingAmount: budget.remaining,
         progress: budget.progress / 100,
         transactionCount: budget.transactionCount ?? 0,
-        cycle: budget.period as BudgetCycle,
+        cycle: selectedCycle,
         startDate: budget.startDate,
         endDate: budget.endDate,
         nextResetDate: budget.endDate,
       })),
-    [activeBudgetRows],
+    [activeBudgetRows, selectedCycle],
   );
 
   const cycleRange = useMemo(
-    () => getBudgetCycleRange(selectedCycle, resolvedAnchorDate),
+    () =>
+      getBudgetCycleRange({
+        createdAt: resolvedAnchorDate,
+        cycle: selectedCycle,
+        currentDate: resolvedAnchorDate,
+      }),
     [resolvedAnchorDate, selectedCycle],
+  );
+
+  const nextResetDate = useMemo(
+    () => getSoonestResetDate(activeBudgetRows) ?? cycleRange.endDate,
+    [activeBudgetRows, cycleRange.endDate],
   );
 
   const summary = useMemo(() => {
@@ -242,6 +294,7 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
     error,
     refresh,
     cycleRange,
+    nextResetDate,
   } as const;
 }
 
@@ -268,23 +321,30 @@ export function useAvailableBudgetCategories(
     }
 
     setIsLoading(true);
-    if (__DEV__) {
-      console.log("[budgets] planning refresh", {
-        userId,
-        cycle: selectedCycle,
-      });
-    }
+    await budgetsService
+      .ensureActiveCycleBudgets(userId, selectedCycle, resolvedAnchorDate)
+      .catch(() => undefined);
     await budgetsService
       .resetBudgetsIfNeeded(userId, resolvedAnchorDate)
       .catch(() => undefined);
     const rows = await budgetsService.fetch(userId);
-    const activeBudgets = getActiveBudgets(rows, selectedCycle, anchorIso);
+    const activeBudgets = getSharedBudgets(rows, anchorIso);
     setCategoryIdsWithActiveBudget(
       new Set(activeBudgets.map((budget) => budget.categoryId)),
     );
     setCurrentTotalBudgeted(
       roundMoney(activeBudgets.reduce((sum, budget) => sum + budget.amount, 0)),
     );
+
+    if (__DEV__) {
+      console.log("[budgets] shared planning hydration", {
+        selectedCycle,
+        rowCount: activeBudgets.length,
+        currentTotalBudgeted: roundMoney(
+          activeBudgets.reduce((sum, budget) => sum + budget.amount, 0),
+        ),
+      });
+    }
     setIsLoading(false);
   }, [anchorIso, resolvedAnchorDate, selectedCycle, userId]);
 
@@ -308,7 +368,12 @@ export function useAvailableBudgetCategories(
   }, [refresh]);
 
   const cycleRange = useMemo(
-    () => getBudgetCycleRange(selectedCycle, resolvedAnchorDate),
+    () =>
+      getBudgetCycleRange({
+        createdAt: resolvedAnchorDate,
+        cycle: selectedCycle,
+        currentDate: resolvedAnchorDate,
+      }),
     [resolvedAnchorDate, selectedCycle],
   );
 

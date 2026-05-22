@@ -43,10 +43,6 @@ export function useBudgetResetScheduler() {
       return;
     }
 
-    if (__DEV__) {
-      console.log("[budgets] reset scheduler check", { userId });
-    }
-
     await budgetsService
       .resetBudgetsIfNeeded(userId, new Date())
       .catch(() => undefined);
@@ -65,14 +61,6 @@ export function useBudgetResetScheduler() {
     timerRef.current = setTimeout(() => {
       void scheduleNextReset();
     }, delayMs);
-
-    if (__DEV__) {
-      console.log("[budgets] reset scheduler armed", {
-        userId,
-        nextResetDate,
-        delayMs,
-      });
-    }
   }, [clearTimer, userId]);
 
   useEffect(() => {
