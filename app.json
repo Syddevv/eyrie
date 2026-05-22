@@ -5,7 +5,7 @@
     "scheme": "eyrie",
     "icon": "./assets/Logos/eyrie-logo.png",
     "splash": {
-      "image": "./assets/Logos/eyrie-logo-border.png",
+      "image": "./assets/Logos/eyrie-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#F7F7FF"
     },
