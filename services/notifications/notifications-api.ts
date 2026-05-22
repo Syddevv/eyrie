@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 
 import {
   defaultNotificationPreferences,
@@ -30,6 +30,8 @@ function mapPreferences(row: any): NotificationPreferences {
 }
 
 export async function ensureNotificationPreferences(userId: string) {
+  assertSupabaseConfigured("Notifications");
+
   const { data, error } = await supabase
     .from("notification_preferences")
     .select("*")
@@ -62,6 +64,8 @@ export async function updateNotificationPreferences(
   userId: string,
   updates: Partial<Omit<NotificationPreferences, "user_id" | "updated_at">>,
 ) {
+  assertSupabaseConfigured("Notifications");
+
   const payload = {
     ...updates,
     user_id: userId,
@@ -82,6 +86,8 @@ export async function updateNotificationPreferences(
 }
 
 export async function fetchNotifications(userId: string, limit = 100) {
+  assertSupabaseConfigured("Notifications");
+
   const { data, error } = await supabase
     .from("notifications")
     .select("*")
@@ -98,6 +104,8 @@ export async function fetchNotifications(userId: string, limit = 100) {
 }
 
 export async function fetchUnreadNotificationCount(userId: string) {
+  assertSupabaseConfigured("Notifications");
+
   const { count, error } = await supabase
     .from("notifications")
     .select("*", { count: "exact", head: true })
@@ -113,6 +121,8 @@ export async function fetchUnreadNotificationCount(userId: string) {
 }
 
 export async function markNotificationRead(id: string, isRead = true) {
+  assertSupabaseConfigured("Notifications");
+
   const { data, error } = await supabase
     .from("notifications")
     .update({
@@ -131,6 +141,8 @@ export async function markNotificationRead(id: string, isRead = true) {
 }
 
 export async function markAllNotificationsRead(userId: string) {
+  assertSupabaseConfigured("Notifications");
+
   const readAt = new Date().toISOString();
   const { error } = await supabase
     .from("notifications")
@@ -148,6 +160,8 @@ export async function markAllNotificationsRead(userId: string) {
 }
 
 export async function softDeleteNotification(id: string) {
+  assertSupabaseConfigured("Notifications");
+
   const { data, error } = await supabase
     .from("notifications")
     .update({
@@ -168,6 +182,8 @@ export async function upsertNotifications(
   userId: string,
   candidates: NotificationCandidate[],
 ) {
+  assertSupabaseConfigured("Notifications");
+
   if (!candidates.length) {
     return [] as AppNotification[];
   }
@@ -195,6 +211,8 @@ export function subscribeToNotifications(
   userId: string,
   onEvent: (event: NotificationRealtimeEvent) => void,
 ) {
+  assertSupabaseConfigured("Notifications");
+
   const channelId = `notifications:${userId}:${Math.random()
     .toString(36)
     .slice(2, 10)}`;

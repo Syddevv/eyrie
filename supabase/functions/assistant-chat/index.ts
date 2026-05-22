@@ -6,7 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GROQ_API_KEY = Deno.env.get("VITE_GROQ_API_KEY") ?? "";
+const GROQ_API_KEY =
+  Deno.env.get("GROQ_API_KEY") ??
+  Deno.env.get("EXPO_PUBLIC_GROQ_API_KEY") ??
+  "";
 const GROQ_MODEL = Deno.env.get("GROQ_MODEL") ?? "llama-3.1-8b-instant";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";

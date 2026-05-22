@@ -4,7 +4,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import type { User } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { supabase } from "@/lib/supabase";
+import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export type PasswordAuthProvider = "email" | "google";
 
@@ -86,6 +86,8 @@ function getGoogleRedirectUri() {
 }
 
 async function reauthenticateWithGoogle() {
+  assertSupabaseConfigured("Password management");
+
   const redirectTo = getGoogleRedirectUri();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -162,6 +164,8 @@ export async function updatePasswordForEmailUser(input: {
   currentPassword: string;
   newPassword: string;
 }) {
+  assertSupabaseConfigured("Password management");
+
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: input.email.trim().toLowerCase(),
     password: input.currentPassword,
@@ -181,6 +185,8 @@ export async function updatePasswordForEmailUser(input: {
 }
 
 export async function createPasswordForGoogleUser(newPassword: string) {
+  assertSupabaseConfigured("Password management");
+
   const update = async () => {
     const { error } = await supabase.auth.updateUser({
       password: newPassword,

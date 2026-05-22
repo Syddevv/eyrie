@@ -10,6 +10,7 @@ import {
 import { NativeModules } from "react-native";
 
 import {
+  assertSupabaseConfigured,
   supabase,
   supabasePublishableKey,
   supabaseUrl,
@@ -28,14 +29,29 @@ const resetClientStorage: SupportedStorage = {
   removeItem: async () => {},
 };
 
-const passwordResetClient = createClient(supabaseUrl, supabasePublishableKey!, {
-  auth: {
-    storage: resetClientStorage,
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-});
+const passwordResetClient =
+  supabaseUrl && supabasePublishableKey
+    ? createClient(supabaseUrl, supabasePublishableKey, {
+        auth: {
+          storage: resetClientStorage,
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false,
+        },
+      })
+    : null;
+
+function getPasswordResetClient() {
+  assertSupabaseConfigured("Password reset");
+
+  if (!passwordResetClient) {
+    throw new Error(
+      "Password reset is unavailable because the app environment is incomplete.",
+    );
+  }
+
+  return passwordResetClient;
+}
 
 type NetInfoState = {
   isConnected: boolean | null;
@@ -130,6 +146,8 @@ async function ensureOnline() {
 }
 
 async function ensurePasswordResetEmailExists(email: string) {
+  assertSupabaseConfigured("Password reset");
+
   const { data, error } = await supabase.rpc("password_reset_email_exists", {
     target_email: email,
   });
@@ -145,14 +163,14 @@ async function ensurePasswordResetEmailExists(email: string) {
 
 async function clearPasswordResetSession() {
   try {
-    await passwordResetClient.auth.signOut();
+    await getPasswordResetClient().auth.signOut();
   } catch {
     // Ignore reset-client cleanup failures.
   }
 }
 
 async function hasActivePasswordResetSession() {
-  const { data } = await passwordResetClient.auth.getSession();
+  const { data } = await getPasswordResetClient().auth.getSession();
   return Boolean(data.session?.access_token);
 }
 
@@ -331,7 +349,7 @@ export async function beginPasswordResetFromRecoveryUrl(url: string) {
   }
 
   const session = await createSessionFromRedirectUrlForClient(
-    passwordResetClient,
+    getPasswordResetClient(),
     url,
   );
 
@@ -344,6 +362,8 @@ export async function beginPasswordResetFromRecoveryUrl(url: string) {
 }
 
 export async function requestPasswordResetCode(email: string) {
+  assertSupabaseConfigured("Password reset");
+
   const store = useAuthStore.getState();
   const normalizedEmail = normalizeEmail(email);
   store.setSendingPasswordReset(true);
@@ -381,6 +401,8 @@ export async function requestPasswordResetCode(email: string) {
 }
 
 export async function resendPasswordResetCode() {
+  assertSupabaseConfigured("Password reset");
+
   const store = useAuthStore.getState();
   const email = store.passwordResetFlow.email;
 
@@ -423,6 +445,8 @@ export async function resendPasswordResetCode() {
 }
 
 export async function verifyPasswordResetCode(token: string) {
+  assertSupabaseConfigured("Password reset");
+
   const store = useAuthStore.getState();
   const { email, attempts } = store.passwordResetFlow;
 
@@ -445,7 +469,7 @@ export async function verifyPasswordResetCode(token: string) {
     await ensureOnline();
     await clearPasswordResetSession();
 
-    const { data, error } = await passwordResetClient.auth.verifyOtp({
+    const { data, error } = await getPasswordResetClient().auth.verifyOtp({
       email,
       token,
       type: "recovery",
@@ -473,6 +497,8 @@ export async function verifyPasswordResetCode(token: string) {
 }
 
 export async function completePasswordReset(newPassword: string) {
+  assertSupabaseConfigured("Password reset");
+
   const store = useAuthStore.getState();
   store.setUpdatingPasswordReset(true);
 
@@ -483,7 +509,7 @@ export async function completePasswordReset(newPassword: string) {
       throw new Error("reset_session_expired");
     }
 
-    const { error } = await passwordResetClient.auth.updateUser({
+    const { error } = await getPasswordResetClient().auth.updateUser({
       password: newPassword,
     });
 

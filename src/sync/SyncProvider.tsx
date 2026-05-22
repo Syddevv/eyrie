@@ -1,5 +1,6 @@
 import { AppState, NativeModules, Platform, type AppStateStatus } from "react-native";
 import { type PropsWithChildren, useEffect, useRef } from "react";
+import { ENV } from "@/lib/env";
 import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { emitAllChanges } from "@/src/lib/dbSync";
@@ -20,7 +21,7 @@ type NetInfoModule = {
 const CONNECTIVITY_POLL_MS = 15000;
 const CONNECTIVITY_TIMEOUT_MS = 5000;
 const FALLBACK_CONNECTIVITY_URLS = [
-  process.env.EXPO_PUBLIC_SUPABASE_URL,
+  ENV.SUPABASE_URL,
   "https://clients3.google.com/generate_204",
 ].filter((value): value is string => Boolean(value));
 

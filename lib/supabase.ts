@@ -2,22 +2,16 @@ import "expo-sqlite/localStorage/install";
 import "react-native-url-polyfill/auto";
 import { AppState, Platform } from "react-native";
 import { createClient, processLock } from "@supabase/supabase-js";
+import { ENV, assertEnvReady, getEnvErrorMessage } from "@/lib/env";
 
-export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? null;
-export const supabasePublishableKey =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+export const supabaseUrl = ENV.SUPABASE_URL || null;
+export const supabasePublishableKey = ENV.SUPABASE_KEY || null;
 
 export const supabaseConfigError =
-  !supabaseUrl
-    ? new Error(
-        "Missing Supabase URL. Set EXPO_PUBLIC_SUPABASE_URL before launching the app.",
-      )
-    : !supabasePublishableKey
-      ? new Error(
-          "Missing Supabase publishable key. Set EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY or EXPO_PUBLIC_SUPABASE_ANON_KEY.",
-        )
-      : null;
+  (() => {
+    const message = getEnvErrorMessage("Supabase");
+    return message ? new Error(message) : null;
+  })();
 
 if (!supabasePublishableKey) {
   console.error("[supabase] Missing publishable key configuration.");
@@ -40,6 +34,10 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null;
+
+export function assertSupabaseConfigured(feature = "Supabase") {
+  assertEnvReady(feature);
+}
 
 if (Platform.OS !== "web" && supabase) {
   AppState.addEventListener("change", (state) => {

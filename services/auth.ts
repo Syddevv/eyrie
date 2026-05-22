@@ -6,7 +6,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
-import { supabase } from "@/lib/supabase";
+import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { accountsService } from "@/src/db/services";
 
@@ -96,6 +96,8 @@ function getExistingAccountMessage(
 async function getEmailRegistrationStatus(
   email: string,
 ): Promise<EmailRegistrationStatus | null> {
+  assertSupabaseConfigured("Authentication");
+
   const normalizedEmail = normalizeEmail(email);
 
   const { data, error } = await supabase.rpc("get_email_registration_status", {
@@ -179,6 +181,7 @@ export async function createSessionFromRedirectUrlForClient(
 }
 
 export async function createSessionFromRedirectUrl(url: string) {
+  assertSupabaseConfigured("Authentication");
   return createSessionFromRedirectUrlForClient(supabase, url);
 }
 
@@ -298,6 +301,8 @@ export async function signInWithEmailPassword({
   email: string;
   password: string;
 }) {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   const normalizedEmail = normalizeEmail(email);
   store.setSigningIn(true);
@@ -345,6 +350,8 @@ export async function signUpWithEmailPassword({
   email: string;
   password: string;
 }) {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   const normalizedEmail = normalizeEmail(email);
   store.setSigningUp(true);
@@ -396,6 +403,8 @@ export async function verifySignupOtp({
   email: string;
   token: string;
 }): Promise<Session | null> {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   store.setVerifyingOtp(true);
   store.setOtpModalStatus("idle");
@@ -427,6 +436,8 @@ export async function verifySignupOtp({
 }
 
 export async function resendSignupOtp(email: string) {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   store.setSendingOtp(true);
   store.setOtpModalStatus("idle");
@@ -455,6 +466,8 @@ export async function resendSignupOtp(email: string) {
 }
 
 export async function signInWithGoogle() {
+  assertSupabaseConfigured("Google sign-in");
+
   const store = useAuthStore.getState();
 
   store.setGoogleLoading(true);
@@ -531,6 +544,8 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   store.setSigningOut(true);
 

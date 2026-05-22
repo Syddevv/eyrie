@@ -1,4 +1,9 @@
-import { supabase, supabasePublishableKey, supabaseUrl } from "@/lib/supabase";
+import {
+  assertSupabaseConfigured,
+  supabase,
+  supabasePublishableKey,
+  supabaseUrl,
+} from "@/lib/supabase";
 
 import type { AssistantRequestInput, AssistantResponse } from "./types";
 
@@ -26,6 +31,12 @@ export function sanitizeAssistantInput(value: string, maxLength = 600) {
 export async function askAssistant(
   input: AssistantRequestInput,
 ): Promise<AssistantResponse> {
+  assertSupabaseConfigured("The AI assistant");
+
+  if (!supabase || !supabaseUrl || !supabasePublishableKey) {
+    throw new Error(ASSISTANT_FALLBACK_ERROR_MESSAGE);
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();

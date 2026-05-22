@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 
 import type { SyncableTable } from "./types";
 
@@ -13,6 +13,8 @@ export async function fetchRemoteRowById(
   userId: string,
   id: string,
 ) {
+  assertSupabaseConfigured("Cloud sync");
+
   if (table === "users") {
     const { data, error } = await supabase.from("users").select("*").eq("id", id).maybeSingle();
     if (error) {
@@ -36,6 +38,8 @@ export async function fetchRemoteRowById(
 }
 
 export async function upsertRemoteRows(table: SyncableTable, rows: Record<string, unknown>[]) {
+  assertSupabaseConfigured("Cloud sync");
+
   if (!rows.length) {
     return [];
   }
@@ -58,6 +62,8 @@ export async function fetchRemoteRowsPage(
   cursorUpdatedAt: string | null,
   limit: number,
 ) {
+  assertSupabaseConfigured("Cloud sync");
+
   if (table === "users") {
     const query = supabase.from("users").select("*").eq("id", userId).limit(1);
     const { data, error } = cursorUpdatedAt
