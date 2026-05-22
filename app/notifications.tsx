@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   ListRenderItemInfo,
   Pressable,
@@ -15,11 +16,16 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { Pressable as GestureHandlerPressable } from "react-native-gesture-handler";
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  FadeOutUp,
+} from "react-native-reanimated";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import {
   MOTION_DURATION,
   createSpringLayoutTransition,
@@ -113,6 +119,7 @@ const NotificationRow = memo(
     const [localPendingAction, setLocalPendingAction] = useState<
       "toggleRead" | "delete" | null
     >(null);
+    const inFlightActionRef = useRef<"toggleRead" | "delete" | null>(null);
     const effectivePendingAction = localPendingAction ?? pendingAction;
     const isBusy = effectivePendingAction !== null;
     const merchantName =
@@ -128,34 +135,58 @@ const NotificationRow = memo(
     }, [pendingAction]);
 
     const handleToggleRead = async (swipeable: SwipeableMethods) => {
-      if (isBusy) {
+      if (isBusy || inFlightActionRef.current) {
         return;
       }
 
+      inFlightActionRef.current = "toggleRead";
       setLocalPendingAction("toggleRead");
 
       try {
         await onToggleReadItem(item);
-      } catch {
-        // Optimistic state rollback is handled by the notification hook.
+      } catch (error) {
+        console.error("[notifications] Failed to toggle read state", {
+          notificationId: item.id,
+          error,
+        });
+        Alert.alert(
+          "Unable to update notification",
+          error instanceof Error
+            ? error.message
+            : "Please try again in a moment.",
+        );
       } finally {
+        setLocalPendingAction(null);
+        inFlightActionRef.current = null;
         swipeable.close();
         swipeable.reset();
       }
     };
 
     const handleDelete = async (swipeable: SwipeableMethods) => {
-      if (isBusy) {
+      if (isBusy || inFlightActionRef.current) {
         return;
       }
 
+      inFlightActionRef.current = "delete";
       setLocalPendingAction("delete");
 
       try {
         await onDeleteItem(item);
-      } catch {
-        // Optimistic state rollback is handled by the notification hook.
+      } catch (error) {
+        console.error("[notifications] Failed to delete notification", {
+          notificationId: item.id,
+          error,
+        });
+        Alert.alert(
+          "Unable to delete notification",
+          error instanceof Error
+            ? error.message
+            : "Please try again in a moment.",
+        );
       } finally {
+        setLocalPendingAction(null);
+        inFlightActionRef.current = null;
         swipeable.close();
         swipeable.reset();
       }
@@ -166,24 +197,34 @@ const NotificationRow = memo(
       _translation: unknown,
       swipeable: SwipeableMethods,
     ) => (
-      <GestureHandlerPressable
+      <TouchableOpacity
+        accessibilityRole="button"
+        hitSlop={8}
         style={[styles.swipeAction, styles.swipeDelete]}
-        onPressIn={() => {
-          if (!isBusy) {
-            setLocalPendingAction("delete");
-          }
+        onPress={() => {
+          void handleDelete(swipeable);
         }}
-        onPress={() => void handleDelete(swipeable)}
       >
         {effectivePendingAction === "delete" ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
+          <Animated.View
+            key="delete-loading"
+            entering={FadeIn.duration(MOTION_DURATION.TINY)}
+            exiting={FadeOut.duration(MOTION_DURATION.TINY)}
+          >
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          </Animated.View>
         ) : (
-          <>
+          <Animated.View
+            key="delete-idle"
+            entering={FadeIn.duration(MOTION_DURATION.TINY)}
+            exiting={FadeOut.duration(MOTION_DURATION.TINY)}
+            style={styles.swipeActionContent}
+          >
             <Feather name="trash-2" size={18} color="#FFFFFF" />
             <Text style={styles.swipeActionText}>Delete</Text>
-          </>
+          </Animated.View>
         )}
-      </GestureHandlerPressable>
+      </TouchableOpacity>
     );
 
     const leftAction = (
@@ -191,19 +232,29 @@ const NotificationRow = memo(
       _translation: unknown,
       swipeable: SwipeableMethods,
     ) => (
-      <GestureHandlerPressable
+      <TouchableOpacity
+        accessibilityRole="button"
+        hitSlop={8}
         style={[styles.swipeAction, styles.swipeRead]}
-        onPressIn={() => {
-          if (!isBusy) {
-            setLocalPendingAction("toggleRead");
-          }
+        onPress={() => {
+          void handleToggleRead(swipeable);
         }}
-        onPress={() => void handleToggleRead(swipeable)}
       >
         {effectivePendingAction === "toggleRead" ? (
-          <ActivityIndicator color="#FFFFFF" size="small" />
+          <Animated.View
+            key="toggle-loading"
+            entering={FadeIn.duration(MOTION_DURATION.TINY)}
+            exiting={FadeOut.duration(MOTION_DURATION.TINY)}
+          >
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          </Animated.View>
         ) : (
-          <>
+          <Animated.View
+            key="toggle-idle"
+            entering={FadeIn.duration(MOTION_DURATION.TINY)}
+            exiting={FadeOut.duration(MOTION_DURATION.TINY)}
+            style={styles.swipeActionContent}
+          >
             <Feather
               name={item.is_read ? "mail" : "check-circle"}
               size={18}
@@ -212,9 +263,9 @@ const NotificationRow = memo(
             <Text style={styles.swipeActionText}>
               {item.is_read ? "Mark unread" : "Mark read"}
             </Text>
-          </>
+          </Animated.View>
         )}
-      </GestureHandlerPressable>
+      </TouchableOpacity>
     );
 
     return (
@@ -234,15 +285,12 @@ const NotificationRow = memo(
             overshootRight={false}
           >
             <Pressable
-              disabled={effectivePendingAction === "delete"}
+              disabled={isBusy}
               onPress={() => onPressItem(item)}
               style={({ pressed }) => [
                 styles.notificationCardInner,
-                pressed &&
-                  effectivePendingAction !== "delete" &&
-                  styles.notificationCardPressed,
-                effectivePendingAction === "delete" &&
-                  styles.notificationCardBusy,
+                pressed && !isBusy && styles.notificationCardPressed,
+                isBusy && styles.notificationCardBusy,
               ]}
             >
               <View style={styles.notificationCardContent}>
@@ -1057,11 +1105,17 @@ const styles = StyleSheet.create({
   },
   swipeAction: {
     width: 92,
+    height: "100%",
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginVertical: 4,
+    alignSelf: "stretch",
+  },
+  swipeActionContent: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
   },
   swipeRead: {
     backgroundColor: "#1495FF",

@@ -70,14 +70,51 @@ function mergeNotifications(
   current: AppNotification[],
   incoming: AppNotification,
 ) {
-  const next = current.filter((item) => item.id !== incoming.id);
-  if (!incoming.deleted_at) {
-    next.unshift(incoming);
+  const existingIndex = current.findIndex((item) => item.id === incoming.id);
+
+  if (existingIndex === -1) {
+    if (incoming.deleted_at) {
+      return current;
+    }
+
+    const incomingCreatedAt = new Date(incoming.created_at).getTime();
+    const insertIndex = current.findIndex((item) => {
+      const itemCreatedAt = new Date(item.created_at).getTime();
+      return incomingCreatedAt > itemCreatedAt;
+    });
+
+    if (insertIndex === -1) {
+      return [...current, incoming];
+    }
+
+    return [
+      ...current.slice(0, insertIndex),
+      incoming,
+      ...current.slice(insertIndex),
+    ];
   }
-  return next.sort(
-    (left, right) =>
-      new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
-  );
+
+  if (incoming.deleted_at) {
+    return current.filter((item) => item.id !== incoming.id);
+  }
+
+  const existing = current[existingIndex];
+  if (
+    existing.id === incoming.id &&
+    existing.is_read === incoming.is_read &&
+    existing.read_at === incoming.read_at &&
+    existing.deleted_at === incoming.deleted_at &&
+    existing.created_at === incoming.created_at
+  ) {
+    return current;
+  }
+
+  const next = [...current];
+  next[existingIndex] = {
+    ...next[existingIndex],
+    ...incoming,
+  };
+  return next;
 }
 
 function hasFreshNotificationCache(lastFetchedAt: number | null) {
@@ -100,12 +137,18 @@ export function useNotifications(enabled = true) {
   const cache = useNotificationStore((state) =>
     userId ? (state.cacheByUserId[userId] ?? null) : null,
   );
-  const getCacheForUser = useNotificationStore((state) => state.getCacheForUser);
-  const setCacheForUser = useNotificationStore((state) => state.setCacheForUser);
+  const getCacheForUser = useNotificationStore(
+    (state) => state.getCacheForUser,
+  );
+  const setCacheForUser = useNotificationStore(
+    (state) => state.setCacheForUser,
+  );
   const patchNotificationsForUser = useNotificationStore(
     (state) => state.patchNotificationsForUser,
   );
-  const clearCacheForUser = useNotificationStore((state) => state.clearCacheForUser);
+  const clearCacheForUser = useNotificationStore(
+    (state) => state.clearCacheForUser,
+  );
   const notifications = cache?.notifications ?? [];
   const hasCachedData = notifications.length > 0;
   const hasHydrated = cache?.hasHydrated ?? false;
@@ -136,9 +179,11 @@ export function useNotifications(enabled = true) {
         !silent &&
         !currentCache?.hasHydrated &&
         !currentCache?.notifications.length;
-      const isFresh = hasFreshNotificationCache(currentCache?.lastFetchedAt ?? null);
+      const isFresh = hasFreshNotificationCache(
+        currentCache?.lastFetchedAt ?? null,
+      );
 
-      if (!force && !silent && currentCache?.hasHydrated && isFresh) {
+      if (!force && currentCache?.hasHydrated && isFresh) {
         return;
       }
 
@@ -215,7 +260,9 @@ export function useNotifications(enabled = true) {
           : item,
       );
 
-      const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
+      const nextUnreadCount = updatedLocal.filter(
+        (item) => !item.is_read,
+      ).length;
       const mutationVersion =
         (notificationMutationVersionRef.current[notification.id] ?? 0) + 1;
       notificationMutationVersionRef.current[notification.id] = mutationVersion;
@@ -228,15 +275,19 @@ export function useNotifications(enabled = true) {
       return markNotificationRead(notification.id, nextReadState).catch(
         (toggleError) => {
           const current =
-            useNotificationStore.getState().getCacheForUser(userId)?.notifications ??
-            [];
-          const currentItem = current.find((item) => item.id === notification.id);
+            useNotificationStore.getState().getCacheForUser(userId)
+              ?.notifications ?? [];
+          const currentItem = current.find(
+            (item) => item.id === notification.id,
+          );
           const shouldRollback =
             notificationMutationVersionRef.current[notification.id] ===
               mutationVersion && currentItem?.is_read === nextReadState;
 
           if (shouldRollback) {
-            const restoredCount = previous.filter((item) => !item.is_read).length;
+            const restoredCount = previous.filter(
+              (item) => !item.is_read,
+            ).length;
             setCacheForUser(userId, {
               notifications: previous,
               unreadCount: restoredCount,
@@ -273,7 +324,8 @@ export function useNotifications(enabled = true) {
 
     return markAllNotificationsRead(userId).catch((markError) => {
       const current =
-        useNotificationStore.getState().getCacheForUser(userId)?.notifications ?? [];
+        useNotificationStore.getState().getCacheForUser(userId)
+          ?.notifications ?? [];
       const shouldRollback =
         markAllMutationVersionRef.current === mutationVersion &&
         current.length === updatedLocal.length &&
@@ -303,8 +355,12 @@ export function useNotifications(enabled = true) {
       }
 
       const previous = getCacheForUser(userId)?.notifications ?? [];
-      const updatedLocal = previous.filter((item) => item.id !== notification.id);
-      const nextUnreadCount = updatedLocal.filter((item) => !item.is_read).length;
+      const updatedLocal = previous.filter(
+        (item) => item.id !== notification.id,
+      );
+      const nextUnreadCount = updatedLocal.filter(
+        (item) => !item.is_read,
+      ).length;
       const mutationVersion =
         (notificationMutationVersionRef.current[notification.id] ?? 0) + 1;
       notificationMutationVersionRef.current[notification.id] = mutationVersion;
@@ -317,8 +373,8 @@ export function useNotifications(enabled = true) {
 
       return softDeleteNotification(notification.id).catch((deleteError) => {
         const current =
-          useNotificationStore.getState().getCacheForUser(userId)?.notifications ??
-          [];
+          useNotificationStore.getState().getCacheForUser(userId)
+            ?.notifications ?? [];
         const shouldRollback =
           notificationMutationVersionRef.current[notification.id] ===
             mutationVersion &&
@@ -349,7 +405,9 @@ export function useNotifications(enabled = true) {
 
     const currentCache = getCacheForUser(userId);
     const shouldHydrate = !currentCache?.hasHydrated;
-    const isFresh = hasFreshNotificationCache(currentCache?.lastFetchedAt ?? null);
+    const isFresh = hasFreshNotificationCache(
+      currentCache?.lastFetchedAt ?? null,
+    );
 
     void refresh({
       force: shouldHydrate || !isFresh,
@@ -374,7 +432,8 @@ export function useNotifications(enabled = true) {
       }
 
       const nextUnreadCount =
-        useNotificationStore.getState().getCacheForUser(userId)?.unreadCount ?? 0;
+        useNotificationStore.getState().getCacheForUser(userId)?.unreadCount ??
+        0;
       queueBadgeSync(nextUnreadCount);
     });
   }, [enabled, patchNotificationsForUser, userId]);
