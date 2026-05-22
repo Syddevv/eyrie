@@ -103,7 +103,7 @@ export async function getBudgetProgress(userId: string) {
     with: {
       category: true,
     },
-    orderBy: [desc(budgets.startDate)],
+    orderBy: [desc(budgets.createdAt)],
   });
 
   return Promise.all(
@@ -135,8 +135,7 @@ export async function getBudgetProgress(userId: string) {
         remaining,
         progress,
         transactionCount: countResult?.count ?? 0,
-        status:
-          remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
+        status: remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
       };
     }),
   );

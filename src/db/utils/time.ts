@@ -1,3 +1,5 @@
+import type { BudgetPeriod } from "./constants";
+
 export function nowIso() {
   return new Date().toISOString();
 }
@@ -36,14 +38,29 @@ export function toTransactionIso(
 }
 
 export function getBudgetCycleRange(
-  period: "weekly" | "biweekly" | "monthly",
+  period: BudgetPeriod,
   anchorDate: string | Date = new Date(),
 ) {
-  const value = typeof anchorDate === "string" ? new Date(anchorDate) : new Date(anchorDate);
+  const value =
+    typeof anchorDate === "string"
+      ? new Date(anchorDate)
+      : new Date(anchorDate);
 
   if (period === "monthly") {
-    const start = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const start = new Date(
+      Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+    const end = new Date(
+      Date.UTC(
+        value.getUTCFullYear(),
+        value.getUTCMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      ),
+    );
     return { startDate: start.toISOString(), endDate: end.toISOString() };
   }
 
@@ -63,4 +80,43 @@ export function getBudgetCycleRange(
   end.setUTCHours(23, 59, 59, 999);
 
   return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+export function calculateNextResetDate(
+  period: BudgetPeriod,
+  anchorDate: string | Date = new Date(),
+) {
+  return getBudgetCycleRange(period, anchorDate).endDate;
+}
+
+export function shouldResetBudget(
+  nextResetDate: string,
+  anchorDate: string | Date = new Date(),
+) {
+  const value =
+    typeof anchorDate === "string"
+      ? new Date(anchorDate)
+      : new Date(anchorDate);
+  return value.getTime() >= new Date(nextResetDate).getTime();
+}
+
+export function resetBudgetIfNeeded(
+  budget: { period: BudgetPeriod; endDate: string },
+  anchorDate: string | Date = new Date(),
+) {
+  if (!shouldResetBudget(budget.endDate, anchorDate)) {
+    return {
+      shouldReset: false as const,
+      nextResetDate: budget.endDate,
+      cycleRange: null,
+    };
+  }
+
+  const cycleRange = getBudgetCycleRange(budget.period, anchorDate);
+
+  return {
+    shouldReset: true as const,
+    nextResetDate: cycleRange.endDate,
+    cycleRange,
+  };
 }

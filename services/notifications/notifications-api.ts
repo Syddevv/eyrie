@@ -85,6 +85,16 @@ export async function updateNotificationPreferences(
   return mapPreferences(data);
 }
 
+export async function createNotification(
+  userId: string,
+  candidate: NotificationCandidate,
+) {
+  assertSupabaseConfigured("Notifications");
+
+  const [notification] = await upsertNotifications(userId, [candidate]);
+  return notification ?? null;
+}
+
 export async function fetchNotifications(userId: string, limit = 100) {
   assertSupabaseConfigured("Notifications");
 

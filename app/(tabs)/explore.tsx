@@ -88,6 +88,14 @@ function cycleLabel(value: BudgetCycle) {
   return "Monthly";
 }
 
+function formatNextResetDate(value: string) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 const FLOATING_TAB_BAR_CLEARANCE = 104;
 
 export default function BudgetScreen() {
@@ -96,7 +104,8 @@ export default function BudgetScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const [selectedCycle, setSelectedCycle] = useState<BudgetCycle>("monthly");
-  const { budgets, summary, isLoading, refresh } = useBudgets(selectedCycle);
+  const { budgets, summary, isLoading, refresh, cycleRange } =
+    useBudgets(selectedCycle);
   const [editingBudget, setEditingBudget] = useState<BudgetCard | null>(null);
   const [draftBudgetValue, setDraftBudgetValue] = useState("");
   const [budgetPendingDelete, setBudgetPendingDelete] =
@@ -166,13 +175,17 @@ export default function BudgetScreen() {
         backgroundColor:
           colorScheme === "light" ? "#FFF9ED" : "rgba(68, 43, 8, 0.9)",
         borderColor:
-          colorScheme === "light" ? "rgba(245, 158, 11, 0.28)" : "rgba(251, 191, 36, 0.22)",
+          colorScheme === "light"
+            ? "rgba(245, 158, 11, 0.28)"
+            : "rgba(251, 191, 36, 0.22)",
       },
       categoryDangerCard: {
         backgroundColor:
           colorScheme === "light" ? "#FFF3F2" : "rgba(68, 18, 18, 0.92)",
         borderColor:
-          colorScheme === "light" ? "rgba(239, 68, 68, 0.24)" : "rgba(248, 113, 113, 0.22)",
+          colorScheme === "light"
+            ? "rgba(239, 68, 68, 0.24)"
+            : "rgba(248, 113, 113, 0.22)",
       },
       actionButton: {
         backgroundColor:
@@ -188,7 +201,10 @@ export default function BudgetScreen() {
         backgroundColor: colorScheme === "light" ? "#E8EDF4" : "#1B2433",
       },
       totalProgressTrack: {
-        backgroundColor: colorScheme === "light" ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.18)",
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(255,255,255,0.22)"
+            : "rgba(255,255,255,0.18)",
       },
       modalOverlay: {
         backgroundColor:
@@ -228,7 +244,9 @@ export default function BudgetScreen() {
             : "rgba(255,255,255,0.04)",
       },
       totalOverText: { color: colorScheme === "light" ? "#FFE2E0" : "#FFE2E0" },
-      totalWarningText: { color: colorScheme === "light" ? "#FFF2CC" : "#FFF2CC" },
+      totalWarningText: {
+        color: colorScheme === "light" ? "#FFF2CC" : "#FFF2CC",
+      },
     }),
     [colorScheme, colors],
   );
@@ -359,7 +377,9 @@ export default function BudgetScreen() {
   const totalBalanceLabel = formatBudgetBalanceLabel(totalRemainingRaw);
   const totalProgressWidth = `${Math.min(Math.max(totalProgress, 0), 1) * 100}%`;
   const totalProgressLabel =
-    summary.limit > 0 ? `${Math.round(totalUsagePercent)}% used` : "No budget set";
+    summary.limit > 0
+      ? `${Math.round(totalUsagePercent)}% used`
+      : "No budget set";
   const totalGradientColors =
     totalVisualState === "over"
       ? pageStyles.totalDangerGradient
@@ -408,9 +428,7 @@ export default function BudgetScreen() {
                   size={14}
                   color="#FFFFFF"
                 />
-                <Text style={styles.totalPillText}>
-                  {totalProgressLabel}
-                </Text>
+                <Text style={styles.totalPillText}>{totalProgressLabel}</Text>
               </View>
             </View>
 
@@ -418,7 +436,9 @@ export default function BudgetScreen() {
               {formatCurrency(summary.limit)}
             </Text>
 
-            <View style={[styles.totalProgressTrack, pageStyles.totalProgressTrack]}>
+            <View
+              style={[styles.totalProgressTrack, pageStyles.totalProgressTrack]}
+            >
               <View
                 style={[
                   styles.totalProgressFill,
@@ -437,7 +457,9 @@ export default function BudgetScreen() {
                   size={13}
                   color="#FFFFFF"
                 />
-                <Text style={styles.totalAlertText}>{totalStatusCopy.long}</Text>
+                <Text style={styles.totalAlertText}>
+                  {totalStatusCopy.long}
+                </Text>
               </View>
             ) : null}
 
@@ -484,7 +506,16 @@ export default function BudgetScreen() {
                         ? styles.segmentActive
                         : [styles.segmentInactive, pageStyles.segmentInactive]
                     }
-                    onPress={() => setSelectedCycle(cycle)}
+                    onPress={() => {
+                      if (__DEV__) {
+                        console.log("[budgets] cycle selected", {
+                          from: selectedCycle,
+                          to: cycle,
+                        });
+                      }
+
+                      setSelectedCycle(cycle);
+                    }}
                   >
                     <Text
                       style={
@@ -505,6 +536,9 @@ export default function BudgetScreen() {
                 ? "two weeks"
                 : selectedCycle.slice(0, -2)}{" "}
               while transactions stay in history.
+            </Text>
+            <Text style={[styles.cycleHint, pageStyles.mutedText]}>
+              Next reset: {formatNextResetDate(cycleRange.endDate)}
             </Text>
           </View>
 
@@ -571,13 +605,18 @@ export default function BudgetScreen() {
                   Math.max(0, item.amountSpent - item.budgetLimit),
                   getBudgetUsagePercent(item.amountSpent, item.budgetLimit),
                 );
-                const progressWidth = `${Math.min(
-                  Math.max(
-                    getBudgetProgressRatio(item.amountSpent, item.budgetLimit),
-                    0,
-                  ),
-                  1,
-                ) * 100}%`;
+                const progressWidth = `${
+                  Math.min(
+                    Math.max(
+                      getBudgetProgressRatio(
+                        item.amountSpent,
+                        item.budgetLimit,
+                      ),
+                      0,
+                    ),
+                    1,
+                  ) * 100
+                }%`;
                 const progressColor =
                   visualState === "over"
                     ? "#EF4444"
@@ -705,7 +744,7 @@ export default function BudgetScreen() {
                           },
                         ]}
                       >
-                          {remainingLabel.value}{" "}
+                        {remainingLabel.value}{" "}
                         <Text
                           style={[
                             styles.categoryLeftLabel,
@@ -731,9 +770,7 @@ export default function BudgetScreen() {
                             styles.categoryWarningText,
                             {
                               color:
-                                visualState === "over"
-                                  ? "#DC2626"
-                                  : "#D97706",
+                                visualState === "over" ? "#DC2626" : "#D97706",
                             },
                           ]}
                         >

@@ -1,6 +1,7 @@
 export const NOTIFICATION_TYPES = [
   "budget_warning",
   "budget_exceeded",
+  "budget_reset",
   "goal_progress",
   "goal_completed",
   "weekly_report",
@@ -117,4 +118,3 @@ export type NotificationRealtimeEvent =
       new: null;
       old: AppNotification;
     };
-

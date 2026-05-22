@@ -31,6 +31,12 @@ export const notificationMetadataMap: Record<
     category: "budget",
     priority: "high",
   },
+  budget_reset: {
+    icon: "refresh-cw",
+    color: "#1495FF",
+    category: "budget",
+    priority: "medium",
+  },
   goal_progress: {
     icon: "target",
     color: "#3B82F6",
@@ -202,6 +208,7 @@ export function shouldReceiveNotification(
   switch (notification.type) {
     case "budget_warning":
     case "budget_exceeded":
+    case "budget_reset":
       return preferences.budget_alerts;
     case "goal_progress":
     case "goal_completed":

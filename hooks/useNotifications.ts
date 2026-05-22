@@ -12,6 +12,7 @@ import {
   syncNotificationBadge,
   type AppNotification,
 } from "@/services/notifications";
+import { onNotificationsChanged } from "@/src/lib/dbSync";
 import { useNotificationStore } from "@/store/useNotificationStore";
 
 const NOTIFICATIONS_STALE_MS = 60_000;
@@ -437,6 +438,16 @@ export function useNotifications(enabled = true) {
       queueBadgeSync(nextUnreadCount);
     });
   }, [enabled, patchNotificationsForUser, userId]);
+
+  useEffect(() => {
+    if (!userId || !enabled) {
+      return;
+    }
+
+    return onNotificationsChanged(() => {
+      void refresh({ force: true, silent: true }).catch(() => undefined);
+    });
+  }, [enabled, refresh, userId]);
 
   useEffect(() => {
     if (!userId) {

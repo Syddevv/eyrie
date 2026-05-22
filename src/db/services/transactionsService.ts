@@ -3,6 +3,7 @@ import { and, eq, gte, isNull, lte } from "drizzle-orm";
 import { db } from "../client";
 import { budgets, transactions } from "../schema";
 import { transactionsRepository } from "../repositories/transactionsRepository";
+import { budgetsService } from "./budgetsService";
 import { merchantsService } from "./merchantsService";
 import {
   applyTransactionEffects,
@@ -27,7 +28,11 @@ import {
   emitMerchantsChanged,
   emitTransactionsChanged,
 } from "@/src/lib/dbSync";
-import { prepareCreateForSync, prepareDeleteForSync, prepareUpdateForSync } from "@/src/sync/helpers";
+import {
+  prepareCreateForSync,
+  prepareDeleteForSync,
+  prepareUpdateForSync,
+} from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
 import { usersService } from "./usersService";
@@ -47,7 +52,21 @@ export type CreateTransactionInput = Omit<
 };
 
 export class TransactionsService {
-  private async enqueueTransactionDependencies(entries: (Pick<NewTransaction, "userId" | "accountId" | "transferAccountId" | "type" | "categoryId" | "transactionDate"> | null | undefined)[]) {
+  private async enqueueTransactionDependencies(
+    entries: (
+      | Pick<
+          NewTransaction,
+          | "userId"
+          | "accountId"
+          | "transferAccountId"
+          | "type"
+          | "categoryId"
+          | "transactionDate"
+        >
+      | null
+      | undefined
+    )[],
+  ) {
     const accountIds = new Set<string>();
     const budgetIds = new Set<string>();
     let userId: string | null = null;
@@ -112,9 +131,19 @@ export class TransactionsService {
             merchantId: input.merchantId ?? null,
             merchantName: input.merchantName ?? null,
             categoryId: input.categoryId ?? null,
-            merchantDefaultCategoryId: input.merchantDefaultCategoryId ?? input.categoryId ?? null,
+            merchantDefaultCategoryId:
+              input.merchantDefaultCategoryId ?? input.categoryId ?? null,
           })
         : null;
+
+    await budgetsService
+      .resetBudgetsIfNeeded(input.userId, input.transactionDate ?? timestamp)
+      .catch((error) => {
+        console.error("[transactions] budget reset check failed", {
+          userId: input.userId,
+          error,
+        });
+      });
 
     const created = await db.transaction(async (tx) => {
       const entry = {
@@ -123,8 +152,8 @@ export class TransactionsService {
           merchantId: merchantPayload?.merchantId ?? input.merchantId ?? null,
           merchantName:
             input.type === "expense"
-              ? merchantPayload?.merchantName ?? null
-              : input.merchantName ?? null,
+              ? (merchantPayload?.merchantName ?? null)
+              : (input.merchantName ?? null),
           id: transactionId,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -146,8 +175,15 @@ export class TransactionsService {
       return created;
     });
 
-    if (created.type === "expense" && created.merchantId && created.categoryId) {
-      await merchantsService.learnMerchantCategory(created.merchantId, created.categoryId);
+    if (
+      created.type === "expense" &&
+      created.merchantId &&
+      created.categoryId
+    ) {
+      await merchantsService.learnMerchantCategory(
+        created.merchantId,
+        created.categoryId,
+      );
     }
 
     processTransactionNotificationEvent({
@@ -173,7 +209,12 @@ export class TransactionsService {
     await enqueueSync("transactions", created.id, "upsert", created.userId);
     await this.enqueueTransactionDependencies([created]);
     showSuccessToast({
-      title: created.type === "income" ? "Income added" : created.type === "transfer" ? "Transfer added" : "Expense added",
+      title:
+        created.type === "income"
+          ? "Income added"
+          : created.type === "transfer"
+            ? "Transfer added"
+            : "Expense added",
       message: "Transaction saved successfully.",
       dedupeKey: `transaction:create:${created.id}`,
       source: "transactions-service",
@@ -204,6 +245,15 @@ export class TransactionsService {
             merchantDefaultCategoryId: previewNext.categoryId ?? null,
           })
         : null;
+
+    await budgetsService
+      .resetBudgetsIfNeeded(previewNext.userId, previewNext.transactionDate)
+      .catch((error) => {
+        console.error("[transactions] budget reset check failed", {
+          userId: previewNext.userId,
+          error,
+        });
+      });
 
     const updated = await db.transaction(async (tx) => {
       const current = await tx.query.transactions.findFirst({
@@ -255,13 +305,19 @@ export class TransactionsService {
       updated.type === "expense" &&
       updated.merchantId &&
       updated.categoryId &&
-      (existing.merchantId !== updated.merchantId || existing.categoryId !== updated.categoryId)
+      (existing.merchantId !== updated.merchantId ||
+        existing.categoryId !== updated.categoryId)
     ) {
-      await merchantsService.learnMerchantCategory(updated.merchantId, updated.categoryId);
+      await merchantsService.learnMerchantCategory(
+        updated.merchantId,
+        updated.categoryId,
+      );
     }
 
-    const updatedExpenseAmount = updated.type === "expense" ? updated.amount : 0;
-    const existingExpenseAmount = existing.type === "expense" ? existing.amount : 0;
+    const updatedExpenseAmount =
+      updated.type === "expense" ? updated.amount : 0;
+    const existingExpenseAmount =
+      existing.type === "expense" ? existing.amount : 0;
 
     processTransactionNotificationEvent({
       userId: updated.userId,
@@ -324,7 +380,10 @@ export class TransactionsService {
       }
 
       await reverseTransactionEffects(tx, existing);
-      await tx.update(transactions).set(prepareDeleteForSync()).where(eq(transactions.id, id));
+      await tx
+        .update(transactions)
+        .set(prepareDeleteForSync())
+        .where(eq(transactions.id, id));
       await refreshBudgetsForTransactionChange(tx, existing, undefined);
       return existing;
     });
@@ -385,7 +444,8 @@ export class TransactionsService {
     const merchant = await merchantsService.ensureMerchant({
       userId: input.userId,
       name,
-      defaultCategoryId: input.merchantDefaultCategoryId ?? input.categoryId ?? null,
+      defaultCategoryId:
+        input.merchantDefaultCategoryId ?? input.categoryId ?? null,
     });
 
     return merchant

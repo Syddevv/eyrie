@@ -1,13 +1,23 @@
 import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 
-import { accounts, budgets, goalContributions, goals, transactions } from "../schema";
+import {
+  accounts,
+  budgets,
+  goalContributions,
+  goals,
+  transactions,
+} from "../schema";
 import type { Transaction } from "../types";
 import { roundMoney } from "../utils/money";
 import { nowIso } from "../utils/time";
 
 type Executor = any;
 
-async function adjustAccountBalance(tx: Executor, accountId: string, delta: number) {
+async function adjustAccountBalance(
+  tx: Executor,
+  accountId: string,
+  delta: number,
+) {
   if (!delta) {
     return;
   }
@@ -29,7 +39,12 @@ async function adjustAccountBalance(tx: Executor, accountId: string, delta: numb
     .where(eq(accounts.id, accountId));
 }
 
-function getTransactionBalanceImpacts(entry: Pick<Transaction, "type" | "amount" | "accountId" | "transferAccountId">) {
+function getTransactionBalanceImpacts(
+  entry: Pick<
+    Transaction,
+    "type" | "amount" | "accountId" | "transferAccountId"
+  >,
+) {
   if (entry.type === "expense") {
     return [{ accountId: entry.accountId, delta: -entry.amount }];
   }
@@ -46,26 +61,37 @@ function getTransactionBalanceImpacts(entry: Pick<Transaction, "type" | "amount"
   ];
 }
 
-export async function applyTransactionEffects(tx: Executor, entry: Transaction) {
+export async function applyTransactionEffects(
+  tx: Executor,
+  entry: Transaction,
+) {
   for (const impact of getTransactionBalanceImpacts(entry)) {
     await adjustAccountBalance(tx, impact.accountId, impact.delta);
   }
 }
 
-export async function reverseTransactionEffects(tx: Executor, entry: Transaction) {
+export async function reverseTransactionEffects(
+  tx: Executor,
+  entry: Transaction,
+) {
   for (const impact of getTransactionBalanceImpacts(entry)) {
     await adjustAccountBalance(tx, impact.accountId, -impact.delta);
   }
 }
 
-export async function refreshBudgetsForExpense(tx: Executor, userId: string, categoryId: string, transactionDate: string) {
+export async function refreshBudgetsForExpense(
+  tx: Executor,
+  userId: string,
+  categoryId: string,
+  transactionDate: string,
+) {
   const matchingBudgets = await tx.query.budgets.findMany({
     where: and(
       eq(budgets.userId, userId),
       eq(budgets.categoryId, categoryId),
       isNull(budgets.deletedAt),
       lte(budgets.startDate, transactionDate),
-      gte(budgets.endDate, transactionDate)
+      gte(budgets.endDate, transactionDate),
     ),
   });
 
@@ -86,8 +112,8 @@ export async function refreshBudgetsForExpense(tx: Executor, userId: string, cat
           eq(transactions.categoryId, budget.categoryId),
           isNull(transactions.deletedAt),
           gte(transactions.transactionDate, budget.startDate),
-          lte(transactions.transactionDate, budget.endDate)
-        )
+          lte(transactions.transactionDate, budget.endDate),
+        ),
       );
 
     await tx
@@ -100,46 +126,80 @@ export async function refreshBudgetsForExpense(tx: Executor, userId: string, cat
   }
 }
 
-export async function refreshBudgetsForTransactionChange(
+export async function adjustBudgetsForExpenseDelta(
   tx: Executor,
-  previousEntry?: Transaction | null,
-  nextEntry?: Transaction | null
+  userId: string,
+  categoryId: string,
+  transactionDate: string,
+  delta: number,
 ) {
-  const candidates = [previousEntry, nextEntry].filter(
-    (entry): entry is Transaction => Boolean(entry && entry.type === "expense" && entry.categoryId)
-  );
+  if (!delta) {
+    return;
+  }
 
-  const uniqueKeys = [...new Set(candidates.map((entry) => `${entry.userId}|${entry.categoryId}|${entry.transactionDate}`))];
+  const matchingBudgets = await tx.query.budgets.findMany({
+    where: and(
+      eq(budgets.userId, userId),
+      eq(budgets.categoryId, categoryId),
+      isNull(budgets.deletedAt),
+      lte(budgets.startDate, transactionDate),
+      gte(budgets.endDate, transactionDate),
+    ),
+  });
 
-  for (const key of uniqueKeys) {
-    const [userId, categoryId, transactionDate] = key.split("|");
-    await refreshBudgetsForExpense(tx, userId, categoryId, transactionDate);
+  for (const budget of matchingBudgets) {
+    await tx
+      .update(budgets)
+      .set({
+        spent: roundMoney(Math.max(0, budget.spent + delta)),
+        updatedAt: nowIso(),
+      })
+      .where(eq(budgets.id, budget.id));
   }
 }
 
-export async function refreshGoalCurrentAmount(tx: Executor, goalId: string) {
-  const [result] = await tx
-    .select({
-      total: sql<number>`coalesce(sum(${goalContributions.amount}), 0)`,
-    })
-    .from(goalContributions)
-    .where(and(eq(goalContributions.goalId, goalId), isNull(goalContributions.deletedAt)));
+export async function refreshBudgetsForTransactionChange(
+  tx: Executor,
+  previousEntry?: Transaction | null,
+  nextEntry?: Transaction | null,
+) {
+  if (
+    previousEntry &&
+    previousEntry.type === "expense" &&
+    previousEntry.categoryId
+  ) {
+    await adjustBudgetsForExpenseDelta(
+      tx,
+      previousEntry.userId,
+      previousEntry.categoryId,
+      previousEntry.transactionDate,
+      -previousEntry.amount,
+    );
+  }
 
-  await tx
-    .update(goals)
-    .set({
-      currentAmount: roundMoney(result?.total ?? 0),
-      isCompleted: sql`case when ${roundMoney(result?.total ?? 0)} >= ${goals.targetAmount} then 1 else 0 end`,
-      updatedAt: nowIso(),
-    })
-    .where(eq(goals.id, goalId));
+  if (nextEntry && nextEntry.type === "expense" && nextEntry.categoryId) {
+    await adjustBudgetsForExpenseDelta(
+      tx,
+      nextEntry.userId,
+      nextEntry.categoryId,
+      nextEntry.transactionDate,
+      nextEntry.amount,
+    );
+  }
 }
 
-export async function adjustGoalContributionAccountBalance(tx: Executor, accountId: string, amountDelta: number) {
+export async function adjustGoalContributionAccountBalance(
+  tx: Executor,
+  accountId: string,
+  amountDelta: number,
+) {
   await adjustAccountBalance(tx, accountId, amountDelta);
 }
 
-export async function refreshAccountsVisibilityTimestamp(tx: Executor, accountIds: string[]) {
+export async function refreshAccountsVisibilityTimestamp(
+  tx: Executor,
+  accountIds: string[],
+) {
   if (!accountIds.length) {
     return;
   }

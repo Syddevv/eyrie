@@ -29,6 +29,7 @@ export type BudgetCardItem = {
   cycle: BudgetCycle;
   startDate: string;
   endDate: string;
+  nextResetDate: string;
 };
 
 export type BudgetPlanningSnapshot = {
@@ -57,6 +58,8 @@ function getActiveBudgets<
       inRange(anchorIso, budget.startDate, budget.endDate),
   );
 }
+
+type BudgetProgressRow = Awaited<ReturnType<typeof getBudgetProgress>>[number];
 
 export function calculateBudgetPlanningSnapshot(input: {
   availableFunds: number;
@@ -92,17 +95,24 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
   const fallbackAnchorDateRef = useRef(new Date());
   const resolvedAnchorDate = anchorDate ?? fallbackAnchorDateRef.current;
   const anchorIso = resolvedAnchorDate.toISOString();
-  const [budgets, setBudgets] = useState<BudgetCardItem[]>([]);
+  const [budgetRows, setBudgetRows] = useState<BudgetProgressRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasResolved, setHasResolved] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const budgetRowsRef = useRef<BudgetProgressRow[]>([]);
+  const selectedCycleRef = useRef(selectedCycle);
+
+  useEffect(() => {
+    selectedCycleRef.current = selectedCycle;
+  }, [selectedCycle]);
 
   const refresh = useCallback(
     async (force = false) => {
       if (!userId) {
-        setBudgets([]);
+        budgetRowsRef.current = [];
+        setBudgetRows([]);
         setError(null);
         setIsLoading(false);
         setIsRefreshing(false);
@@ -111,44 +121,25 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         return;
       }
 
-      const shouldRefreshInBackground = force && budgets.length > 0;
-      setIsLoading((prev) => prev || budgets.length === 0);
+      const shouldRefreshInBackground =
+        force && budgetRowsRef.current.length > 0;
+      setIsLoading((prev) => prev || budgetRowsRef.current.length === 0);
       setIsRefreshing(shouldRefreshInBackground);
       setError(null);
 
-      try {
-        await budgetsService.ensureActiveCycleBudgets(
+      if (__DEV__) {
+        console.log("[budgets] refresh", {
+          force,
           userId,
-          selectedCycle,
-          resolvedAnchorDate,
-        );
-        const rows = await getBudgetProgress(userId);
-        const next = getActiveBudgets(rows, selectedCycle, anchorIso).map(
-          (budget) => ({
-            id: budget.id,
-            categoryId: budget.categoryId,
-            categoryName: budget.category?.name ?? "Expense Category",
-            categoryIconType: (budget.category?.iconType ??
-              "vector") as BudgetCardItem["categoryIconType"],
-            categoryIcon:
-              budget.category?.iconName ??
-              budget.category?.icon ??
-              "shape-outline",
-            categoryIconImageUri: budget.category?.iconImageUri ?? null,
-            categoryEmoji: budget.category?.emoji ?? null,
-            categoryColor: budget.category?.color ?? "#64748B",
-            budgetLimit: budget.amount,
-            amountSpent: budget.spent,
-            remainingAmount: budget.remaining,
-            progress: budget.progress / 100,
-            transactionCount: budget.transactionCount ?? 0,
-            cycle: budget.period as BudgetCycle,
-            startDate: budget.startDate,
-            endDate: budget.endDate,
-          }),
-        );
+          cycle: selectedCycleRef.current,
+          cachedRows: budgetRowsRef.current.length,
+        });
+      }
 
-        setBudgets(next);
+      try {
+        const rows = await getBudgetProgress(userId);
+        budgetRowsRef.current = rows;
+        setBudgetRows(rows);
         setHasResolved(true);
         setLastLoadedAt(Date.now());
       } catch (error) {
@@ -158,12 +149,8 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         setIsRefreshing(false);
       }
     },
-    [anchorIso, budgets.length, resolvedAnchorDate, selectedCycle, userId],
+    [userId],
   );
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   useEffect(() => {
     const offAccounts = onAccountsChanged(() => {
@@ -182,6 +169,12 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
 
   useFocusEffect(
     useCallback(() => {
+      if (userId) {
+        void budgetsService
+          .resetBudgetsIfNeeded(userId, resolvedAnchorDate)
+          .catch(() => undefined);
+      }
+
       const shouldRefresh =
         !hasResolved ||
         lastLoadedAt === null ||
@@ -192,7 +185,40 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
       }
 
       return undefined;
-    }, [hasResolved, lastLoadedAt, refresh]),
+    }, [hasResolved, lastLoadedAt, refresh, resolvedAnchorDate, userId]),
+  );
+
+  const activeBudgetRows = useMemo(() => budgetRows, [budgetRows]);
+
+  const budgets = useMemo(
+    () =>
+      activeBudgetRows.map((budget) => ({
+        id: budget.id,
+        categoryId: budget.categoryId,
+        categoryName: budget.category?.name ?? "Expense Category",
+        categoryIconType: (budget.category?.iconType ??
+          "vector") as BudgetCardItem["categoryIconType"],
+        categoryIcon:
+          budget.category?.iconName ?? budget.category?.icon ?? "shape-outline",
+        categoryIconImageUri: budget.category?.iconImageUri ?? null,
+        categoryEmoji: budget.category?.emoji ?? null,
+        categoryColor: budget.category?.color ?? "#64748B",
+        budgetLimit: budget.amount,
+        amountSpent: budget.spent,
+        remainingAmount: budget.remaining,
+        progress: budget.progress / 100,
+        transactionCount: budget.transactionCount ?? 0,
+        cycle: budget.period as BudgetCycle,
+        startDate: budget.startDate,
+        endDate: budget.endDate,
+        nextResetDate: budget.endDate,
+      })),
+    [activeBudgetRows],
+  );
+
+  const cycleRange = useMemo(
+    () => getBudgetCycleRange(selectedCycle, resolvedAnchorDate),
+    [resolvedAnchorDate, selectedCycle],
   );
 
   const summary = useMemo(() => {
@@ -215,6 +241,7 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
     hasResolved,
     error,
     refresh,
+    cycleRange,
   } as const;
 }
 
@@ -241,11 +268,15 @@ export function useAvailableBudgetCategories(
     }
 
     setIsLoading(true);
-    await budgetsService.ensureActiveCycleBudgets(
-      userId,
-      selectedCycle,
-      resolvedAnchorDate,
-    );
+    if (__DEV__) {
+      console.log("[budgets] planning refresh", {
+        userId,
+        cycle: selectedCycle,
+      });
+    }
+    await budgetsService
+      .resetBudgetsIfNeeded(userId, resolvedAnchorDate)
+      .catch(() => undefined);
     const rows = await budgetsService.fetch(userId);
     const activeBudgets = getActiveBudgets(rows, selectedCycle, anchorIso);
     setCategoryIdsWithActiveBudget(

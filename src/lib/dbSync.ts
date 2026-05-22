@@ -2,6 +2,7 @@ type Callback = () => void;
 
 const accountListeners = new Set<Callback>();
 const budgetListeners = new Set<Callback>();
+const notificationListeners = new Set<Callback>();
 const categoryListeners = new Set<Callback>();
 const goalListeners = new Set<Callback>();
 const merchantListeners = new Set<Callback>();
@@ -34,6 +35,23 @@ export function onBudgetsChanged(cb: Callback) {
 
 export function emitBudgetsChanged() {
   for (const cb of Array.from(budgetListeners)) {
+    try {
+      cb();
+    } catch {
+      // swallow
+    }
+  }
+}
+
+export function onNotificationsChanged(cb: Callback) {
+  notificationListeners.add(cb);
+  return () => {
+    notificationListeners.delete(cb);
+  };
+}
+
+export function emitNotificationsChanged() {
+  for (const cb of Array.from(notificationListeners)) {
     try {
       cb();
     } catch {
@@ -146,6 +164,8 @@ export default {
   emitAccountsChanged,
   onBudgetsChanged,
   emitBudgetsChanged,
+  onNotificationsChanged,
+  emitNotificationsChanged,
   onCategoriesChanged,
   emitCategoriesChanged,
   onGoalsChanged,

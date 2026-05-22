@@ -17,6 +17,7 @@ import { useNotificationBootstrap } from "@/hooks/useNotificationBootstrap";
 import { useUserActivityTracker } from "@/hooks/useUserActivityTracker";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { useBudgetResetScheduler } from "@/hooks/useBudgetResetScheduler";
 import { useAuthStore } from "@/store/useAuthStore";
 import { DatabaseProvider } from "@/src/db/DatabaseProvider";
 import { SyncProvider, SyncStatusBanner } from "@/src/sync";
@@ -33,6 +34,7 @@ WebBrowser.maybeCompleteAuthSession();
 function AppShell() {
   useNotificationBootstrap();
   useUserActivityTracker();
+  useBudgetResetScheduler();
 
   return (
     <Stack
