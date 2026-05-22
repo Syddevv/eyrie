@@ -3,7 +3,7 @@ import { budgetsRepository } from "../repositories/budgetsRepository";
 import { refreshBudgetsForExpense } from "./financeOrchestrator";
 import type { NewBudget } from "../types";
 import { createId } from "../utils/ids";
-import { nowIso } from "../utils/time";
+import { getBudgetCycleRange, nowIso } from "../utils/time";
 import {
   assertBudgetPeriod,
   assertNonNegativeAmount,
@@ -194,6 +194,69 @@ export class BudgetsService {
 
   async fetch(userId: string) {
     return budgetsRepository.findAllByUser(userId);
+  }
+
+  async ensureActiveCycleBudgets(
+    userId: string,
+    period: NewBudget["period"],
+    anchorDate: string | Date = new Date(),
+  ) {
+    assertRequiredText(userId, "userId");
+    assertBudgetPeriod(period);
+
+    const cycleRange = getBudgetCycleRange(period, anchorDate);
+    const allBudgets = await budgetsRepository.findAllByUser(userId);
+    const periodBudgets = allBudgets.filter((budget) => budget.period === period);
+
+    if (!periodBudgets.length) {
+      return [];
+    }
+
+    const activeCategoryIds = new Set(
+      periodBudgets
+        .filter(
+          (budget) =>
+            budget.startDate <= cycleRange.startDate &&
+            cycleRange.endDate <= budget.endDate,
+        )
+        .map((budget) => budget.categoryId),
+    );
+    const latestBudgetByCategory = new Map<string, (typeof periodBudgets)[number]>();
+
+    for (const budget of periodBudgets) {
+      if (!latestBudgetByCategory.has(budget.categoryId)) {
+        latestBudgetByCategory.set(budget.categoryId, budget);
+      }
+    }
+
+    const updatedBudgets: Awaited<ReturnType<BudgetsService["update"]>>[] = [];
+
+    for (const template of latestBudgetByCategory.values()) {
+      if (activeCategoryIds.has(template.categoryId)) {
+        continue;
+      }
+
+      // Only roll a budget forward when its current cycle has fully ended.
+      if (template.endDate >= cycleRange.startDate) {
+        continue;
+      }
+
+      const updated = await this.update(
+        template.id,
+        {
+          startDate: cycleRange.startDate,
+          endDate: cycleRange.endDate,
+          spent: 0,
+        },
+        { notifySuccess: false },
+      );
+
+      if (updated) {
+        updatedBudgets.push(updated);
+      }
+    }
+
+    return updatedBudgets;
   }
 
   async fetchById(id: string) {

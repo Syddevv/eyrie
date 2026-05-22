@@ -117,6 +117,11 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
       setError(null);
 
       try {
+        await budgetsService.ensureActiveCycleBudgets(
+          userId,
+          selectedCycle,
+          resolvedAnchorDate,
+        );
         const rows = await getBudgetProgress(userId);
         const next = getActiveBudgets(rows, selectedCycle, anchorIso).map(
           (budget) => ({
@@ -153,7 +158,7 @@ export function useBudgets(selectedCycle: BudgetCycle, anchorDate?: Date) {
         setIsRefreshing(false);
       }
     },
-    [anchorIso, budgets.length, selectedCycle, userId],
+    [anchorIso, budgets.length, resolvedAnchorDate, selectedCycle, userId],
   );
 
   useEffect(() => {
@@ -236,6 +241,11 @@ export function useAvailableBudgetCategories(
     }
 
     setIsLoading(true);
+    await budgetsService.ensureActiveCycleBudgets(
+      userId,
+      selectedCycle,
+      resolvedAnchorDate,
+    );
     const rows = await budgetsService.fetch(userId);
     const activeBudgets = getActiveBudgets(rows, selectedCycle, anchorIso);
     setCategoryIdsWithActiveBudget(
@@ -245,7 +255,7 @@ export function useAvailableBudgetCategories(
       roundMoney(activeBudgets.reduce((sum, budget) => sum + budget.amount, 0)),
     );
     setIsLoading(false);
-  }, [anchorIso, selectedCycle, userId]);
+  }, [anchorIso, resolvedAnchorDate, selectedCycle, userId]);
 
   useEffect(() => {
     void refresh();
