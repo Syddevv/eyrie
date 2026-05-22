@@ -20,6 +20,8 @@ type NetInfoModule = {
 
 const CONNECTIVITY_POLL_MS = 15000;
 const CONNECTIVITY_TIMEOUT_MS = 5000;
+const ONLINE_STABILITY_MS = 1500;
+const OFFLINE_STABILITY_MS = 600;
 const FALLBACK_CONNECTIVITY_URLS = [
   ENV.SUPABASE_URL,
   "https://clients3.google.com/generate_204",
@@ -168,11 +170,69 @@ function useSyncTriggers() {
 
   useEffect(() => {
     let isMounted = true;
-    let previousConnection: boolean | null = null;
+    let candidateConnection: boolean | null = null;
     let unsubscribe = () => {};
     let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    let stabilityTimer: ReturnType<typeof setTimeout> | null = null;
+    let validationToken = 0;
+    const lastValidatedConnection = {
+      current: null as boolean | null,
+    };
 
     setNetworkReady(false);
+
+    const clearStabilityTimer = () => {
+      if (stabilityTimer) {
+        clearTimeout(stabilityTimer);
+        stabilityTimer = null;
+      }
+    };
+
+    const commitConnectionState = async (isOnline: boolean) => {
+      const wasOnline = lastValidatedConnection.current;
+      lastValidatedConnection.current = isOnline;
+      setOnline(isOnline);
+      setNetworkReady(true);
+
+      if (userId && isOnline && wasOnline === false) {
+        void runSync({ userId, reason: "reconnect", force: true });
+      }
+    };
+
+    const scheduleValidatedState = (nextConnection: boolean) => {
+      candidateConnection = nextConnection;
+      clearStabilityTimer();
+      validationToken += 1;
+      const currentToken = validationToken;
+      const delay = nextConnection ? ONLINE_STABILITY_MS : OFFLINE_STABILITY_MS;
+
+      stabilityTimer = setTimeout(() => {
+        if (!isMounted || currentToken !== validationToken) {
+          return;
+        }
+
+        void (async () => {
+          if (nextConnection) {
+            const stillOnline = await probeInternetConnection();
+
+            if (
+              !isMounted ||
+              currentToken !== validationToken ||
+              candidateConnection !== true
+            ) {
+              return;
+            }
+
+            if (!stillOnline) {
+              scheduleValidatedState(false);
+              return;
+            }
+          }
+
+          await commitConnectionState(nextConnection);
+        })();
+      }, delay);
+    };
 
     void (async () => {
       const netInfo = await getNetInfoModule();
@@ -193,14 +253,11 @@ function useSyncTriggers() {
             return;
           }
 
-          const wasOnline = previousConnection;
-          previousConnection = isOnline;
-          setOnline(isOnline);
-          setNetworkReady(true);
-
-          if (userId && isOnline && wasOnline === false) {
-            void runSync({ userId, reason: "reconnect", force: true });
+          if (candidateConnection === isOnline) {
+            return;
           }
+
+          scheduleValidatedState(isOnline);
         };
 
         void applyFallbackState();
@@ -215,15 +272,19 @@ function useSyncTriggers() {
           return;
         }
 
-        const isOnline =
-          Boolean(state.isConnected) && state.isInternetReachable !== false;
-        const wasOnline = previousConnection;
-        previousConnection = isOnline;
-        setOnline(isOnline);
-        setNetworkReady(true);
+        const hasNetwork = Boolean(state.isConnected);
+        const definitelyOffline =
+          !hasNetwork || state.isInternetReachable === false;
 
-        if (userId && isOnline && wasOnline === false) {
-          void runSync({ userId, reason: "reconnect", force: true });
+        if (definitelyOffline) {
+          if (candidateConnection !== false) {
+            scheduleValidatedState(false);
+          }
+          return;
+        }
+
+        if (candidateConnection !== true) {
+          scheduleValidatedState(true);
         }
       };
 
@@ -235,8 +296,13 @@ function useSyncTriggers() {
             return;
           }
 
-          setOnline(true);
-          setNetworkReady(true);
+          void probeInternetConnection().then((isOnline) => {
+            if (!isMounted) {
+              return;
+            }
+
+            scheduleValidatedState(isOnline);
+          });
         });
 
       unsubscribe = netInfo.addEventListener((state) => {
@@ -247,6 +313,7 @@ function useSyncTriggers() {
     return () => {
       isMounted = false;
       unsubscribe();
+      clearStabilityTimer();
 
       if (fallbackInterval) {
         clearInterval(fallbackInterval);

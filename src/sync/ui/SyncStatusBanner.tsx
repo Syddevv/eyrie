@@ -51,6 +51,7 @@ export function SyncStatusBanner() {
   const autoDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastBannerKey = useRef<string | null>(null);
   const lastHandledConnectivityChange = useRef(0);
+  const hasConfirmedOffline = useRef(false);
   const lastConnectivityBanner = useRef<{
     kind: Extract<BannerKind, "offline" | "online">;
     shownAt: number;
@@ -71,6 +72,7 @@ export function SyncStatusBanner() {
       setBanner(null);
       lastBannerKey.current = null;
       lastHandledConnectivityChange.current = connectivityChangeId;
+      hasConfirmedOffline.current = false;
       return;
     }
 
@@ -89,29 +91,42 @@ export function SyncStatusBanner() {
       const kind: Extract<BannerKind, "offline" | "online"> = isOnline
         ? "online"
         : "offline";
-      const lastConnectivityEvent = lastConnectivityBanner.current;
-      const shouldSuppress =
-        lastConnectivityEvent?.kind === kind &&
-        now - lastConnectivityEvent.shownAt < BANNER_COOLDOWN_MS;
+      const canShowConnectivityBanner =
+        kind === "offline" || hasConfirmedOffline.current;
 
-      if (!shouldSuppress) {
-        lastConnectivityBanner.current = {
-          kind,
-          shownAt: now,
-        };
-        nextBanner =
-          kind === "online"
-            ? {
-                kind: "online",
-                title: "Back online",
-                subtitle: "Your connection has been restored.",
-              }
-            : {
-                kind: "offline",
-                title: "Offline mode",
-                subtitle:
-                  "Changes will sync automatically when your connection returns.",
-              };
+      if (kind === "offline") {
+        hasConfirmedOffline.current = true;
+      }
+
+      if (canShowConnectivityBanner) {
+        const lastConnectivityEvent = lastConnectivityBanner.current;
+        const shouldSuppress =
+          lastConnectivityEvent?.kind === kind &&
+          now - lastConnectivityEvent.shownAt < BANNER_COOLDOWN_MS;
+
+        if (!shouldSuppress) {
+          lastConnectivityBanner.current = {
+            kind,
+            shownAt: now,
+          };
+          nextBanner =
+            kind === "online"
+              ? {
+                  kind: "online",
+                  title: "Back online",
+                  subtitle: "Your connection has been restored.",
+                }
+              : {
+                  kind: "offline",
+                  title: "Offline mode",
+                  subtitle:
+                    "Changes will sync automatically when your connection returns.",
+                };
+
+          if (kind === "online") {
+            hasConfirmedOffline.current = false;
+          }
+        }
       }
     }
 
