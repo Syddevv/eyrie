@@ -5,7 +5,6 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Modal,
-  LayoutChangeEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -66,11 +65,10 @@ export function OtpVerificationModal() {
   );
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [codeRowWidth, setCodeRowWidth] = useState(0);
-  const hiddenInputRef = useRef<TextInput | null>(null);
-  const refocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
   const verifyRequestIdRef = useRef(0);
   const lastSubmittedCodeRef = useRef("");
   const caretOpacity = useSharedValue(1);
@@ -91,19 +89,18 @@ export function OtpVerificationModal() {
 
   useEffect(() => {
     if (!otpModal.visible) {
-      if (refocusTimeoutRef.current) {
-        clearTimeout(refocusTimeoutRef.current);
-        refocusTimeoutRef.current = null;
-      }
       setCode(Array.from({ length: OTP_LENGTH }, () => ""));
       setIsInputFocused(false);
+      setFocusedIndex(null);
       setIsKeyboardVisible(false);
       setKeyboardHeight(0);
       lastSubmittedCodeRef.current = "";
       return;
     }
 
-    const timer = setTimeout(() => hiddenInputRef.current?.focus(), 220);
+    const timer = setTimeout(() => {
+      inputRefs.current[0]?.focus();
+    }, 220);
     return () => clearTimeout(timer);
   }, [otpModal.visible]);
 
@@ -120,10 +117,10 @@ export function OtpVerificationModal() {
       },
     );
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      hiddenInputRef.current?.blur();
       setIsKeyboardVisible(false);
       setKeyboardHeight(0);
       setIsInputFocused(false);
+      setFocusedIndex(null);
     });
 
     return () => {
@@ -178,7 +175,7 @@ export function OtpVerificationModal() {
 
         setCode(Array.from({ length: OTP_LENGTH }, () => ""));
         lastSubmittedCodeRef.current = "";
-        hiddenInputRef.current?.focus();
+        focusInput(0);
       }
     })();
   }, [isVerifyingOtp, joinedCode, otpModal.email, otpModal.visible]);
@@ -223,68 +220,91 @@ export function OtpVerificationModal() {
     otpModal.status,
   ]);
 
-  function focusHiddenInput() {
-    if (refocusTimeoutRef.current) {
-      clearTimeout(refocusTimeoutRef.current);
-    }
-
-    hiddenInputRef.current?.blur();
-
-    refocusTimeoutRef.current = setTimeout(
-      () => {
-        hiddenInputRef.current?.focus();
-        refocusTimeoutRef.current = null;
-      },
-      Platform.OS === "android" ? 60 : 0,
-    );
+  function focusInput(index: number) {
+    const safeIndex = Math.max(0, Math.min(index, OTP_LENGTH - 1));
+    inputRefs.current[safeIndex]?.focus();
   }
 
-  function handleCodeRowLayout(event: LayoutChangeEvent) {
-    setCodeRowWidth(event.nativeEvent.layout.width);
+  function getNextFocusIndex() {
+    const emptyIndex = code.findIndex((digit) => !digit);
+    return emptyIndex === -1 ? OTP_LENGTH - 1 : emptyIndex;
   }
 
-  function handleCodeChange(value: string) {
-    const digits = value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+  function applyDigits(digits: string, startIndex: number) {
     lastSubmittedCodeRef.current = "";
     setOtpModalStatus("idle");
 
+    setCode((current) => {
+      const next = [...current];
+      let writeIndex = startIndex;
+
+      for (const digit of digits) {
+        if (writeIndex >= OTP_LENGTH) {
+          break;
+        }
+
+        next[writeIndex] = digit;
+        writeIndex += 1;
+      }
+
+      return next;
+    });
+
+    const nextFocusIndex = Math.min(startIndex + digits.length, OTP_LENGTH - 1);
+    requestAnimationFrame(() => {
+      if (startIndex + digits.length >= OTP_LENGTH) {
+        inputRefs.current[OTP_LENGTH - 1]?.focus();
+        return;
+      }
+
+      focusInput(nextFocusIndex);
+    });
+  }
+
+  function handleCodeChange(index: number, value: string) {
+    const digits = value.replace(/\D/g, "");
+
     if (!digits.length) {
-      setCode(Array.from({ length: OTP_LENGTH }, () => ""));
+      setCode((current) => {
+        const next = [...current];
+        next[index] = "";
+        return next;
+      });
+      lastSubmittedCodeRef.current = "";
+      setOtpModalStatus("idle");
       return;
     }
 
     if (digits.length > 1) {
-      const nextDigits = digits.split("");
-      setCode(
-        Array.from(
-          { length: OTP_LENGTH },
-          (_, index) => nextDigits[index] ?? "",
-        ),
-      );
-    } else {
-      setCode((current) => {
-        const next = [...current];
-        const nextIndex = current.findIndex((digit) => !digit);
-        const targetIndex = nextIndex === -1 ? OTP_LENGTH - 1 : nextIndex;
-        next[targetIndex] = digits;
-        return next;
-      });
+      applyDigits(digits.slice(0, OTP_LENGTH - index), index);
+      return;
     }
+
+    applyDigits(digits, index);
   }
 
-  function handleKeyPress(key: string) {
+  function handleKeyPress(index: number, key: string) {
     if (key !== "Backspace") {
       return;
     }
 
     lastSubmittedCodeRef.current = "";
     setOtpModalStatus("idle");
+
     setCode((current) => {
       const next = [...current];
-      const lastFilledIndex = next.findLastIndex((digit) => digit !== "");
 
-      if (lastFilledIndex >= 0) {
-        next[lastFilledIndex] = "";
+      if (next[index]) {
+        next[index] = "";
+        return next;
+      }
+
+      const previousIndex = index - 1;
+      if (previousIndex >= 0) {
+        next[previousIndex] = "";
+        requestAnimationFrame(() => {
+          focusInput(previousIndex);
+        });
       }
 
       return next;
@@ -301,9 +321,9 @@ export function OtpVerificationModal() {
 
     try {
       await resendSignupOtp(otpModal.email);
-      hiddenInputRef.current?.focus();
+      inputRefs.current[0]?.focus();
     } catch {
-      hiddenInputRef.current?.focus();
+      inputRefs.current[0]?.focus();
     }
   }
 
@@ -428,51 +448,17 @@ export function OtpVerificationModal() {
               </Text>
 
               <Pressable
-                onLayout={handleCodeRowLayout}
-                onPress={focusHiddenInput}
+                onPress={() => focusInput(getNextFocusIndex())}
                 style={styles.codeRow}
               >
-                <TextInput
-                  ref={hiddenInputRef}
-                  autoCapitalize="none"
-                  autoComplete="one-time-code"
-                  autoCorrect={false}
-                  caretHidden
-                  contextMenuHidden={false}
-                  importantForAutofill="yes"
-                  keyboardType="number-pad"
-                  maxLength={OTP_LENGTH}
-                  onBlur={() => setIsInputFocused(false)}
-                  onChangeText={handleCodeChange}
-                  onFocus={() => setIsInputFocused(true)}
-                  onKeyPress={({ nativeEvent }) =>
-                    handleKeyPress(nativeEvent.key)
-                  }
-                  selection={{
-                    start: joinedCode.length,
-                    end: joinedCode.length,
-                  }}
-                  selectionColor="transparent"
-                  showSoftInputOnFocus
-                  style={[
-                    styles.hiddenInput,
-                    { width: codeRowWidth || "100%" },
-                  ]}
-                  value={joinedCode}
-                />
                 {code.map((digit, index) => {
                   const isError = otpModal.status === "error";
                   const isActiveSlot =
-                    isInputFocused &&
-                    (index === joinedCode.length ||
-                      (joinedCode.length === OTP_LENGTH &&
-                        index === OTP_LENGTH - 1)) &&
-                    !digit;
+                    isInputFocused && focusedIndex === index && !digit;
 
                   return (
-                    <Pressable
+                    <View
                       key={index}
-                      onPress={focusHiddenInput}
                       style={[
                         styles.codeInput,
                         {
@@ -498,8 +484,38 @@ export function OtpVerificationModal() {
                           : null,
                       ]}
                     >
+                      <TextInput
+                        ref={(ref) => {
+                          inputRefs.current[index] = ref;
+                        }}
+                        autoCapitalize="none"
+                        autoComplete={index === 0 ? "one-time-code" : "off"}
+                        autoCorrect={false}
+                        caretHidden
+                        contextMenuHidden={false}
+                        importantForAutofill="yes"
+                        keyboardType="number-pad"
+                        maxLength={OTP_LENGTH}
+                        onBlur={() => {
+                          setIsInputFocused(false);
+                          setFocusedIndex(null);
+                        }}
+                        onChangeText={(value) => handleCodeChange(index, value)}
+                        onFocus={() => {
+                          setIsInputFocused(true);
+                          setFocusedIndex(index);
+                        }}
+                        onKeyPress={({ nativeEvent }) =>
+                          handleKeyPress(index, nativeEvent.key)
+                        }
+                        selectionColor="transparent"
+                        style={styles.codeTextInput}
+                        textAlign="center"
+                        value={digit}
+                      />
                       {digit ? (
                         <Text
+                          pointerEvents="none"
                           style={[
                             styles.codeDigit,
                             { color: colors.foreground },
@@ -507,16 +523,20 @@ export function OtpVerificationModal() {
                         >
                           {digit}
                         </Text>
-                      ) : isActiveSlot ? (
+                      ) : null}
+                      {!digit && isActiveSlot ? (
                         <Animated.View
+                          pointerEvents="none"
                           style={[
                             styles.fakeCaret,
                             animatedCaretStyle,
                             { backgroundColor: colors.primary },
                           ]}
                         />
-                      ) : (
+                      ) : null}
+                      {!digit && !isActiveSlot ? (
                         <Text
+                          pointerEvents="none"
                           style={[
                             styles.codePlaceholder,
                             {
@@ -526,8 +546,8 @@ export function OtpVerificationModal() {
                         >
                           •
                         </Text>
-                      )}
-                    </Pressable>
+                      ) : null}
+                    </View>
                   );
                 })}
               </Pressable>
@@ -696,19 +716,11 @@ const styles = StyleSheet.create({
   codeRow: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
     alignSelf: "center",
     gap: spacing[2],
     marginTop: spacing[5],
-    position: "relative",
-  },
-  hiddenInput: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    opacity: 0.02,
-    color: "transparent",
-    backgroundColor: "transparent",
   },
   codeInput: {
     width: 46,
@@ -717,6 +729,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+    overflow: "hidden",
+  },
+  codeTextInput: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0,
+    color: "transparent",
+    backgroundColor: "transparent",
   },
   codeDigit: {
     fontFamily: fontFamilies.sans,
