@@ -5,13 +5,13 @@
     "scheme": "eyrie",
     "icon": "./assets/Logos/eyrie-logo.png",
     "splash": {
-      "image": "./assets/Logos/eyrie-logo.png",
+      "image": "./assets/Logos/eyrie-logo-border.png",
       "resizeMode": "contain",
       "backgroundColor": "#F7F7FF"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Logos/eyrie-logo-remove-bg-final.png",
+        "foregroundImage": "./assets/Logos/eyrie-logo-final.png",
         "backgroundColor": "#019042"
       },
       "package": "com.sydu.eyrie"
