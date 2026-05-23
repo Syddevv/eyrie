@@ -31,6 +31,7 @@ import { formatCurrency } from "@/hooks/use-dashboard";
 import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
 import {
+  formatBudgetCycleDateRange,
   formatNextResetDate,
   formatResetDateLabel,
   formatResetDateLabelFromNextResetDate,
@@ -711,6 +712,17 @@ export default function BudgetScreen() {
                             {item.transactionCount} transaction
                             {item.transactionCount === 1 ? "" : "s"}
                           </Text>
+                          <Text
+                            style={[
+                              styles.categoryCycleRange,
+                              pageStyles.mutedText,
+                            ]}
+                          >
+                            {formatBudgetCycleDateRange(
+                              item.startDate,
+                              item.endDate,
+                            )}
+                          </Text>
                           {visualState !== "safe" ? (
                             <View
                               style={[
@@ -1344,6 +1356,13 @@ function createStyles() {
       fontFamily: fontFamilies.sans,
       fontSize: 14,
       lineHeight: 18,
+    },
+    categoryCycleRange: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: fontWeights.medium,
     },
     warningBadge: {
       marginTop: 8,

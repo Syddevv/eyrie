@@ -1,5 +1,6 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -9,6 +10,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useCallback,
   type ComponentProps,
 } from "react";
 import {
@@ -36,7 +38,7 @@ import { CategoryAvatar } from "@/components/category-avatar";
 import { themeColors } from "@/constants/colors";
 import { MOTION_DURATION, createStaggerDelay } from "@/constants/motion";
 import { useAccounts } from "@/hooks/useAccounts";
-import { useBudgets } from "@/hooks/useBudgets";
+import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { WALLETS } from "@/constants/wallets";
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
@@ -67,6 +69,7 @@ import {
   getBudgetUsagePercent,
   getBudgetVisualState,
 } from "@/src/lib/budget-presentation";
+import { formatBudgetCycleDateRange } from "@/src/db/utils/time";
 import { buildHomeInsights } from "@/src/lib/home-insights";
 import { triggerNavigationHaptic } from "@/src/lib/navigationHaptics";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
@@ -92,6 +95,7 @@ const HOME_CARD_GAP = 12;
 const HOME_CARD_WIDTH = (HOME_CONTENT_WIDTH - HOME_CARD_GAP) / 2;
 const HOME_CARD_HEIGHT = 138;
 const BALANCE_VISIBILITY_STORAGE_KEY = "eyrie:home-balance-visibility";
+const BUDGET_CYCLE_STORAGE_KEY = "eyrie:budget-cycle-selection";
 
 type EmptyStateVariant = "cards" | "budgets" | "transactions";
 type ThemePalette = (typeof themeColors)[keyof typeof themeColors];
@@ -817,7 +821,9 @@ export default function HomeScreen() {
     hasResolved: accountsResolved,
   } = useAccounts();
   const { transactions } = useTransactions();
-  const { budgets: monthlyBudgets } = useBudgets("monthly");
+  const [selectedBudgetCycle, setSelectedBudgetCycle] =
+    useState<BudgetCycle>("monthly");
+  const { budgets: selectedCycleBudgets } = useBudgets(selectedBudgetCycle);
   const { goals } = useSavingsGoals();
   const [showCardsSwipeHint, setShowCardsSwipeHint] = useState(true);
   const [showWalletsSwipeHint, setShowWalletsSwipeHint] = useState(true);
@@ -831,10 +837,33 @@ export default function HomeScreen() {
     (state) => state.unreadCount,
   );
   const deferredTransactions = useDeferredValue(transactions);
-  const deferredBudgets = useDeferredValue(monthlyBudgets);
+  const deferredBudgets = useDeferredValue(selectedCycleBudgets);
   const deferredGoals = useDeferredValue(goals);
 
   useDashboardBootstrap(currentUser?.id);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      AsyncStorage.getItem(BUDGET_CYCLE_STORAGE_KEY)
+        .then((storedValue) => {
+          if (
+            isActive &&
+            (storedValue === "weekly" ||
+              storedValue === "biweekly" ||
+              storedValue === "monthly")
+          ) {
+            setSelectedBudgetCycle(storedValue);
+          }
+        })
+        .catch(() => undefined);
+
+      return () => {
+        isActive = false;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -926,8 +955,8 @@ export default function HomeScreen() {
   const showWalletsEmptyState =
     accountsResolved && !accountsInitialLoading && walletAccounts.length === 0;
   const visibleBudgets = useMemo(
-    () => monthlyBudgets.slice(0, 2),
-    [monthlyBudgets],
+    () => selectedCycleBudgets.slice(0, 2),
+    [selectedCycleBudgets],
   );
   const visibleRecentTransactions = useMemo(
     () => recentTransactions.slice(0, 3),
@@ -2114,6 +2143,17 @@ export default function HomeScreen() {
                                 {item.transactionCount} transaction
                                 {item.transactionCount === 1 ? "" : "s"}
                               </Text>
+                              <Text
+                                style={[
+                                  styles.budgetCycleRange,
+                                  pageStyles.mutedText,
+                                ]}
+                              >
+                                {formatBudgetCycleDateRange(
+                                  item.startDate,
+                                  item.endDate,
+                                )}
+                              </Text>
                               {visualState !== "safe" && !isZeroBudget ? (
                                 <Animated.View
                                   entering={FadeIn.duration(
@@ -3236,6 +3276,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 18,
+  },
+  budgetCycleRange: {
+    marginTop: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   budgetSpent: {
     fontFamily: fontFamilies.sans,

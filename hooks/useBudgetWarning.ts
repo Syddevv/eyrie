@@ -53,12 +53,16 @@ export function useBudgetWarning(categoryId: string | null): BudgetWarning {
         return;
       }
 
-      // Check if budget is at or over limit
+      // The shared budget status maps the near-limit warning state to the
+      // legacy "limit" value used by this hook.
       if (currentBudget.status === "limit" || currentBudget.status === "over") {
         const isOver = currentBudget.status === "over";
+        const isAtLimit = currentBudget.spent >= currentBudget.amount;
         const message = isOver
           ? `⚠️ Budget limit exceeded! You've already spent ₱${currentBudget.spent.toFixed(2)} of your ₱${currentBudget.amount.toFixed(2)} limit for this category.`
-          : `⚠️ Budget limit reached! You've spent ₱${currentBudget.spent.toFixed(2)} of your ₱${currentBudget.amount.toFixed(2)} limit for this category.`;
+          : isAtLimit
+            ? `⚠️ Budget limit reached! You've spent ₱${currentBudget.spent.toFixed(2)} of your ₱${currentBudget.amount.toFixed(2)} limit for this category.`
+            : `⚠️ Budget running low! You've spent ₱${currentBudget.spent.toFixed(2)} of your ₱${currentBudget.amount.toFixed(2)} limit for this category.`;
 
         setWarning({
           hasWarning: true,

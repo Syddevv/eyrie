@@ -1,4 +1,5 @@
 import { DEFAULT_CURRENCY_CODE } from "@/src/db/utils/constants";
+import { getBudgetHealthStatus } from "@/src/lib/budget-health";
 
 type IconLibrary = "feather" | "material";
 type InsightTone =
@@ -131,7 +132,9 @@ export function buildHomeInsights(input: {
     .filter((budget) => budget.budgetLimit > 0)
     .sort((left, right) => right.progress - left.progress)[0];
   const overBudget = budgets.find(
-    (budget) => budget.amountSpent > budget.budgetLimit,
+    (budget) =>
+      getBudgetHealthStatus(budget.amountSpent, budget.budgetLimit) ===
+      "overBudget",
   );
   const nearGoal = activeGoals
     .filter(
@@ -248,7 +251,12 @@ export function buildHomeInsights(input: {
 
   if (mostUsedBudget) {
     const progress = Math.round(mostUsedBudget.progress * 100);
-    const isWarning = mostUsedBudget.progress >= 0.65;
+    const budgetStatus = getBudgetHealthStatus(
+      mostUsedBudget.amountSpent,
+      mostUsedBudget.budgetLimit,
+    );
+    const isWarning =
+      budgetStatus === "warning" || budgetStatus === "overBudget";
 
     insights.push({
       id: `budget-progress:${mostUsedBudget.id}`,

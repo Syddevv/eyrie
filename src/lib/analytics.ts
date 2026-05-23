@@ -549,19 +549,19 @@ function buildInsights(input: {
   const { budgetRows, spendingBreakdown, weeklySpending, incomeVsExpenses, accounts, goals } = input;
 
   const warningBudget = budgetRows.find(
-    (budget) => getBudgetHealthStatus(budget.effectiveSpent, budget.effectiveAmount) === "warning",
+    (budget) => getBudgetHealthStatus(budget.spent, budget.amount) === "warning",
   );
   const overBudget = budgetRows.find(
-    (budget) => getBudgetHealthStatus(budget.effectiveSpent, budget.effectiveAmount) === "overBudget",
+    (budget) => getBudgetHealthStatus(budget.spent, budget.amount) === "overBudget",
   );
 
   if (overBudget) {
     messages.push({
       id: "budget-over",
-      message: `${overBudget.category?.name ?? "A category"} is over budget by ${formatCurrency(Math.max(0, overBudget.effectiveSpent - overBudget.effectiveAmount))}.`,
+      message: `${overBudget.category?.name ?? "A category"} is over budget by ${formatCurrency(Math.max(0, overBudget.spent - overBudget.amount))}.`,
     });
   } else if (warningBudget) {
-    const remaining = Math.max(0, warningBudget.effectiveAmount - warningBudget.effectiveSpent);
+    const remaining = Math.max(0, warningBudget.amount - warningBudget.spent);
     messages.push({
       id: "budget-warning",
       message: `${warningBudget.category?.name ?? "A category"} is close to its limit with ${formatCurrency(remaining)} left.`,
@@ -731,8 +731,8 @@ export function buildAnalyticsSnapshot(input: {
 
   const budgetHealthSummary = calculateBudgetHealthSummary(
     budgetRows.map((budget) => ({
-      amount: budget.effectiveAmount,
-      spent: budget.effectiveSpent,
+      amount: budget.amount,
+      spent: budget.spent,
     })),
   );
   const score = budgetHealthSummary.score;

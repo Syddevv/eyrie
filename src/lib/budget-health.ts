@@ -6,6 +6,9 @@ export type BudgetHealthRow = {
 };
 
 export type BudgetHealthStatus = "onTrack" | "warning" | "overBudget";
+export type BudgetProgressStatus = "healthy" | "limit" | "over";
+
+export const BUDGET_WARNING_THRESHOLD = 0.8;
 
 export type BudgetHealthSummary = {
   score: number;
@@ -26,10 +29,27 @@ export function getBudgetHealthStatus(
   if (ratio > 1) {
     return "overBudget";
   }
-  if (ratio >= 0.75) {
+  if (ratio >= BUDGET_WARNING_THRESHOLD) {
     return "warning";
   }
   return "onTrack";
+}
+
+export function getBudgetProgressStatus(
+  spent: number,
+  amount: number,
+): BudgetProgressStatus {
+  const status = getBudgetHealthStatus(spent, amount);
+
+  if (status === "overBudget") {
+    return "over";
+  }
+
+  if (status === "warning") {
+    return "limit";
+  }
+
+  return "healthy";
 }
 
 export function calculateBudgetHealthSummary(

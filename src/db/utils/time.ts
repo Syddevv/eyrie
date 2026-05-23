@@ -198,6 +198,35 @@ export function formatNextResetDate(value: string | Date) {
   }).format(asDate(value));
 }
 
+export function formatBudgetCycleDateRange(
+  startDate: string | Date,
+  endDate: string | Date,
+) {
+  const start = asDate(startDate);
+  const end = asDate(endDate);
+  const includeStartYear = start.getUTCFullYear() !== end.getUTCFullYear();
+
+  const startLabel = new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: includeStartYear ? "numeric" : undefined,
+    timeZone: "UTC",
+  }).format(start);
+  const endLabel = new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+    .formatToParts(end)
+    .filter((part) => includeStartYear || part.type !== "year")
+    .map((part) => part.value)
+    .join("")
+    .replace(/,\s*$/, "");
+
+  return `${startLabel} - ${endLabel}`;
+}
+
 export function shouldResetBudget(
   nextResetDate: string,
   anchorDate: string | Date = new Date(),

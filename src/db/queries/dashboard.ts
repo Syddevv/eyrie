@@ -12,7 +12,10 @@ import {
 
 import { db } from "../client";
 import { accounts, budgets, categories, goals, transactions } from "../schema";
-import { calculateBudgetHealthSummary } from "@/src/lib/budget-health";
+import {
+  calculateBudgetHealthSummary,
+  getBudgetProgressStatus,
+} from "@/src/lib/budget-health";
 import { dedupeCashAccountsForDisplay } from "../services/accountsService";
 import { clamp, roundMoney } from "../utils/money";
 import { addDaysIso, endOfDayIso, nowIso, startOfDayIso } from "../utils/time";
@@ -135,7 +138,7 @@ export async function getBudgetProgress(userId: string) {
         remaining,
         progress,
         transactionCount: countResult?.count ?? 0,
-        status: remaining < 0 ? "over" : remaining === 0 ? "limit" : "healthy",
+        status: getBudgetProgressStatus(budget.spent, budget.amount),
       };
     }),
   );
