@@ -11,8 +11,8 @@ import { prepareCreateForSync, prepareUpdateForSync } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { emitUsersChanged } from "@/src/lib/dbSync";
 import {
+  calculateStreakAfterActivity,
   getLocalDateKey,
-  getNextStreakAfterActivity,
   validateStreakState,
 } from "@/src/lib/streaks";
 
@@ -31,6 +31,13 @@ type LocalUser = {
 
 const LOCAL_DUPLICATE_EMAIL_ERROR =
   "This email is already associated with an existing account.";
+
+function logStreakChange(
+  event: string,
+  payload: Record<string, unknown>,
+) {
+  console.log(`[streak] ${event}`, payload);
+}
 
 function normalizeEmail(email?: string | null) {
   return email?.trim().toLowerCase() || null;
@@ -176,38 +183,64 @@ export class UsersService {
     }
 
     const today = getLocalDateKey();
-    const validated = await this.validateCurrentStreak(id, existing, today);
-    const baseUser = validated ?? existing;
-    const previousDate = baseUser.lastActiveDate ?? null;
-
-    if (previousDate === today) {
-      return baseUser;
-    }
-
-    const nextCurrentStreak = getNextStreakAfterActivity(
+    const transition = calculateStreakAfterActivity(
       {
-        currentStreak: baseUser.currentStreak ?? 0,
-        lastActiveDate: previousDate,
+        currentStreak: existing.currentStreak ?? 0,
+        lastActiveDate: existing.lastActiveDate ?? null,
+        longestStreak: existing.longestStreak ?? 0,
       },
       today,
     );
-    const nextLongestStreak = Math.max(
-      baseUser.longestStreak ?? 0,
-      nextCurrentStreak,
-    );
+
+    if (!transition.changed) {
+      logStreakChange(
+        transition.ignoredFutureDate
+          ? "activity_preserved_future_date"
+          : "activity_already_counted",
+        {
+          userId: id,
+          currentStreak: transition.currentStreak,
+          lastActiveDate: transition.lastActiveDate,
+          daysSinceLastActivity: transition.daysSinceLastActivity,
+        },
+      );
+      return existing;
+    }
 
     const updated = (await usersRepository.update(
       id,
       prepareUpdateForSync({
-        currentStreak: nextCurrentStreak,
-        lastActiveDate: today,
-        longestStreak: nextLongestStreak,
+        currentStreak: transition.currentStreak,
+        lastActiveDate: transition.lastActiveDate,
+        longestStreak: transition.longestStreak,
         updatedAt: nowIso(),
       }),
     )) as LocalUser;
 
     await enqueueSync("users", updated.id, "upsert", updated.id);
     emitUsersChanged();
+
+    logStreakChange(
+      transition.resetFromMissedPeriod ? "activity_reset_after_gap" : "activity_counted",
+      {
+        userId: id,
+        previousStreak: transition.previousStreak,
+        currentStreak: transition.currentStreak,
+        previousLastActiveDate: transition.previousLastActiveDate,
+        lastActiveDate: transition.lastActiveDate,
+        daysSinceLastActivity: transition.daysSinceLastActivity,
+        longestStreak: transition.longestStreak,
+      },
+    );
+
+    if (transition.resetFromMissedPeriod && transition.previousLastActiveDate) {
+      await processStreakLostNotificationEvent({
+        userId: updated.id,
+        previousActiveDate: transition.previousLastActiveDate,
+        lostAt: today,
+      }).catch(() => undefined);
+    }
+
     return updated;
   }
 
@@ -230,30 +263,25 @@ export class UsersService {
       today,
     );
 
-    if (!validated.lostStreak) {
-      return existing;
+    if (validated.daysSinceLastActivity != null && validated.daysSinceLastActivity < 0) {
+      logStreakChange("validation_preserved_future_date", {
+        userId: id,
+        currentStreak: existing.currentStreak ?? 0,
+        lastActiveDate: existing.lastActiveDate ?? null,
+        daysSinceLastActivity: validated.daysSinceLastActivity,
+      });
     }
 
-    const updated = (await usersRepository.update(
-      id,
-      prepareUpdateForSync({
-        currentStreak: 0,
-        updatedAt: nowIso(),
-      }),
-    )) as LocalUser;
-
-    await enqueueSync("users", updated.id, "upsert", updated.id);
-    emitUsersChanged();
-
-    if (existing.lastActiveDate) {
-      await processStreakLostNotificationEvent({
-        userId: updated.id,
-        previousActiveDate: existing.lastActiveDate,
-        lostAt: today,
-      }).catch(() => undefined);
+    if (validated.lostStreak) {
+      logStreakChange("validation_detected_missed_period", {
+        userId: id,
+        currentStreak: existing.currentStreak ?? 0,
+        lastActiveDate: existing.lastActiveDate ?? null,
+        daysSinceLastActivity: validated.daysSinceLastActivity,
+      });
     }
 
-    return updated;
+    return existing;
   }
 }
 

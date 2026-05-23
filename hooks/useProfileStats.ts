@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { usersService } from "@/src/db/services";
 import { getProfileStatsSnapshot } from "@/src/db/queries/profile";
 import {
   onAccountsChanged,
@@ -51,7 +50,6 @@ export function useProfileStats() {
 
     setIsLoading((current) => current || !hasResolved);
     try {
-      await usersService.validateCurrentStreak(userId).catch(() => undefined);
       const next = await getProfileStatsSnapshot(userId);
       setStats(next);
       setHasResolved(true);

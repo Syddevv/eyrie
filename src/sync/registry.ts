@@ -12,6 +12,7 @@ import {
   users,
 } from "@/src/db/schema";
 import { SYSTEM_CATEGORY_USER_ID } from "@/src/db/utils/constants";
+import { isValidDateKey } from "@/src/lib/streaks";
 import type { SyncableTable } from "./types";
 
 type RegistryEntry = {
@@ -31,6 +32,74 @@ function commonRemoteFields(row: Record<string, unknown>) {
   };
 }
 
+function toStreakCount(value: unknown, fallback: number) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+function toStreakDate(value: unknown, fallback: string | null) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  return isValidDateKey(value) ? value : fallback;
+}
+
+function shouldPreserveLocalStreak(
+  existing: typeof users.$inferSelect | undefined,
+  remoteUpdatedAt: string,
+) {
+  if (!existing) {
+    return false;
+  }
+
+  if (existing.syncStatus === "pending" || existing.syncStatus === "failed") {
+    return true;
+  }
+
+  return Boolean(
+    existing.updatedAt &&
+      remoteUpdatedAt &&
+      new Date(existing.updatedAt).getTime() > new Date(remoteUpdatedAt).getTime(),
+  );
+}
+
+function mergeUserStreakFields(
+  existing: typeof users.$inferSelect | undefined,
+  row: Record<string, unknown>,
+) {
+  const remoteUpdatedAt = String(row.updated_at ?? "");
+  const preserveLocal = shouldPreserveLocalStreak(existing, remoteUpdatedAt);
+
+  if (preserveLocal && existing) {
+    console.log("[streak:sync] preserving newer local streak", {
+      userId: existing.id,
+      localUpdatedAt: existing.updatedAt,
+      remoteUpdatedAt,
+      syncStatus: existing.syncStatus,
+      currentStreak: existing.currentStreak,
+      lastActiveDate: existing.lastActiveDate,
+    });
+
+    return {
+      preserveLocal,
+      currentStreak: existing.currentStreak,
+      lastActiveDate: existing.lastActiveDate,
+      longestStreak: existing.longestStreak,
+    };
+  }
+
+  return {
+    preserveLocal,
+    currentStreak: toStreakCount(row.current_streak, existing?.currentStreak ?? 0),
+    lastActiveDate: toStreakDate(row.last_active_date, existing?.lastActiveDate ?? null),
+    longestStreak: toStreakCount(row.longest_streak, existing?.longestStreak ?? 0),
+  };
+}
+
 export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
   users: {
     tableName: "users",
@@ -46,23 +115,45 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       longest_streak: row.longestStreak ?? 0,
     }),
     upsertLocal: async (row) => {
+      const id = String(row.id);
+      const existing = await db.query.users.findFirst({
+        where: eq(users.id, id),
+      });
+      const streakFields = mergeUserStreakFields(existing, row);
+      const updatedAt =
+        streakFields.preserveLocal && existing
+          ? existing.updatedAt
+          : String(row.updated_at);
+      const lastSyncedAt =
+        streakFields.preserveLocal && existing
+          ? existing.lastSyncedAt
+          : ((row.last_synced_at as string | null) ?? null);
+      const syncStatus =
+        streakFields.preserveLocal && existing
+          ? existing.syncStatus
+          : "synced";
+      const syncError =
+        streakFields.preserveLocal && existing
+          ? existing.syncError
+          : null;
+
       await db
         .insert(users)
         .values({
-          id: String(row.id),
+          id,
           fullName: (row.full_name as string | null) ?? null,
           email: (row.email as string | null) ?? null,
           avatarUrl: (row.avatar_url as string | null) ?? null,
           currencyCode: (row.currency_code as string | null) ?? undefined,
-          currentStreak: Number(row.current_streak ?? 0),
-          lastActiveDate: (row.last_active_date as string | null) ?? null,
-          longestStreak: Number(row.longest_streak ?? 0),
+          currentStreak: streakFields.currentStreak,
+          lastActiveDate: streakFields.lastActiveDate,
+          longestStreak: streakFields.longestStreak,
           createdAt: String(row.created_at),
-          updatedAt: String(row.updated_at),
+          updatedAt,
           deletedAt: (row.deleted_at as string | null) ?? null,
-          lastSyncedAt: (row.last_synced_at as string | null) ?? null,
-          syncStatus: "synced",
-          syncError: null,
+          lastSyncedAt,
+          syncStatus,
+          syncError,
         })
         .onConflictDoUpdate({
           target: users.id,
@@ -71,14 +162,14 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
             email: (row.email as string | null) ?? null,
             avatarUrl: (row.avatar_url as string | null) ?? null,
             currencyCode: (row.currency_code as string | null) ?? undefined,
-            currentStreak: Number(row.current_streak ?? 0),
-            lastActiveDate: (row.last_active_date as string | null) ?? null,
-            longestStreak: Number(row.longest_streak ?? 0),
-            updatedAt: String(row.updated_at),
+            currentStreak: streakFields.currentStreak,
+            lastActiveDate: streakFields.lastActiveDate,
+            longestStreak: streakFields.longestStreak,
+            updatedAt,
             deletedAt: (row.deleted_at as string | null) ?? null,
-            lastSyncedAt: (row.last_synced_at as string | null) ?? null,
-            syncStatus: "synced",
-            syncError: null,
+            lastSyncedAt,
+            syncStatus,
+            syncError,
           },
         });
     },
