@@ -116,12 +116,20 @@ export function AssistantChatPanel({
           : withOpacity(colors.border, 0.92),
       },
       sendButton: {
-        backgroundColor: isDark ? "#1495FF" : "#0E67F7",
+        backgroundColor: colors.primary,
       },
       sendButtonDisabled: {
         backgroundColor: isDark
-          ? "#1E2634"
+          ? colors.secondary
           : withOpacity(colors.secondary, 0.92),
+      },
+      sendButtonIcon: {
+        color: colors.primaryForeground,
+      },
+      sendButtonIconDisabled: {
+        color: isDark
+          ? colors.secondaryForeground
+          : withOpacity(colors.mutedForeground, 0.9),
       },
       title: { color: isDark ? "#FFFFFF" : colors.foreground },
       subtitle: { color: isDark ? "#9EA6B5" : "#6A7384" },
@@ -236,6 +244,13 @@ export function AssistantChatPanel({
   const handleSend = useCallback(() => {
     void sendMessage();
   }, [sendMessage]);
+
+  const isSendDisabled =
+    isOffline ||
+    isSending ||
+    !input.trim() ||
+    cooldownRemaining > 0 ||
+    remainingMessages === 0;
 
   return (
     <SafeAreaView
@@ -387,20 +402,10 @@ export function AssistantChatPanel({
             </View>
 
             <Pressable
-              disabled={
-                isOffline ||
-                isSending ||
-                !input.trim() ||
-                cooldownRemaining > 0 ||
-                remainingMessages === 0
-              }
+              disabled={isSendDisabled}
               style={({ pressed }) => [
                 styles.sendButton,
-                isOffline ||
-                isSending ||
-                !input.trim() ||
-                cooldownRemaining > 0 ||
-                remainingMessages === 0
+                isSendDisabled
                   ? pageStyles.sendButtonDisabled
                   : pageStyles.sendButton,
                 { opacity: pressed ? 0.82 : 1 },
@@ -408,12 +413,23 @@ export function AssistantChatPanel({
               onPress={handleSend}
             >
               {isSending ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator
+                  color={
+                    isSendDisabled
+                      ? pageStyles.sendButtonIconDisabled.color
+                      : pageStyles.sendButtonIcon.color
+                  }
+                  size="small"
+                />
               ) : (
                 <Ionicons
                   name="paper-plane-outline"
                   size={20}
-                  color="#FFFFFF"
+                  color={
+                    isSendDisabled
+                      ? pageStyles.sendButtonIconDisabled.color
+                      : pageStyles.sendButtonIcon.color
+                  }
                 />
               )}
             </Pressable>
