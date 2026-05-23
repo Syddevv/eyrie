@@ -31,6 +31,7 @@ import { useSyncStore } from "./store";
 import { fetchRemoteRowById, fetchRemoteRowsPage, upsertRemoteRows } from "./supabase";
 import type { SyncRunReason, SyncRunResult, SyncableTable } from "./types";
 import { showSuccessToast } from "@/store/useToastStore";
+import { isOfflineGuestUserId } from "@/src/lib/offline-auth";
 
 let activeRun: Promise<SyncRunResult | null> | null = null;
 
@@ -281,12 +282,27 @@ export async function runSync(input?: {
     return null;
   }
 
+  if (isOfflineGuestUserId(userId)) {
+    await refreshSyncCounts(userId);
+    return {
+      uploaded: 0,
+      downloaded: 0,
+      skipped: 0,
+      failed: 0,
+      reason,
+      startedAt: nowIso(),
+      finishedAt: nowIso(),
+      state: "offline",
+      message: "Offline guest data will sync after you sign in.",
+    };
+  }
+
   const store = useSyncStore.getState();
   if (activeRun && !input?.force) {
     return activeRun;
   }
 
-  if (!store.isOnline && reason !== "manual" && !input?.force) {
+  if (!store.isOnline && reason !== "manual") {
     await refreshSyncCounts(userId);
     return {
       uploaded: 0,
