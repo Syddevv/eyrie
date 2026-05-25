@@ -63,7 +63,8 @@ Track expenses, manage budgets, monitor savings goals, and receive AI-powered fi
 
 Manage your finances anytime, online or offline.
 
-![Home Page](./assets/readme/Home%20Page%20Mock-Up.png)
+![Home Page](<img width="941" height="1672" alt="Home Page Mock-Up" src="https://github.com/user-attachments/assets/7cff386a-003f-4490-a8ff-bfa270f0ddd7" />
+)
 
 ---
 
@@ -249,12 +250,6 @@ Eyrie focuses on:
 Contributions, issues, and feature requests are welcome.
 
 Feel free to fork the project and submit a pull request.
-
----
-
-# 📄 License
-
-This project is licensed under the MIT License.
 
 ---
 
