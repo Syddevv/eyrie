@@ -63,7 +63,7 @@ Track expenses, manage budgets, monitor savings goals, and receive AI-powered fi
 
 Manage your finances anytime, online or offline.
 
-![Home Page](<img width="941" height="1672" alt="Home Page Mock-Up" src="https://github.com/user-attachments/assets/7cff386a-003f-4490-a8ff-bfa270f0ddd7" />)
+<img width="941" height="1672" alt="Home Page Mock-Up" src="https://github.com/user-attachments/assets/1694bc1d-e8d7-4df4-b234-877c465b6e2d" />
 
 ---
 
