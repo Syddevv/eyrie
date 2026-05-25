@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Logos/eyrie-final-logo.png",
+        "foregroundImage": "./assets/Logos/eyrie-final-icon.png",
         "backgroundColor": "#019042"
       },
       "softwareKeyboardLayoutMode": "resize",
