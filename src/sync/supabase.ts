@@ -2,11 +2,26 @@ import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 
 import type { SyncableTable } from "./types";
 
+const SYNC_REQUEST_TIMEOUT_MS = 8000;
+
 export type RemoteSyncRow = Record<string, unknown> & {
   id: string;
   updated_at: string;
   deleted_at?: string | null;
 };
+
+function withSyncTimeout<T>(request: PromiseLike<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Sync request timed out."));
+    }, SYNC_REQUEST_TIMEOUT_MS);
+
+    Promise.resolve(request)
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timeout));
+  });
+}
 
 export async function fetchRemoteRowById(
   table: SyncableTable,
@@ -14,21 +29,29 @@ export async function fetchRemoteRowById(
   id: string,
 ) {
   assertSupabaseConfigured("Cloud sync");
+  const client = supabase;
+  if (!client) {
+    throw new Error("Cloud sync is not configured.");
+  }
 
   if (table === "users") {
-    const { data, error } = await supabase.from("users").select("*").eq("id", id).maybeSingle();
+    const { data, error } = await withSyncTimeout(
+      client.from("users").select("*").eq("id", id).maybeSingle(),
+    );
     if (error) {
       throw error;
     }
     return data as RemoteSyncRow | null;
   }
 
-  const { data, error } = await supabase
-    .from(table)
-    .select("*")
-    .eq("user_id", userId)
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await withSyncTimeout(
+    client
+      .from(table)
+      .select("*")
+      .eq("user_id", userId)
+      .eq("id", id)
+      .maybeSingle(),
+  );
 
   if (error) {
     throw error;
@@ -39,15 +62,18 @@ export async function fetchRemoteRowById(
 
 export async function upsertRemoteRows(table: SyncableTable, rows: Record<string, unknown>[]) {
   assertSupabaseConfigured("Cloud sync");
+  const client = supabase;
+  if (!client) {
+    throw new Error("Cloud sync is not configured.");
+  }
 
   if (!rows.length) {
     return [];
   }
 
-  const { data, error } = await supabase
-    .from(table)
-    .upsert(rows, { onConflict: "id" })
-    .select("*");
+  const { data, error } = await withSyncTimeout(
+    client.from(table).upsert(rows, { onConflict: "id" }).select("*"),
+  );
 
   if (error) {
     throw error;
@@ -63,12 +89,16 @@ export async function fetchRemoteRowsPage(
   limit: number,
 ) {
   assertSupabaseConfigured("Cloud sync");
+  const client = supabase;
+  if (!client) {
+    throw new Error("Cloud sync is not configured.");
+  }
 
   if (table === "users") {
-    const query = supabase.from("users").select("*").eq("id", userId).limit(1);
-    const { data, error } = cursorUpdatedAt
-      ? await query.gte("updated_at", cursorUpdatedAt)
-      : await query;
+    const query = client.from("users").select("*").eq("id", userId).limit(1);
+    const { data, error } = await withSyncTimeout(
+      cursorUpdatedAt ? query.gte("updated_at", cursorUpdatedAt) : query,
+    );
 
     if (error) {
       throw error;
@@ -77,7 +107,7 @@ export async function fetchRemoteRowsPage(
     return (data ?? []) as RemoteSyncRow[];
   }
 
-  let query = supabase
+  let query = client
     .from(table)
     .select("*")
     .eq("user_id", userId)
@@ -89,7 +119,7 @@ export async function fetchRemoteRowsPage(
     query = query.gte("updated_at", cursorUpdatedAt);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await withSyncTimeout(query);
   if (error) {
     throw error;
   }
