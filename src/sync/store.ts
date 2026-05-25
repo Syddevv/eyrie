@@ -59,7 +59,7 @@ const INITIAL_STATE = {
   pendingCount: 0,
   failedCount: 0,
   isRestoring: false,
-  hydrationReady: true,
+  hydrationReady: false,
   hasStartedSync: false,
   hasCompletedSync: false,
 };
@@ -100,9 +100,8 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
   setUiState: ({ uiState, lastError, lastErrorKind, isOnline }) =>
     set((state) => ({
       uiState,
-      lastError: lastError !== undefined ? lastError : state.lastError,
-      lastErrorKind:
-        lastErrorKind !== undefined ? lastErrorKind : state.lastErrorKind,
+      lastError: lastError ?? state.lastError,
+      lastErrorKind: lastErrorKind ?? state.lastErrorKind,
       isOnline: isOnline ?? state.isOnline,
       isSyncing: uiState === "syncing" || uiState === "restoring",
     })),
@@ -120,22 +119,17 @@ export const useSyncStore = create<SyncStoreState>((set) => ({
   reset: () => set(INITIAL_STATE),
 }));
 
-export function waitForHydrationReady(timeoutMs = 1500) {
+export function waitForHydrationReady() {
   if (useSyncStore.getState().hydrationReady) {
     return Promise.resolve();
   }
 
   return new Promise<void>((resolve) => {
-    const timeout = setTimeout(() => {
-      unsubscribe();
-      resolve();
-    }, timeoutMs);
     const unsubscribe = useSyncStore.subscribe((state) => {
-      if (!state.hydrationReady && state.isOnline) {
+      if (!state.hydrationReady) {
         return;
       }
 
-      clearTimeout(timeout);
       unsubscribe();
       resolve();
     });

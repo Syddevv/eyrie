@@ -4,7 +4,6 @@ import { ENV } from "@/lib/env";
 import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { emitAllChanges } from "@/src/lib/dbSync";
-import { isOfflineGuestUserId } from "@/src/lib/offline-auth";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
 import { accountsService } from "@/src/db/services";
@@ -84,7 +83,6 @@ function useSyncTriggers() {
   const networkReady = useSyncStore((state) => state.networkReady);
   const reset = useSyncStore((state) => state.reset);
   const setHydrationReady = useSyncStore((state) => state.setHydrationReady);
-  const isOnline = useSyncStore((state) => state.isOnline);
   const previousUserId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -98,23 +96,7 @@ function useSyncTriggers() {
       return;
     }
 
-    if (isOfflineGuestUserId(userId)) {
-      setHydrationReady(true);
-      previousUserId.current = userId;
-      return;
-    }
-
     if (!networkReady) {
-      setHydrationReady(true);
-      void refreshSyncCounts(userId).catch(() => undefined);
-      return;
-    }
-
-    if (!isOnline) {
-      setHydrationReady(true);
-      useSyncStore.getState().setRestoring(false);
-      void refreshSyncCounts(userId).catch(() => undefined);
-      previousUserId.current = userId;
       return;
     }
 
@@ -184,7 +166,7 @@ function useSyncTriggers() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthReady, isOnline, networkReady, reset, setHydrationReady, userId]);
+  }, [isAuthReady, networkReady, reset, setHydrationReady, userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,15 +193,6 @@ function useSyncTriggers() {
       lastValidatedConnection.current = isOnline;
       setOnline(isOnline);
       setNetworkReady(true);
-      if (!isOnline) {
-        useSyncStore.getState().setHydrationReady(true);
-        useSyncStore.getState().setUiState({
-          uiState: "offline",
-          lastError: null,
-          lastErrorKind: null,
-          isOnline: false,
-        });
-      }
 
       if (userId && isOnline && wasOnline === false) {
         void runSync({ userId, reason: "reconnect", force: true });

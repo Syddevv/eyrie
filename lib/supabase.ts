@@ -27,6 +27,7 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabasePublishableKey!, {
       auth: {
         storage: globalThis.localStorage,
+        storageKey: "eyrie-auth",
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
@@ -37,6 +38,45 @@ export const supabase = isSupabaseConfigured
 
 export function assertSupabaseConfigured(feature = "Supabase") {
   assertEnvReady(feature);
+}
+
+const INVALID_REFRESH_TOKEN_PATTERNS = [
+  "invalid refresh token",
+  "refresh token not found",
+  "invalid_grant",
+];
+
+export function isInvalidRefreshTokenError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return INVALID_REFRESH_TOKEN_PATTERNS.some((pattern) =>
+    message.includes(pattern),
+  );
+}
+
+export async function clearLocalSupabaseSession() {
+  if (!supabase) {
+    return;
+  }
+
+  const authClient = supabase.auth as typeof supabase.auth & {
+    storageKey?: string;
+  };
+  const storageKey = authClient.storageKey ?? "eyrie-auth";
+
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+    return;
+  } catch {
+    // Fall through to direct storage cleanup when the stored refresh token is stale.
+  }
+
+  globalThis.localStorage?.removeItem(storageKey);
+  globalThis.localStorage?.removeItem(`${storageKey}-user`);
+  globalThis.localStorage?.removeItem(`${storageKey}-code-verifier`);
 }
 
 if (Platform.OS !== "web" && supabase) {

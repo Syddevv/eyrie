@@ -23,7 +23,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { openForgotPasswordFlow } from '@/services/password-reset';
 import { signInWithEmailPassword, signInWithGoogle } from '@/services/auth';
-import { useOfflineState } from '@/src/sync/hooks';
 import { useAuthStore } from '@/store/useAuthStore';
 
 function withOpacity(hex: string, opacity: number) {
@@ -101,7 +100,6 @@ export default function SignInScreen() {
   const colors = themeColors[colorScheme];
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
   const { isSigningIn, isGoogleLoading } = useAuth();
-  const { isOffline } = useOfflineState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -140,11 +138,6 @@ export default function SignInScreen() {
   const canSubmit = email.trim().length > 0 && password.length > 0;
 
   const handleSignIn = async () => {
-    if (isOffline) {
-      showSnackbar('You are offline. Sign in requires an internet connection.', 'error');
-      return;
-    }
-
     if (!email.trim()) {
       showSnackbar('Enter your email to continue.', 'error');
       return;
@@ -168,11 +161,6 @@ export default function SignInScreen() {
   };
 
   const handleGoogle = async () => {
-    if (isOffline) {
-      showSnackbar('You are offline. Google sign-in requires an internet connection.', 'error');
-      return;
-    }
-
     try {
       await signInWithGoogle();
     } catch {
@@ -181,11 +169,6 @@ export default function SignInScreen() {
   };
 
   const handleForgotPassword = async () => {
-    if (isOffline) {
-      showSnackbar('You are offline. Password reset requires an internet connection.', 'error');
-      return;
-    }
-
     try {
       await openForgotPasswordFlow(email.trim().toLowerCase());
     } catch {

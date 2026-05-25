@@ -22,7 +22,6 @@ import { fontFamilies, fontWeights } from '@/constants/typography';
 import { useAuth } from '@/hooks/useAuth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { signInWithGoogle, signUpWithEmailPassword } from '@/services/auth';
-import { useOfflineState } from '@/src/sync/hooks';
 import { useAuthStore } from '@/store/useAuthStore';
 
 function withOpacity(hex: string, opacity: number) {
@@ -103,7 +102,6 @@ export default function SignUpScreen() {
   const colors = themeColors[colorScheme];
   const showSnackbar = useAuthStore((state) => state.showSnackbar);
   const { isSigningUp, isGoogleLoading } = useAuth();
-  const { isOffline } = useOfflineState();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -162,11 +160,6 @@ export default function SignUpScreen() {
     acceptedTerms;
 
   const handleCreateAccount = async () => {
-    if (isOffline) {
-      showSnackbar('You are offline. Account creation requires an internet connection.', 'error');
-      return;
-    }
-
     if (!fullName.trim()) {
       showSnackbar('Enter your full name to continue.', 'error');
       return;
@@ -214,11 +207,6 @@ export default function SignUpScreen() {
   };
 
   const handleGoogle = async () => {
-    if (isOffline) {
-      showSnackbar('You are offline. Google sign-in requires an internet connection.', 'error');
-      return;
-    }
-
     try {
       await signInWithGoogle();
     } catch {

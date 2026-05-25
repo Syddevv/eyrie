@@ -9,10 +9,6 @@ import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { accountsService } from "@/src/db/services";
-import {
-  clearOfflineAuthSnapshot,
-  isOfflineGuestUserId,
-} from "@/src/lib/offline-auth";
 
 const EXISTING_ACCOUNT_ERROR_MESSAGE =
   "This email is already associated with an existing account.";
@@ -546,23 +542,14 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
+  assertSupabaseConfigured("Authentication");
+
   const store = useAuthStore.getState();
   store.setSigningOut(true);
 
   try {
     // Reset cached default cash account state before signing out
     accountsService.resetDefaultCashCache();
-    await clearOfflineAuthSnapshot();
-
-    if (isOfflineGuestUserId(store.user?.id) || !supabase) {
-      store.setSession(null);
-      store.setOfflineUser(null);
-      store.closeOtpModal();
-      store.showSnackbar("Signed out.", "success");
-      return;
-    }
-
-    assertSupabaseConfigured("Authentication");
 
     const { error } = await supabase.auth.signOut();
 

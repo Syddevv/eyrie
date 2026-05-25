@@ -6,7 +6,6 @@ import {
   useMemo,
   useState,
 } from "react";
-import { InteractionManager } from "react-native";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 
 import { db } from "./client";
@@ -52,121 +51,114 @@ export function DatabaseProvider({ children }: PropsWithChildren) {
     }
 
     let isMounted = true;
-    let interactionTask: ReturnType<typeof InteractionManager.runAfterInteractions> | null =
-      null;
+    void (async () => {
+      try {
+        // Startup cannot depend on idle interactions because the loading
+        // screen itself runs continuous animations.
+        setBootState({
+          phase: "validating",
+          message: "Validating your local finance database...",
+        });
 
-    interactionTask = InteractionManager.runAfterInteractions(() => {
-      void (async () => {
-        try {
-          // Phase 1: Log migration status
-          setBootState({
-            phase: "validating",
-            message: "Validating your local finance database...",
-          });
+        const migrationSnapshot = await getMigrationVersionSnapshot();
+        console.log("[db:boot] Migration snapshot:", {
+          hasMigrationTable: migrationSnapshot.hasMigrationTable,
+          appliedCount: migrationSnapshot.appliedMigrations?.length || 0,
+          migrations: migrationSnapshot.appliedMigrations
+            ?.map((m: any) => m.hash || m.id)
+            .slice(-3),
+        });
 
-          const migrationSnapshot = await getMigrationVersionSnapshot();
-          console.log("[db:boot] Migration snapshot:", {
-            hasMigrationTable: migrationSnapshot.hasMigrationTable,
-            appliedCount: migrationSnapshot.appliedMigrations?.length || 0,
-            migrations: migrationSnapshot.appliedMigrations
-              ?.map((m: any) => m.hash || m.id)
-              .slice(-3),
-          });
+        const validation = await validateAndRepairLocalSchema();
 
-          // Phase 2: Validate and repair schema
-          const validation = await validateAndRepairLocalSchema();
+        console.log("[db:boot] Schema validation complete:", {
+          repaired: validation.repaired,
+          skipped: validation.skipped,
+          unrecoverable: validation.unrecoverable,
+          errorCount: validation.errors?.length || 0,
+        });
 
-          console.log("[db:boot] Schema validation complete:", {
-            repaired: validation.repaired,
-            skipped: validation.skipped,
-            unrecoverable: validation.unrecoverable,
-            errorCount: validation.errors?.length || 0,
-          });
-
-          if (validation.errors?.length) {
-            console.log(
-              "[db:boot] Validation errors:",
-              validation.errors.map((e) => `${e.table}.${e.column}: ${e.error}`),
-            );
-          }
-
-          const criticalErrors = validation.unrecoverable.filter(
-            (err) =>
-              err.includes("Missing required table") ||
-              err.includes("user_id") ||
-              err.includes("updated_at"),
+        if (validation.errors?.length) {
+          console.log(
+            "[db:boot] Validation errors:",
+            validation.errors.map((e) => `${e.table}.${e.column}: ${e.error}`),
           );
+        }
 
-          if (criticalErrors.length > 0) {
-            const errorDetails = validation.errors?.length
-              ? `\n${validation.errors
-                  .filter((e) => e.recoverable === false)
-                  .map((e) => `  ${e.table}.${e.column}: ${e.error}`)
-                  .join("\n")}`
-              : "";
+        const criticalErrors = validation.unrecoverable.filter(
+          (err) =>
+            err.includes("Missing required table") ||
+            err.includes("user_id") ||
+            err.includes("updated_at"),
+        );
 
-            throw new Error(
-              `Critical database schema error: ${criticalErrors.join(
-                "; ",
-              )}${errorDetails}`,
-            );
-          }
+        if (criticalErrors.length > 0) {
+          const errorDetails = validation.errors?.length
+            ? `\n${validation.errors
+                .filter((e) => e.recoverable === false)
+                .map((e) => `  ${e.table}.${e.column}: ${e.error}`)
+                .join("\n")}`
+            : "";
 
-          if (validation.unrecoverable.length > 0) {
-            console.warn("[db:boot] Non-critical schema issues:", {
-              issues: validation.unrecoverable,
-              repaired: validation.repaired.length,
-              skipped: validation.skipped.length,
-            });
-          }
+          throw new Error(
+            `Critical database schema error: ${criticalErrors.join(
+              "; ",
+            )}${errorDetails}`,
+          );
+        }
 
-          // Phase 3: Seed database
-          setBootState({
-            phase: "seeding",
-            message: "Finishing local database setup...",
-          });
-
-          await seedDatabase();
-
-          const cleanupResult =
-            await accountsService.cleanupDuplicateCashAccounts();
-          if (cleanupResult.removed > 0) {
-            console.log(
-              `[db:boot] Cleanup removed ${cleanupResult.removed} duplicate CASH accounts`,
-            );
-          }
-
-          if (isMounted) {
-            console.log("[db:boot] Database boot complete");
-            setBootState({
-              phase: "ready",
-              message: "Local finance database is ready.",
-            });
-          }
-        } catch (bootError) {
-          if (!isMounted) {
-            return;
-          }
-
-          const message =
-            bootError instanceof Error ? bootError.message : String(bootError);
-
-          console.error("[db:boot] Boot error:", {
-            message,
-            stack: bootError instanceof Error ? bootError.stack : undefined,
-          });
-
-          setBootState({
-            phase: "error",
-            message,
+        if (validation.unrecoverable.length > 0) {
+          console.warn("[db:boot] Non-critical schema issues:", {
+            issues: validation.unrecoverable,
+            repaired: validation.repaired.length,
+            skipped: validation.skipped.length,
           });
         }
-      })();
-    });
+
+        setBootState({
+          phase: "seeding",
+          message: "Finishing local database setup...",
+        });
+
+        await seedDatabase();
+
+        const cleanupResult =
+          await accountsService.cleanupDuplicateCashAccounts();
+        if (cleanupResult.removed > 0) {
+          console.log(
+            `[db:boot] Cleanup removed ${cleanupResult.removed} duplicate CASH accounts`,
+          );
+        }
+
+        if (isMounted) {
+          console.log("[db:boot] Database boot complete");
+          setBootState({
+            phase: "ready",
+            message: "Local finance database is ready.",
+          });
+        }
+      } catch (bootError) {
+        if (!isMounted) {
+          return;
+        }
+
+        const message =
+          bootError instanceof Error ? bootError.message : String(bootError);
+
+        console.error("[db:boot] Boot error:", {
+          message,
+          stack: bootError instanceof Error ? bootError.stack : undefined,
+        });
+
+        setBootState({
+          phase: "error",
+          message,
+        });
+      }
+    })();
 
     return () => {
       isMounted = false;
-      interactionTask?.cancel();
     };
   }, [error, success]);
 

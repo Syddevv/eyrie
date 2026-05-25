@@ -1,7 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
 import { showToast } from "@/store/useToastStore";
-import type { OfflineAuthUser } from "@/src/lib/offline-auth";
 
 export type AuthMode = "sign-in" | "sign-up";
 export type SnackbarTone = "success" | "error" | "info";
@@ -43,7 +42,6 @@ type AuthStoreState = {
   otpModal: OtpModalState;
   passwordResetFlow: PasswordResetFlowState;
   setSession: (session: Session | null) => void;
-  setOfflineUser: (user: OfflineAuthUser | null) => void;
   setReady: (isReady: boolean) => void;
   setSigningIn: (value: boolean) => void;
   setSigningUp: (value: boolean) => void;
@@ -109,11 +107,6 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({
       session,
       user: session?.user ?? null,
-    }),
-  setOfflineUser: (user) =>
-    set({
-      session: null,
-      user: user as User | null,
     }),
   setReady: (isReady) => set({ isReady }),
   setHasCompletedOnboarding: (hasCompletedOnboarding) =>
