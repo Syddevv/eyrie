@@ -246,14 +246,6 @@ Eyrie focuses on:
 
 ---
 
-# 🤝 Contributing
-
-Contributions, issues, and feature requests are welcome.
-
-Feel free to fork the project and submit a pull request.
-
----
-
 <div align="center">
 
 ### Built with ❤️ using React Native & Expo
