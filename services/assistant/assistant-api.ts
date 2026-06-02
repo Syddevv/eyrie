@@ -1,6 +1,10 @@
 import { supabase } from "@/lib/supabase";
 
-import type { AssistantRequestInput, AssistantResponse } from "./types";
+import type {
+  AssistantRequestInput,
+  AssistantResponse,
+  AssistantUsageStatus,
+} from "./types";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 export const ASSISTANT_FALLBACK_ERROR_MESSAGE =
@@ -141,6 +145,59 @@ export async function askAssistant(
 
     return {
       reply: aiReply.trim(),
+      remainingMessages: parseNumber(data?.remainingMessages),
+      dailyLimit: parseNumber(data?.dailyLimit),
+      cooldownRemaining: parseNumber(data?.cooldownRemaining),
+      resetAt: parseString(data?.resetAt) ?? null,
+    };
+  } catch (error) {
+    if (error instanceof AssistantFunctionError) {
+      throw error;
+    }
+
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        "The AI assistant took too long to respond. Please try again.",
+      );
+    }
+
+    throw new Error(normalizeAssistantError(error));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getAssistantUsageStatus(): Promise<AssistantUsageStatus> {
+  if (!supabase) {
+    throw new Error(ASSISTANT_FALLBACK_ERROR_MESSAGE);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  try {
+    const { data, error } = await supabase.functions.invoke("ai-chat", {
+      body: {
+        requestMeta: {
+          action: "status",
+        },
+      },
+      signal: controller.signal,
+    } as any);
+
+    if (error) {
+      const parsedError = await readFunctionError(error);
+
+      if (parsedError) {
+        throw new AssistantFunctionError(parsedError.message, parsedError);
+      }
+
+      throw error;
+    }
+
+    return {
       remainingMessages: parseNumber(data?.remainingMessages),
       dailyLimit: parseNumber(data?.dailyLimit),
       cooldownRemaining: parseNumber(data?.cooldownRemaining),

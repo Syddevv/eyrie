@@ -729,6 +729,37 @@ Deno.serve(async (request: Request) => {
 
     recordRequestStart(user.id, requestId);
 
+    if (request.method === "GET") {
+      const currentDate = new Date().toISOString().slice(0, 10);
+
+      try {
+        const usageRow = await fetchOrCreateUsageRow(supabase, user.id, currentDate)
+          .then((row) => ensureLimitResetAt(supabase, row));
+        const cooldownRemaining = cooldownRemainingSeconds(usageRow);
+
+        return jsonResponse(200, {
+          ...usageResponseMetadata(usageRow),
+          cooldownRemaining,
+        });
+      } catch (error) {
+        recordRequestEnd({
+          userId: user.id,
+          requestId,
+          durationMs: performance.now() - startedAt,
+          errorType: "usage_status_failed",
+        });
+        console.error("[ai-chat] usage status failed", {
+          requestId,
+          userId: user.id,
+          error,
+        });
+        return safeErrorResponse(
+          500,
+          "The AI assistant is temporarily unavailable.",
+        );
+      }
+    }
+
     let body: AssistantRequest;
     try {
       body = (await request.json()) as AssistantRequest;
@@ -748,6 +779,44 @@ Deno.serve(async (request: Request) => {
         400,
         "The assistant request could not be processed.",
       );
+    }
+
+    const requestAction =
+      body.requestMeta &&
+      typeof body.requestMeta === "object" &&
+      typeof (body.requestMeta as Record<string, unknown>).action === "string"
+        ? ((body.requestMeta as Record<string, unknown>).action as string)
+        : null;
+
+    if (request.method === "GET" || requestAction === "status") {
+      const currentDate = new Date().toISOString().slice(0, 10);
+
+      try {
+        const usageRow = await fetchOrCreateUsageRow(supabase, user.id, currentDate)
+          .then((row) => ensureLimitResetAt(supabase, row));
+        const cooldownRemaining = cooldownRemainingSeconds(usageRow);
+
+        return jsonResponse(200, {
+          ...usageResponseMetadata(usageRow),
+          cooldownRemaining,
+        });
+      } catch (error) {
+        recordRequestEnd({
+          userId: user.id,
+          requestId,
+          durationMs: performance.now() - startedAt,
+          errorType: "usage_status_failed",
+        });
+        console.error("[ai-chat] usage status failed", {
+          requestId,
+          userId: user.id,
+          error,
+        });
+        return safeErrorResponse(
+          500,
+          "The AI assistant is temporarily unavailable.",
+        );
+      }
     }
 
     const { messages, latestUserMessage, financialContext } =

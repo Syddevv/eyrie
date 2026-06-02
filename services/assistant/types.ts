@@ -93,3 +93,10 @@ export type AssistantResponse = {
   cooldownRemaining?: number;
   resetAt?: string | null;
 };
+
+export type AssistantUsageStatus = {
+  remainingMessages?: number;
+  dailyLimit?: number;
+  cooldownRemaining?: number;
+  resetAt?: string | null;
+};

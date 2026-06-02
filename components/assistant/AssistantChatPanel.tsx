@@ -230,6 +230,9 @@ export function AssistantChatPanel({
     Math.max(footerBottomOffset, composerBottomInset) +
     footerHeight +
     (hasUserMessages ? 28 : 20);
+  const hasReachedLimit = remainingMessages === 0;
+  const isComposerLocked =
+    isOffline || isSending || hasReachedLimit;
   const showUsageSummary =
     typeof remainingMessages === "number" && typeof dailyLimit === "number";
   const usageSummaryText = showUsageSummary
@@ -310,11 +313,10 @@ export function AssistantChatPanel({
   }, [sendMessage]);
 
   const isSendDisabled =
-    isOffline ||
-    isSending ||
+    isComposerLocked ||
     !input.trim() ||
     cooldownRemaining > 0 ||
-    remainingMessages === 0;
+    hasReachedLimit;
 
   return (
     <SafeAreaView
@@ -447,12 +449,12 @@ export function AssistantChatPanel({
               styles.inputRow,
               styles.composerCard,
               pageStyles.composerCard,
-              isOffline && styles.inputWrapDisabled,
+              isComposerLocked && styles.inputWrapDisabled,
             ]}
           >
             <View style={styles.inputWrap}>
               <TextInput
-                editable={!isOffline && !isSending}
+                editable={!isComposerLocked}
                 value={input}
                 onChangeText={setInput}
                 style={[styles.input, pageStyles.title]}
@@ -463,7 +465,7 @@ export function AssistantChatPanel({
                 returnKeyType="send"
                 blurOnSubmit={false}
                 onSubmitEditing={() => {
-                  if (!isOffline && !isSending) {
+                  if (!isComposerLocked) {
                     void sendMessage();
                   }
                 }}
