@@ -105,6 +105,63 @@ function mergeUserStreakFields(
   };
 }
 
+async function accountExists(id: string | null | undefined) {
+  if (!id) {
+    return false;
+  }
+
+  const existing = await db.query.accounts.findFirst({
+    where: eq(accounts.id, id),
+  });
+
+  return Boolean(existing);
+}
+
+async function categoryExists(id: string | null | undefined) {
+  if (!id) {
+    return false;
+  }
+
+  const existing = await db.query.categories.findFirst({
+    where: eq(categories.id, id),
+  });
+
+  return Boolean(existing);
+}
+
+async function ensurePlaceholderCategory(input: {
+  id: string;
+  userId: string;
+  type: string;
+  updatedAt: string;
+}) {
+  if (await categoryExists(input.id)) {
+    return;
+  }
+
+  await db.insert(categories).values({
+    id: input.id,
+    userId: input.userId,
+    type: input.type,
+    name: "Restored Category",
+    icon: "shape-outline",
+    iconType: "vector",
+    iconName: "shape-outline",
+    iconImageUri: null,
+    emoji: null,
+    color: "#64748B",
+    isDefault: false,
+    isSystem: false,
+    isArchived: true,
+    createdAt: input.updatedAt,
+    updatedAt: input.updatedAt,
+    deletedAt: null,
+    lastSyncedAt: input.updatedAt,
+    syncStatus: "synced",
+    syncError: null,
+  }).onConflictDoNothing();
+}
+
 export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
   users: {
     tableName: "users",
@@ -312,12 +369,18 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       default_category_id: row.defaultCategoryId ?? null,
     }),
     upsertLocal: async (row) => {
+      const defaultCategoryId = (row.default_category_id as string | null) ?? null;
+      const safeDefaultCategoryId =
+        defaultCategoryId && (await categoryExists(defaultCategoryId))
+          ? defaultCategoryId
+          : null;
+
       await db.insert(merchants).values({
         id: String(row.id),
         userId: String(row.user_id),
         name: String(row.name),
         logoUri: (row.logo_uri as string | null) ?? null,
-        defaultCategoryId: (row.default_category_id as string | null) ?? null,
+        defaultCategoryId: safeDefaultCategoryId,
         createdAt: String(row.created_at),
         updatedAt: String(row.updated_at),
         deletedAt: (row.deleted_at as string | null) ?? null,
@@ -330,7 +393,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
           userId: String(row.user_id),
           name: String(row.name),
           logoUri: (row.logo_uri as string | null) ?? null,
-          defaultCategoryId: (row.default_category_id as string | null) ?? null,
+          defaultCategoryId: safeDefaultCategoryId,
           updatedAt: String(row.updated_at),
           deletedAt: (row.deleted_at as string | null) ?? null,
           lastSyncedAt: (row.last_synced_at as string | null) ?? null,
@@ -358,16 +421,27 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       transaction_date: row.transactionDate,
     }),
     upsertLocal: async (row) => {
+      const categoryId = (row.category_id as string | null) ?? null;
+      const merchantId = (row.merchant_id as string | null) ?? null;
+      const transferAccountId = (row.transfer_account_id as string | null) ?? null;
+      const safeCategoryId =
+        categoryId && (await categoryExists(categoryId)) ? categoryId : null;
+      const safeMerchantId = merchantId ?? null;
+      const safeTransferAccountId =
+        transferAccountId && (await accountExists(transferAccountId))
+          ? transferAccountId
+          : null;
+
       await db.insert(transactions).values({
         id: String(row.id),
         userId: String(row.user_id),
         type: String(row.type),
         amount: Number(row.amount ?? 0),
         currencyCode: String(row.currency_code),
-        categoryId: (row.category_id as string | null) ?? null,
-        merchantId: (row.merchant_id as string | null) ?? null,
+        categoryId: safeCategoryId,
+        merchantId: safeMerchantId,
         accountId: String(row.account_id),
-        transferAccountId: (row.transfer_account_id as string | null) ?? null,
+        transferAccountId: safeTransferAccountId,
         merchantName: (row.merchant_name as string | null) ?? null,
         notes: (row.notes as string | null) ?? null,
         transactionDate: String(row.transaction_date),
@@ -384,10 +458,10 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
           type: String(row.type),
           amount: Number(row.amount ?? 0),
           currencyCode: String(row.currency_code),
-          categoryId: (row.category_id as string | null) ?? null,
-          merchantId: (row.merchant_id as string | null) ?? null,
+          categoryId: safeCategoryId,
+          merchantId: safeMerchantId,
           accountId: String(row.account_id),
-          transferAccountId: (row.transfer_account_id as string | null) ?? null,
+          transferAccountId: safeTransferAccountId,
           merchantName: (row.merchant_name as string | null) ?? null,
           notes: (row.notes as string | null) ?? null,
           transactionDate: String(row.transaction_date),
@@ -414,10 +488,18 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       end_date: row.endDate,
     }),
     upsertLocal: async (row) => {
+      const categoryId = String(row.category_id);
+      await ensurePlaceholderCategory({
+        id: categoryId,
+        userId: String(row.user_id),
+        type: "expense",
+        updatedAt: String(row.updated_at),
+      });
+
       await db.insert(budgets).values({
         id: String(row.id),
         userId: String(row.user_id),
-        categoryId: String(row.category_id),
+        categoryId,
         amount: Number(row.amount ?? 0),
         spent: Number(row.spent ?? 0),
         period: String(row.period),
@@ -433,7 +515,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
         target: budgets.id,
         set: {
           userId: String(row.user_id),
-          categoryId: String(row.category_id),
+          categoryId,
           amount: Number(row.amount ?? 0),
           spent: Number(row.spent ?? 0),
           period: String(row.period),
@@ -468,6 +550,12 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       is_archived: row.isArchived,
     }),
     upsertLocal: async (row) => {
+      const linkedWalletId = (row.linked_wallet_id as string | null) ?? null;
+      const safeLinkedWalletId =
+        linkedWalletId && (await accountExists(linkedWalletId))
+          ? linkedWalletId
+          : null;
+
       await db.insert(goals).values({
         id: String(row.id),
         userId: String(row.user_id),
@@ -480,7 +568,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
         iconImageUri: (row.icon_image_uri as string | null) ?? null,
         emoji: (row.emoji as string | null) ?? null,
         color: (row.color as string | null) ?? null,
-        linkedWalletId: (row.linked_wallet_id as string | null) ?? null,
+        linkedWalletId: safeLinkedWalletId,
         isCompleted: Boolean(row.is_completed),
         isArchived: Boolean(row.is_archived),
         createdAt: String(row.created_at),
@@ -502,7 +590,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
           iconImageUri: (row.icon_image_uri as string | null) ?? null,
           emoji: (row.emoji as string | null) ?? null,
           color: (row.color as string | null) ?? null,
-          linkedWalletId: (row.linked_wallet_id as string | null) ?? null,
+          linkedWalletId: safeLinkedWalletId,
           isCompleted: Boolean(row.is_completed),
           isArchived: Boolean(row.is_archived),
           updatedAt: String(row.updated_at),
@@ -526,11 +614,15 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       note: row.note ?? null,
     }),
     upsertLocal: async (row) => {
+      const walletId = (row.wallet_id as string | null) ?? null;
+      const safeWalletId =
+        walletId && (await accountExists(walletId)) ? walletId : null;
+
       await db.insert(goalContributions).values({
         id: String(row.id),
         userId: String(row.user_id),
         goalId: String(row.goal_id),
-        walletId: (row.wallet_id as string | null) ?? null,
+        walletId: safeWalletId,
         amount: Number(row.amount ?? 0),
         note: (row.note as string | null) ?? null,
         createdAt: String(row.created_at),
@@ -544,7 +636,7 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
         set: {
           userId: String(row.user_id),
           goalId: String(row.goal_id),
-          walletId: (row.wallet_id as string | null) ?? null,
+          walletId: safeWalletId,
           amount: Number(row.amount ?? 0),
           note: (row.note as string | null) ?? null,
           updatedAt: String(row.updated_at),

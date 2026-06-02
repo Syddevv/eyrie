@@ -196,6 +196,39 @@ export async function adjustGoalContributionAccountBalance(
   await adjustAccountBalance(tx, accountId, amountDelta);
 }
 
+export async function refreshGoalCurrentAmount(tx: Executor, goalId: string) {
+  const goal = await tx.query.goals.findFirst({
+    where: eq(goals.id, goalId),
+  });
+
+  if (!goal) {
+    throw new Error(`Goal ${goalId} not found.`);
+  }
+
+  const [result] = await tx
+    .select({
+      total: sql<number>`coalesce(sum(${goalContributions.amount}), 0)`,
+    })
+    .from(goalContributions)
+    .where(
+      and(
+        eq(goalContributions.goalId, goalId),
+        isNull(goalContributions.deletedAt),
+      ),
+    );
+
+  const currentAmount = roundMoney(result?.total ?? 0);
+
+  await tx
+    .update(goals)
+    .set({
+      currentAmount,
+      isCompleted: goal.targetAmount > 0 ? currentAmount >= goal.targetAmount : false,
+      updatedAt: nowIso(),
+    })
+    .where(eq(goals.id, goalId));
+}
+
 export async function refreshAccountsVisibilityTimestamp(
   tx: Executor,
   accountIds: string[],
