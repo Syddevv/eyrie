@@ -7,7 +7,9 @@ import { useDatabaseBootstrap } from "@/src/db/DatabaseProvider";
 import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
-import { accountsService } from "@/src/db/services";
+import { accountsService, categoriesService } from "@/src/db/services";
+import { db } from "@/src/db/client";
+import { refreshAllBudgetSpendingForUser } from "@/src/db/services/financeOrchestrator";
 
 type NetInfoState = {
   isConnected: boolean | null;
@@ -132,6 +134,18 @@ function useSyncTriggers() {
       console.log(`[sync] Cleaning up duplicate CASH accounts...`);
       const cleanupResult = await accountsService.cleanupDuplicateCashAccounts();
       console.log(`[sync] Duplicate CASH cleanup complete`, cleanupResult);
+      console.log(`[sync] Cleaning up duplicate system categories...`);
+      const categoryCleanupResult =
+        await categoriesService.cleanupDuplicateSystemCategories(userId);
+      console.log(
+        `[sync] Duplicate system category cleanup complete`,
+        categoryCleanupResult,
+      );
+      console.log(`[sync] Recomputing budget spending from restored transactions...`);
+      await db.transaction(async (tx) => {
+        await refreshAllBudgetSpendingForUser(tx, userId);
+      });
+      console.log(`[sync] Budget spending recompute complete`);
       console.log(`[sync] Ensuring default CASH account...`);
       await accountsService.ensureDefaultCashAccount(userId, null);
       console.log(`[sync] Default CASH account ensured`);

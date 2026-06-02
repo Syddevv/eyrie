@@ -188,6 +188,41 @@ export async function refreshBudgetsForTransactionChange(
   }
 }
 
+export async function refreshAllBudgetSpendingForUser(
+  tx: Executor,
+  userId: string,
+) {
+  const userBudgets = await tx.query.budgets.findMany({
+    where: and(eq(budgets.userId, userId), isNull(budgets.deletedAt)),
+  });
+
+  for (const budget of userBudgets) {
+    const [result] = await tx
+      .select({
+        total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, budget.userId),
+          eq(transactions.type, "expense"),
+          eq(transactions.categoryId, budget.categoryId),
+          isNull(transactions.deletedAt),
+          gte(transactions.transactionDate, budget.startDate),
+          lte(transactions.transactionDate, budget.endDate),
+        ),
+      );
+
+    await tx
+      .update(budgets)
+      .set({
+        spent: roundMoney(result?.total ?? 0),
+        updatedAt: nowIso(),
+      })
+      .where(eq(budgets.id, budget.id));
+  }
+}
+
 export async function adjustGoalContributionAccountBalance(
   tx: Executor,
   accountId: string,

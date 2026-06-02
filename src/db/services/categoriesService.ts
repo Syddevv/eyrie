@@ -1,3 +1,7 @@
+import { eq } from "drizzle-orm";
+
+import { db } from "../client";
+import { merchantCategoryHistory, merchants } from "../schema";
 import { categoriesRepository } from "../repositories/categoriesRepository";
 import type { NewCategory } from "../types";
 import { emitCategoriesChanged } from "@/src/lib/dbSync";
@@ -8,7 +12,11 @@ import {
   assertCategoryType,
   assertRequiredText,
 } from "../utils/validation";
-import { SYSTEM_CATEGORY_USER_ID } from "../utils/constants";
+import {
+  DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_INCOME_CATEGORIES,
+  SYSTEM_CATEGORY_USER_ID,
+} from "../utils/constants";
 import {
   prepareCreateForSync,
   prepareDeleteForSync,
@@ -41,7 +49,20 @@ type CategoriesRepositoryLike = typeof categoriesRepository;
 
 type DeleteCategoryInput = { mode: "delete" } | { mode: "archive" };
 
+const DEFAULT_SYSTEM_CATEGORY_ID_BY_KEY = new Map(
+  [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES].map(
+    (category) => [
+      `${category.id.includes("_income_") ? "income" : "expense"}:${category.name.trim().toLowerCase()}`,
+      category.id,
+    ],
+  ),
+);
+
 export class CategoriesService {
+  private getSystemCategoryKey(type: string, name: string) {
+    return `${type.trim().toLowerCase()}:${name.trim().toLowerCase()}`;
+  }
+
   private assertCategoryEditable(category: {
     isDefault?: boolean | null;
     isSystem?: boolean | null;
@@ -49,6 +70,23 @@ export class CategoriesService {
     if (category.isDefault || category.isSystem) {
       throw new Error("System categories cannot be modified.");
     }
+  }
+
+  async resolveCanonicalCategoryId(categoryId: string | null | undefined) {
+    if (!categoryId) {
+      return null;
+    }
+
+    const category = await categoriesRepository.findById(categoryId);
+    if (!category) {
+      return categoryId;
+    }
+
+    const canonicalId = DEFAULT_SYSTEM_CATEGORY_ID_BY_KEY.get(
+      this.getSystemCategoryKey(category.type, category.name),
+    );
+
+    return canonicalId ?? categoryId;
   }
 
   async create(input: CreateCategoryInput) {
@@ -242,6 +280,60 @@ export class CategoriesService {
 
   async fetchById(id: string) {
     return categoriesRepository.findById(id);
+  }
+
+  async cleanupDuplicateSystemCategories(userId: string) {
+    const rows = await categoriesRepository.findAllManagedByUser(userId, true);
+    let removed = 0;
+
+    for (const category of rows) {
+      if (
+        category.userId === SYSTEM_CATEGORY_USER_ID ||
+        category.isSystem ||
+        category.isDefault
+      ) {
+        continue;
+      }
+
+      const canonicalId = DEFAULT_SYSTEM_CATEGORY_ID_BY_KEY.get(
+        this.getSystemCategoryKey(category.type, category.name),
+      );
+
+      if (!canonicalId || canonicalId === category.id) {
+        continue;
+      }
+
+      const canonicalCategory = await categoriesRepository.findById(canonicalId);
+      if (!canonicalCategory || canonicalCategory.deletedAt) {
+        continue;
+      }
+
+      await categoriesRepository.reassignTransactions(category.id, canonicalId);
+      await categoriesRepository.reassignBudgets(category.id, canonicalId);
+
+      await db
+        .update(merchants)
+        .set({ defaultCategoryId: canonicalId })
+        .where(eq(merchants.defaultCategoryId, category.id));
+
+      await db
+        .delete(merchantCategoryHistory)
+        .where(eq(merchantCategoryHistory.categoryId, category.id));
+
+      const deletedAt = nowIso();
+      await categoriesRepository.update(
+        category.id,
+        prepareDeleteForSync(deletedAt),
+      );
+      await enqueueSync("categories", category.id, "delete", userId);
+      removed += 1;
+    }
+
+    if (removed > 0) {
+      emitCategoriesChanged();
+    }
+
+    return { removed };
   }
 
   async deleteManaged(id: string, input: DeleteCategoryInput) {

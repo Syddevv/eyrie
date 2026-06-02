@@ -36,6 +36,7 @@ import {
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
 import { usersService } from "./usersService";
+import { categoriesService } from "./categoriesService";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
@@ -124,20 +125,39 @@ export class TransactionsService {
 
     const timestamp = nowIso();
     const transactionId = input.id ?? createId("txn");
-    const merchantPayload =
+    const canonicalCategoryId =
       input.type === "expense"
+        ? await categoriesService.resolveCanonicalCategoryId(
+            input.categoryId ?? null,
+          )
+        : input.categoryId ?? null;
+    const normalizedInput = {
+      ...input,
+      categoryId: canonicalCategoryId,
+      merchantDefaultCategoryId:
+        input.type === "expense"
+          ? (canonicalCategoryId ?? input.merchantDefaultCategoryId ?? null)
+          : (input.merchantDefaultCategoryId ?? null),
+    };
+    const merchantPayload =
+      normalizedInput.type === "expense"
         ? await this.resolveExpenseMerchant({
-            userId: input.userId,
-            merchantId: input.merchantId ?? null,
-            merchantName: input.merchantName ?? null,
-            categoryId: input.categoryId ?? null,
+            userId: normalizedInput.userId,
+            merchantId: normalizedInput.merchantId ?? null,
+            merchantName: normalizedInput.merchantName ?? null,
+            categoryId: normalizedInput.categoryId ?? null,
             merchantDefaultCategoryId:
-              input.merchantDefaultCategoryId ?? input.categoryId ?? null,
+              normalizedInput.merchantDefaultCategoryId ??
+              normalizedInput.categoryId ??
+              null,
           })
         : null;
 
     await budgetsService
-      .resetBudgetsIfNeeded(input.userId, input.transactionDate ?? timestamp)
+      .resetBudgetsIfNeeded(
+        normalizedInput.userId,
+        normalizedInput.transactionDate ?? timestamp,
+      )
       .catch((error) => {
         console.error("[transactions] budget reset check failed", {
           userId: input.userId,
@@ -148,12 +168,13 @@ export class TransactionsService {
     const created = await db.transaction(async (tx) => {
       const entry = {
         ...prepareCreateForSync({
-          ...input,
-          merchantId: merchantPayload?.merchantId ?? input.merchantId ?? null,
+          ...normalizedInput,
+          merchantId:
+            merchantPayload?.merchantId ?? normalizedInput.merchantId ?? null,
           merchantName:
-            input.type === "expense"
+            normalizedInput.type === "expense"
               ? (merchantPayload?.merchantName ?? null)
-              : (input.merchantName ?? null),
+              : (normalizedInput.merchantName ?? null),
           id: transactionId,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -235,6 +256,11 @@ export class TransactionsService {
       ...existing,
       ...input,
     };
+    if (previewNext.type === "expense") {
+      previewNext.categoryId = await categoriesService.resolveCanonicalCategoryId(
+        previewNext.categoryId ?? null,
+      );
+    }
     const merchantPayload =
       previewNext.type === "expense"
         ? await this.resolveExpenseMerchant({

@@ -28,6 +28,7 @@ import {
   buildNotificationCandidate,
   createNotification,
 } from "@/services/notifications";
+import { categoriesService } from "./categoriesService";
 
 export type BudgetMutationOptions = {
   notifySuccess?: boolean;
@@ -56,19 +57,26 @@ export class BudgetsService {
     assertBudgetPeriod(input.period);
     assertPositiveAmount(input.amount, "budget amount");
 
+    const canonicalCategoryId =
+      await categoriesService.resolveCanonicalCategoryId(input.categoryId);
+    const normalizedInput = {
+      ...input,
+      categoryId: canonicalCategoryId ?? input.categoryId,
+    };
+
     const timestamp = nowIso();
     const existingBudget =
       (
         await budgetsRepository.findByUserAndCategory(
-          input.userId,
-          input.categoryId,
+          normalizedInput.userId,
+          normalizedInput.categoryId,
         )
       )[0] ?? null;
 
     if (existingBudget) {
       const cycleRange = getBudgetCycleRange({
         createdAt: existingBudget.createdAt,
-        cycle: input.period,
+        cycle: normalizedInput.period,
         currentDate: timestamp,
       });
 
@@ -78,7 +86,7 @@ export class BudgetsService {
           categoryId: existingBudget.categoryId,
           createdAt: existingBudget.createdAt,
           previousCycle: existingBudget.period,
-          nextCycle: input.period,
+          nextCycle: normalizedInput.period,
           nextResetDate: cycleRange.endDate,
         });
       }
@@ -86,8 +94,8 @@ export class BudgetsService {
       const updated = await this.update(
         existingBudget.id,
         prepareUpdateForSync({
-          amount: input.amount,
-          period: input.period,
+          amount: normalizedInput.amount,
+          period: normalizedInput.period,
           startDate: cycleRange.startDate,
           endDate: cycleRange.endDate,
           updatedAt: timestamp,
@@ -111,14 +119,14 @@ export class BudgetsService {
 
     const cycleRange = getBudgetCycleRange({
       createdAt: timestamp,
-      cycle: input.period,
+      cycle: normalizedInput.period,
       currentDate: timestamp,
     });
 
     if (__DEV__) {
       console.log("[budgets] create budget with original anchor", {
-        categoryId: input.categoryId,
-        cycle: input.period,
+        categoryId: normalizedInput.categoryId,
+        cycle: normalizedInput.period,
         createdAt: timestamp,
         nextResetDate: cycleRange.endDate,
       });
@@ -126,7 +134,7 @@ export class BudgetsService {
 
     const budget = await budgetsRepository.create({
       ...prepareCreateForSync({
-        ...input,
+        ...normalizedInput,
         id: input.id ?? createId("budget"),
         spent: input.spent ?? 0,
         startDate: cycleRange.startDate,
