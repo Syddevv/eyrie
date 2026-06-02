@@ -24,7 +24,7 @@ import {
   useTransactions,
   type TransactionListItem,
 } from "@/hooks/useTransactions";
-import { useSyncStatus } from "@/src/sync";
+import { useManualSync, useSyncStatus } from "@/src/sync";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 const monthNames = [
@@ -194,7 +194,16 @@ export default function TransactionsScreen() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
   const { transactions, summary, isLoading, refresh } = useTransactions();
-  const { lastSyncedAt, pendingCount, uiState, isRestoring } = useSyncStatus();
+  const { syncNow } = useManualSync();
+  const {
+    lastSyncedAt,
+    pendingCount,
+    failedCount,
+    uiState,
+    isRestoring,
+    lastError,
+  } =
+    useSyncStatus();
   const [searchQuery, setSearchQuery] = useState("");
   const [showTypeFilters, setShowTypeFilters] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">(
@@ -305,13 +314,19 @@ export default function TransactionsScreen() {
     });
   }, [router]);
 
+  const isRetrying = uiState === "retrying" && pendingCount > 0;
+  const needsAttention =
+    uiState === "failed" || (uiState === "retrying" && pendingCount === 0);
+
   const syncLabel = isRestoring
     ? "Restoring your data..."
     : uiState === "offline"
       ? "Offline mode"
-      : uiState === "retrying"
+      : needsAttention
+        ? "Sync needs attention"
+      : isRetrying
         ? "Retrying sync..."
-        : uiState === "syncing" || uiState === "restoring"
+      : uiState === "syncing" || uiState === "restoring"
           ? "Syncing..."
           : lastSyncedAt
             ? `Last synced ${new Intl.DateTimeFormat("en-PH", {
@@ -467,6 +482,12 @@ export default function TransactionsScreen() {
               <Text style={[styles.syncSubtitle, pageStyles.subtitle]}>
                 {uiState === "offline"
                   ? "Changes will sync automatically when your connection returns."
+                  : needsAttention
+                    ? lastError ?? "Some changes need manual review."
+                  : isRetrying
+                    ? `${pendingCount} changes waiting to retry`
+                  : failedCount
+                    ? `${failedCount} sync issue${failedCount === 1 ? "" : "s"} need review`
                   : pendingCount
                     ? `${pendingCount} changes waiting to upload`
                     : "Your local data stays available offline."}
@@ -482,7 +503,11 @@ export default function TransactionsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
-              onRefresh={() => refresh().catch(() => undefined)}
+              onRefresh={() =>
+                syncNow()
+                  .catch(() => undefined)
+                  .then(() => refresh().catch(() => undefined))
+              }
               tintColor={colors.primary}
             />
           }

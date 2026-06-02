@@ -3,6 +3,7 @@ import { type PropsWithChildren, useEffect, useRef } from "react";
 import { ENV } from "@/lib/env";
 import { showSuccessToast } from "@/store/useToastStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useDatabaseBootstrap } from "@/src/db/DatabaseProvider";
 import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
 import { useSyncStore } from "./store";
@@ -78,6 +79,7 @@ async function probeInternetConnection() {
 function useSyncTriggers() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const isAuthReady = useAuthStore((state) => state.isReady);
+  const { isReady: isDatabaseReady } = useDatabaseBootstrap();
   const setOnline = useSyncStore((state) => state.setOnline);
   const setNetworkReady = useSyncStore((state) => state.setNetworkReady);
   const networkReady = useSyncStore((state) => state.networkReady);
@@ -96,7 +98,7 @@ function useSyncTriggers() {
       return;
     }
 
-    if (!networkReady) {
+    if (!networkReady || !isDatabaseReady) {
       return;
     }
 
@@ -117,6 +119,7 @@ function useSyncTriggers() {
       await runSync({
         userId,
         reason: previousUserId.current ? "launch" : "login",
+        pullFirst: shouldRestore,
       });
       console.log(`[sync] Sync complete`);
 
@@ -166,7 +169,7 @@ function useSyncTriggers() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthReady, networkReady, reset, setHydrationReady, userId]);
+  }, [isAuthReady, isDatabaseReady, networkReady, reset, setHydrationReady, userId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -194,7 +197,7 @@ function useSyncTriggers() {
       setOnline(isOnline);
       setNetworkReady(true);
 
-      if (userId && isOnline && wasOnline === false) {
+      if (userId && isDatabaseReady && isOnline && wasOnline === false) {
         void runSync({ userId, reason: "reconnect", force: true });
       }
     };
@@ -319,11 +322,17 @@ function useSyncTriggers() {
         clearInterval(fallbackInterval);
       }
     };
-  }, [setNetworkReady, setOnline, userId]);
+  }, [isDatabaseReady, setNetworkReady, setOnline, userId]);
 
   useEffect(() => {
     function onAppStateChange(state: AppStateStatus) {
-      if (state === "active" && userId && isAuthReady && networkReady) {
+      if (
+        state === "active" &&
+        userId &&
+        isAuthReady &&
+        isDatabaseReady &&
+        networkReady
+      ) {
         void runSync({ userId, reason: "foreground" });
       }
     }
@@ -332,18 +341,19 @@ function useSyncTriggers() {
     return () => {
       subscription.remove();
     };
-  }, [isAuthReady, networkReady, userId]);
+  }, [isAuthReady, isDatabaseReady, networkReady, userId]);
 }
 
 export function SyncProvider({ children }: PropsWithChildren) {
   const isOnline = useSyncStore((state) => state.isOnline);
   const networkReady = useSyncStore((state) => state.networkReady);
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const { isReady: isDatabaseReady } = useDatabaseBootstrap();
 
   useSyncTriggers();
 
   useEffect(() => {
-    if (!userId || isOnline || !networkReady) {
+    if (!userId || !isDatabaseReady || isOnline || !networkReady) {
       return;
     }
 
@@ -358,7 +368,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
     return () => {
       clearInterval(interval);
     };
-  }, [isOnline, networkReady, userId]);
+  }, [isDatabaseReady, isOnline, networkReady, userId]);
 
   return <>{children}</>;
 }

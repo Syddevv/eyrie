@@ -59,8 +59,20 @@ export async function enqueueSync(
     .where(eq(syncQueue.id, existing.id));
 }
 
-export async function getDueQueueItems(userId: string, limit = MAX_SYNC_BATCH_SIZE) {
+export async function getDueQueueItems(
+  userId: string,
+  limit = MAX_SYNC_BATCH_SIZE,
+  includeDelayed = false,
+) {
   const timestamp = nowIso();
+  if (includeDelayed) {
+    return db.query.syncQueue.findMany({
+      where: and(eq(syncQueue.userId, userId), isNull(syncQueue.lockedAt)),
+      orderBy: [asc(syncQueue.createdAt)],
+      limit,
+    });
+  }
+
   return db.query.syncQueue.findMany({
     where: and(
       eq(syncQueue.userId, userId),

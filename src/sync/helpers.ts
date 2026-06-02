@@ -181,6 +181,67 @@ export async function fetchBootstrapRecordIds(tableName: SyncableTable, userId: 
   }
 }
 
+export async function fetchFailedRecordIds(tableName: SyncableTable, userId: string) {
+  switch (tableName) {
+    case "users": {
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.id, userId), eq(users.syncStatus, "failed"), isNull(users.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "accounts": {
+      const rows = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(and(eq(accounts.userId, userId), eq(accounts.syncStatus, "failed"), isNull(accounts.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "categories": {
+      const rows = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(and(eq(categories.userId, userId), eq(categories.syncStatus, "failed"), isNull(categories.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "merchants": {
+      const rows = await db
+        .select({ id: merchants.id })
+        .from(merchants)
+        .where(and(eq(merchants.userId, userId), eq(merchants.syncStatus, "failed"), isNull(merchants.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "transactions": {
+      const rows = await db
+        .select({ id: transactions.id })
+        .from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.syncStatus, "failed"), isNull(transactions.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "budgets": {
+      const rows = await db
+        .select({ id: budgets.id })
+        .from(budgets)
+        .where(and(eq(budgets.userId, userId), eq(budgets.syncStatus, "failed"), isNull(budgets.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "saving_goals": {
+      const rows = await db
+        .select({ id: goals.id })
+        .from(goals)
+        .where(and(eq(goals.userId, userId), eq(goals.syncStatus, "failed"), isNull(goals.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "goal_contributions": {
+      const rows = await db
+        .select({ id: goalContributions.id })
+        .from(goalContributions)
+        .where(and(eq(goalContributions.userId, userId), eq(goalContributions.syncStatus, "failed"), isNull(goalContributions.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+  }
+}
+
 export function createSyncQueueId() {
   return createId();
 }

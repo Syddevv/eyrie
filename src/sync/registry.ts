@@ -56,8 +56,13 @@ function shouldPreserveLocalStreak(
     return false;
   }
 
-  if (existing.syncStatus === "pending" || existing.syncStatus === "failed") {
-    return true;
+  const hasMeaningfulLocalStreak =
+    (existing.currentStreak ?? 0) > 0 ||
+    (existing.longestStreak ?? 0) > 0 ||
+    existing.lastActiveDate != null;
+
+  if (!hasMeaningfulLocalStreak) {
+    return false;
   }
 
   return Boolean(

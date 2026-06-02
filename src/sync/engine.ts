@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, or } from "drizzle-orm";
+import { and, count, eq, isNotNull } from "drizzle-orm";
 
 import { db } from "@/src/db/client";
 import { syncQueue, syncState } from "@/src/db/schema";
@@ -11,13 +11,13 @@ import {
 } from "./errors";
 import {
   fetchBootstrapRecordIds,
+  fetchFailedRecordIds,
   fetchRecordById,
   markRecordSyncResult,
 } from "./helpers";
 import { logSync, logSyncError } from "./logger";
 import {
   clearQueueItem,
-  countSyncQueue,
   enqueueSync,
   failQueueItem,
   getQueueSnapshot,
@@ -33,6 +33,34 @@ import type { SyncRunReason, SyncRunResult, SyncableTable } from "./types";
 import { showSuccessToast } from "@/store/useToastStore";
 
 let activeRun: Promise<SyncRunResult | null> | null = null;
+
+type SyncCursor = {
+  updatedAt: string | null;
+  id: string | null;
+};
+
+type DeferredRemoteRow = {
+  tableName: SyncableTable;
+  row: Record<string, unknown> & { id: string; updated_at: string };
+  localSyncStatus?: string;
+};
+
+function isAfterCursor(cursor: SyncCursor, updatedAt: string, id: string) {
+  return (
+    !cursor.updatedAt ||
+    updatedAt > cursor.updatedAt ||
+    (updatedAt === cursor.updatedAt && (!cursor.id || id > cursor.id))
+  );
+}
+
+function advanceCursor(cursor: SyncCursor, updatedAt: string, id: string): SyncCursor {
+  return isAfterCursor(cursor, updatedAt, id) ? { updatedAt, id } : cursor;
+}
+
+function isForeignKeyConstraintError(error: unknown) {
+  const message = normalizeSyncError(error, "Sync failed.");
+  return message.includes("FOREIGN KEY constraint failed");
+}
 
 export async function needsInitialHydration(userId: string) {
   const rows = await db.query.syncState.findMany({
@@ -53,10 +81,13 @@ export async function refreshSyncCounts(userId: string) {
     .from(syncQueue)
     .where(and(eq(syncQueue.userId, userId), isNotNull(syncQueue.lastError)));
 
-  useSyncStore.getState().setSummary({
+  const summary = {
     pendingCount: Number(pendingRows[0]?.value ?? 0),
     failedCount: Number(failedRows[0]?.value ?? 0),
-  });
+  };
+
+  useSyncStore.getState().setSummary(summary);
+  return summary;
 }
 
 export async function forceFullResync(userId: string) {
@@ -86,31 +117,70 @@ export async function getSyncDiagnostics(userId: string) {
 
 export async function retrySyncQueue(userId: string) {
   await retryQueuedFailures(userId);
+
+  for (const tableName of SYNCABLE_TABLES) {
+    const failedIds = await fetchFailedRecordIds(tableName, userId);
+    for (const id of failedIds) {
+      const record = await fetchRecordById(tableName, id);
+      await markRecordSyncResult(tableName, id, {
+        syncStatus: "pending",
+        lastSyncedAt: null,
+        syncError: null,
+      });
+      await enqueueSync(
+        tableName,
+        id,
+        (record as { deletedAt?: string | null } | null)?.deletedAt
+          ? "delete"
+          : "upsert",
+        userId,
+      );
+    }
+  }
+
   await refreshSyncCounts(userId);
 }
 
 async function ensureBootstrapQueue(userId: string) {
   for (const tableName of SYNCABLE_TABLES) {
-    const existingState = await db.query.syncState.findFirst({
-      where: and(eq(syncState.userId, userId), eq(syncState.tableName, tableName)),
-    });
-
-    if (existingState) {
-      continue;
-    }
-
     const ids = await fetchBootstrapRecordIds(tableName, userId);
     for (const id of ids) {
-      await enqueueSync(tableName, id, "upsert", userId);
+      const record = await fetchRecordById(tableName, id);
+      const syncStatus = (record as { syncStatus?: string } | null)?.syncStatus;
+
+      if (syncStatus !== "pending") {
+        continue;
+      }
+
+      await enqueueSync(
+        tableName,
+        id,
+        (record as { deletedAt?: string | null } | null)?.deletedAt
+          ? "delete"
+          : "upsert",
+        userId,
+      );
     }
   }
 }
 
-async function uploadPendingChanges(userId: string) {
+async function uploadPendingChanges(
+  userId: string,
+  options?: { includeDelayed?: boolean },
+) {
   let uploaded = 0;
   let skipped = 0;
-  let failed = 0;
-  const items = await getDueQueueItems(userId, MAX_SYNC_BATCH_SIZE);
+  let retryableFailures = 0;
+  let permanentFailures = 0;
+  let lastRetryableError: string | null = null;
+  let lastPermanentError: string | null = null;
+  let lastRetryableErrorKind: "network" | "offline" | "unknown" | null = null;
+  let lastPermanentErrorKind: "auth" | "schema" | "unknown" | null = null;
+  const items = await getDueQueueItems(
+    userId,
+    MAX_SYNC_BATCH_SIZE,
+    options?.includeDelayed ?? false,
+  );
 
   for (const item of items) {
     await lockQueueItem(item.id);
@@ -140,13 +210,14 @@ async function uploadPendingChanges(userId: string) {
       const localUpdatedAt = String((record as { updatedAt: string }).updatedAt);
 
       if (remoteExisting?.updated_at && remoteExisting.updated_at > localUpdatedAt) {
-        const message = "Remote record is newer than the local pending change.";
         await markRecordSyncResult(item.tableName, item.recordId, {
-          syncStatus: "failed",
-          syncError: message,
+          syncStatus: "synced",
+          lastSyncedAt: String(remoteExisting.updated_at),
+          syncError: null,
+          updatedAt: String(remoteExisting.updated_at),
         });
-        await failQueueItem(item.id, item.attemptCount + 1, message);
-        failed += 1;
+        await clearQueueItem(item.id);
+        skipped += 1;
         continue;
       }
 
@@ -164,9 +235,16 @@ async function uploadPendingChanges(userId: string) {
     } catch (error) {
       const kind = classifySyncError(error);
       const message = normalizeSyncError(error, "Upload failed.");
-      await failQueueItem(item.id, item.attemptCount + 1, message);
+      const isRetryable = isRetryableSyncError(kind);
+
+      if (isRetryable) {
+        await failQueueItem(item.id, item.attemptCount + 1, message);
+      } else {
+        await clearQueueItem(item.id);
+      }
+
       await markRecordSyncResult(item.tableName, item.recordId, {
-        syncStatus: isRetryableSyncError(kind) ? "pending" : "failed",
+        syncStatus: isRetryable ? "pending" : "failed",
         syncError: message,
       });
       logSyncError("upload failed", {
@@ -174,16 +252,40 @@ async function uploadPendingChanges(userId: string) {
         recordId: item.recordId,
         message,
       });
-      failed += 1;
+
+      if (isRetryable) {
+        retryableFailures += 1;
+        lastRetryableError = message;
+        lastRetryableErrorKind = kind === "offline" ? "offline" : "network";
+      } else {
+        permanentFailures += 1;
+        lastPermanentError = message;
+        lastPermanentErrorKind =
+          kind === "auth" || kind === "schema" ? kind : "unknown";
+      }
     } finally {
       await unlockQueueItem(item.id);
     }
   }
 
-  return { uploaded, skipped, failed };
+  return {
+    uploaded,
+    skipped,
+    retryableFailures,
+    permanentFailures,
+    lastRetryableError,
+    lastPermanentError,
+    lastRetryableErrorKind,
+    lastPermanentErrorKind,
+  };
 }
 
-async function upsertSyncCursor(userId: string, tableName: SyncableTable, cursorUpdatedAt: string, cursorId: string) {
+async function upsertSyncCursor(
+  userId: string,
+  tableName: SyncableTable,
+  cursorUpdatedAt: string | null,
+  cursorId: string | null,
+) {
   const existing = await db.query.syncState.findFirst({
     where: and(eq(syncState.userId, userId), eq(syncState.tableName, tableName)),
   });
@@ -216,53 +318,123 @@ async function upsertSyncCursor(userId: string, tableName: SyncableTable, cursor
     .where(eq(syncState.id, existing.id));
 }
 
-async function downloadRemoteChanges(userId: string) {
+async function downloadRemoteChanges(
+  userId: string,
+  options?: { preferRemote?: boolean },
+) {
   let downloaded = 0;
   let skipped = 0;
+  let deferredRows: DeferredRemoteRow[] = [];
 
   for (const tableName of SYNCABLE_TABLES) {
     const state = await db.query.syncState.findFirst({
       where: and(eq(syncState.userId, userId), eq(syncState.tableName, tableName)),
     });
-    const rows = await fetchRemoteRowsPage(
-      tableName,
-      userId,
-      state?.cursorUpdatedAt ?? null,
-      MAX_SYNC_BATCH_SIZE,
-    );
-
-    let lastCursor = {
+    let lastCursor: SyncCursor = {
       updatedAt: state?.cursorUpdatedAt ?? null,
       id: state?.cursorId ?? null,
     };
+    let offset = 0;
 
-    for (const row of rows) {
-      const updatedAt = String(row.updated_at);
-      const id = String(row.id);
-      const isStrictlyAfterCursor =
-        !lastCursor.updatedAt ||
-        updatedAt > lastCursor.updatedAt ||
-        (updatedAt === lastCursor.updatedAt && (!lastCursor.id || id > lastCursor.id));
+    while (true) {
+      const rows = await fetchRemoteRowsPage(
+        tableName,
+        userId,
+        state?.cursorUpdatedAt ?? null,
+        state?.cursorId ?? null,
+        MAX_SYNC_BATCH_SIZE,
+        offset,
+      );
 
-      if (!isStrictlyAfterCursor) {
-        continue;
+      if (!rows.length) {
+        break;
       }
 
-      const localRecord = await fetchRecordById(tableName, id);
-      const localSyncStatus = (localRecord as { syncStatus?: string } | null)?.syncStatus;
-      if (localSyncStatus === "pending" || localSyncStatus === "failed") {
-        skipped += 1;
-        lastCursor = { updatedAt, id };
-        continue;
+      for (const row of rows) {
+        const updatedAt = String(row.updated_at);
+        const id = String(row.id);
+        const isStrictlyAfterCursor = isAfterCursor(lastCursor, updatedAt, id);
+
+        if (!isStrictlyAfterCursor) {
+          continue;
+        }
+
+        const localRecord = await fetchRecordById(tableName, id);
+        const localSyncStatus = (localRecord as { syncStatus?: string } | null)?.syncStatus;
+        if (!options?.preferRemote && localSyncStatus === "pending") {
+          skipped += 1;
+          lastCursor = advanceCursor(lastCursor, updatedAt, id);
+          continue;
+        }
+
+        try {
+          await syncRegistry[tableName].upsertLocal(row);
+          downloaded += 1;
+          lastCursor = advanceCursor(lastCursor, updatedAt, id);
+        } catch (error) {
+          if (isForeignKeyConstraintError(error)) {
+            deferredRows.push({
+              tableName,
+              row: row as DeferredRemoteRow["row"],
+              localSyncStatus,
+            });
+            continue;
+          }
+
+          throw error;
+        }
       }
 
-      await syncRegistry[tableName].upsertLocal(row);
-      downloaded += 1;
-      lastCursor = { updatedAt, id };
+      if (rows.length < MAX_SYNC_BATCH_SIZE || tableName === "users") {
+        break;
+      }
+
+      offset += rows.length;
     }
 
-    if (lastCursor.updatedAt && lastCursor.id) {
-      await upsertSyncCursor(userId, tableName, lastCursor.updatedAt, lastCursor.id);
+    await upsertSyncCursor(userId, tableName, lastCursor.updatedAt, lastCursor.id);
+  }
+
+  for (let attempt = 0; attempt < 3 && deferredRows.length > 0; attempt += 1) {
+    const remaining: DeferredRemoteRow[] = [];
+    let resolvedThisPass = 0;
+
+    for (const item of deferredRows) {
+      if (!options?.preferRemote && item.localSyncStatus === "pending") {
+        skipped += 1;
+        resolvedThisPass += 1;
+        continue;
+      }
+
+      try {
+        await syncRegistry[item.tableName].upsertLocal(item.row);
+        downloaded += 1;
+        resolvedThisPass += 1;
+      } catch (error) {
+        if (isForeignKeyConstraintError(error)) {
+          remaining.push(item);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (resolvedThisPass === 0) {
+      deferredRows = remaining;
+      break;
+    }
+
+    deferredRows = remaining;
+  }
+
+  if (deferredRows.length > 0) {
+    for (const item of deferredRows) {
+      logSyncError("restore row skipped after foreign key retries", {
+        tableName: item.tableName,
+        recordId: String(item.row.id),
+        updatedAt: String(item.row.updated_at),
+      });
     }
   }
 
@@ -273,6 +445,7 @@ export async function runSync(input?: {
   userId?: string | null;
   reason?: SyncRunReason;
   force?: boolean;
+  pullFirst?: boolean;
 }): Promise<SyncRunResult | null> {
   const userId = input?.userId ?? null;
   const reason = input?.reason ?? "manual";
@@ -281,10 +454,15 @@ export async function runSync(input?: {
     return null;
   }
 
-  const store = useSyncStore.getState();
-  if (activeRun && !input?.force) {
-    return activeRun;
+  if (activeRun) {
+    const inFlightResult = await activeRun;
+
+    if (!input?.force) {
+      return inFlightResult;
+    }
   }
+
+  const store = useSyncStore.getState();
 
   if (!store.isOnline && reason !== "manual" && !input?.force) {
     await refreshSyncCounts(userId);
@@ -311,37 +489,59 @@ export async function runSync(input?: {
       reason,
       uiState: syncStore.isRestoring ? "restoring" : "syncing",
     });
-    await ensureBootstrapQueue(userId);
-
     try {
-      const upload = await uploadPendingChanges(userId);
+      if (input?.pullFirst) {
+        await downloadRemoteChanges(userId, { preferRemote: true });
+      }
+
+      await ensureBootstrapQueue(userId);
+
+      const upload = await uploadPendingChanges(userId, {
+        includeDelayed: Boolean(input?.force || reason === "manual"),
+      });
       const download = await downloadRemoteChanges(userId);
       const finishedAt = nowIso();
+      const queueSummary = await refreshSyncCounts(userId);
+      const hasRetryableBacklog = queueSummary.pendingCount > 0;
+      const hasPermanentFailures = upload.permanentFailures > 0;
+      const state =
+        hasPermanentFailures
+          ? "failed"
+          : hasRetryableBacklog
+            ? "retrying"
+            : "idle";
+      const message = hasPermanentFailures
+        ? upload.lastPermanentError ?? "Some changes need manual review."
+        : hasRetryableBacklog
+          ? upload.lastRetryableError ?? "Some changes are waiting to retry."
+          : null;
+      const lastErrorKind = hasPermanentFailures
+        ? upload.lastPermanentErrorKind
+        : hasRetryableBacklog
+          ? upload.lastRetryableErrorKind
+          : null;
 
       const result: SyncRunResult = {
         uploaded: upload.uploaded,
         downloaded: download.downloaded,
         skipped: upload.skipped + download.skipped,
-        failed: upload.failed,
+        failed: upload.retryableFailures + upload.permanentFailures,
         reason,
         startedAt,
         finishedAt,
-        state: upload.failed ? "retrying" : "idle",
-        message: upload.failed
-          ? "Some changes are waiting to retry."
-          : null,
+        state,
+        message,
       };
 
-      await refreshSyncCounts(userId);
       useSyncStore.getState().setSummary({
         lastSyncedAt: finishedAt,
         lastError: result.message,
-        lastErrorKind: result.failed ? "network" : null,
+        lastErrorKind,
       });
       useSyncStore.getState().setUiState({
         uiState: result.state,
         lastError: result.message,
-        lastErrorKind: result.failed ? "network" : null,
+        lastErrorKind,
         isOnline: true,
       });
       if (reason === "manual" && !result.failed) {
@@ -357,12 +557,14 @@ export async function runSync(input?: {
     } catch (error) {
       const kind = classifySyncError(error);
       const message = normalizeSyncError(error, "Sync failed.");
+      const queueSummary = await refreshSyncCounts(userId);
+      const hasRetryableBacklog = queueSummary.pendingCount > 0;
       const uiState =
         kind === "offline"
           ? "offline"
           : kind === "schema"
             ? "schema_error"
-            : isRetryableSyncError(kind)
+            : isRetryableSyncError(kind) && hasRetryableBacklog
               ? "retrying"
               : "failed";
       const finishedAt = nowIso();
