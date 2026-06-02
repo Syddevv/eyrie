@@ -118,7 +118,9 @@ export function AssistantChatPanel({
           : withOpacity(colors.border, 0.92),
       },
       sendButton: {
-        backgroundColor: colors.primary,
+        backgroundColor: isDark
+          ? colors.secondary
+          : withOpacity(colors.secondary, 0.92),
       },
       sendButtonDisabled: {
         backgroundColor: isDark
@@ -126,7 +128,9 @@ export function AssistantChatPanel({
           : withOpacity(colors.secondary, 0.92),
       },
       sendButtonIcon: {
-        color: isDark ? "#081120" : "#FFFFFF",
+        color: isDark
+          ? colors.secondaryForeground
+          : withOpacity(colors.mutedForeground, 0.9),
       },
       sendButtonIconDisabled: {
         color: isDark
@@ -425,7 +429,7 @@ export function AssistantChatPanel({
                 isSendDisabled
                   ? pageStyles.sendButtonDisabled
                   : pageStyles.sendButton,
-                { opacity: pressed ? 0.82 : 1 },
+                { opacity: isSendDisabled ? 0.58 : pressed ? 0.82 : 1 },
               ]}
               onPress={handleSend}
             >
@@ -519,8 +523,10 @@ const styles = StyleSheet.create({
   },
   inputWrap: {
     flex: 1,
+    minWidth: 0,
     minHeight: 40,
     maxHeight: 112,
+    flexShrink: 1,
     justifyContent: "center",
   },
   inputWrapDisabled: {
@@ -529,6 +535,7 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 24,
     maxHeight: 92,
+    flexShrink: 1,
     fontFamily: fontFamilies.sans,
     fontSize: 14,
     lineHeight: 19,
@@ -537,6 +544,7 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 42,
     height: 42,
+    flexShrink: 0,
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
