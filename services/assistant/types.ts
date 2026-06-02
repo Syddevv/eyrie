@@ -91,4 +91,5 @@ export type AssistantResponse = {
   remainingMessages?: number;
   dailyLimit?: number;
   cooldownRemaining?: number;
+  resetAt?: string | null;
 };

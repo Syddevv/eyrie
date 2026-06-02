@@ -11,6 +11,7 @@ export class AssistantFunctionError extends Error {
   remainingMessages?: number;
   dailyLimit?: number;
   cooldownRemaining?: number;
+  resetAt?: string | null;
 
   constructor(
     message: string,
@@ -19,6 +20,7 @@ export class AssistantFunctionError extends Error {
       remainingMessages?: number;
       dailyLimit?: number;
       cooldownRemaining?: number;
+      resetAt?: string | null;
     } = {},
   ) {
     super(message);
@@ -27,6 +29,7 @@ export class AssistantFunctionError extends Error {
     this.remainingMessages = options.remainingMessages;
     this.dailyLimit = options.dailyLimit;
     this.cooldownRemaining = options.cooldownRemaining;
+    this.resetAt = options.resetAt ?? null;
   }
 }
 
@@ -42,6 +45,10 @@ function parseNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+function parseString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 async function readFunctionError(error: unknown) {
@@ -75,6 +82,7 @@ async function readFunctionError(error: unknown) {
     remainingMessages: parseNumber(payload?.remainingMessages),
     dailyLimit: parseNumber(payload?.dailyLimit),
     cooldownRemaining: parseNumber(payload?.cooldownRemaining),
+    resetAt: parseString(payload?.resetAt) ?? null,
   };
 }
 
@@ -136,6 +144,7 @@ export async function askAssistant(
       remainingMessages: parseNumber(data?.remainingMessages),
       dailyLimit: parseNumber(data?.dailyLimit),
       cooldownRemaining: parseNumber(data?.cooldownRemaining),
+      resetAt: parseString(data?.resetAt) ?? null,
     };
   } catch (error) {
     if (error instanceof AssistantFunctionError) {

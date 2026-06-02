@@ -36,6 +36,7 @@ type AssistantUsageState = {
   remainingMessages: number | null;
   dailyLimit: number | null;
   cooldownUntil: number | null;
+  resetAt: string | null;
   statusMessage: string | null;
 };
 
@@ -98,6 +99,7 @@ export function useAssistantSession() {
     remainingMessages: null,
     dailyLimit: DEFAULT_DAILY_LIMIT,
     cooldownUntil: null,
+    resetAt: null,
     statusMessage: null,
   });
   const [clockTick, setClockTick] = useState(() => Date.now());
@@ -156,6 +158,7 @@ export function useAssistantSession() {
     : 0;
   const remainingMessages = usageState.remainingMessages;
   const dailyLimit = usageState.dailyLimit;
+  const resetAt = usageState.resetAt;
   const assistantStatusMessage = usageState.statusMessage;
 
   useEffect(() => {
@@ -240,6 +243,7 @@ export function useAssistantSession() {
               ? result.dailyLimit
               : current.dailyLimit,
           cooldownUntil: null,
+          resetAt: result.resetAt ?? current.resetAt,
           statusMessage: null,
         }));
 
@@ -278,6 +282,7 @@ export function useAssistantSession() {
             assistantError.cooldownRemaining > 0
               ? Date.now() + assistantError.cooldownRemaining * 1000
               : current.cooldownUntil,
+          resetAt: assistantError?.resetAt ?? current.resetAt,
           statusMessage: message,
         }));
 
@@ -349,6 +354,7 @@ export function useAssistantSession() {
     remainingMessages,
     dailyLimit,
     cooldownRemaining,
+    resetAt,
     assistantStatusMessage,
     resetSession: reset,
   } as const;

@@ -56,7 +56,51 @@ type QuickPrompt = {
 };
 
 const BOTTOM_NAV_RESERVED_HEIGHT = 64;
-const AI_ASSISTANT_RESET_TIME_LABEL = "8:00 AM";
+function formatResetTimeLabel(resetAt: string | null) {
+  const date = resetAt ? new Date(resetAt) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  }
+
+  const parts = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+    .formatToParts(date)
+    .reduce(
+      (acc, part) => {
+        if (part.type === "month") {
+          acc.month = part.value;
+        } else if (part.type === "day") {
+          acc.day = part.value;
+        } else if (part.type === "hour") {
+          acc.hour = part.value;
+        } else if (part.type === "minute") {
+          acc.minute = part.value;
+        } else if (part.type === "dayPeriod") {
+          acc.dayPeriod = part.value;
+        }
+
+        return acc;
+      },
+      {
+        month: "",
+        day: "",
+        hour: "",
+        minute: "",
+        dayPeriod: "",
+      },
+    );
+
+  return `${parts.month} ${parts.day}, ${parts.hour}:${parts.minute} ${parts.dayPeriod}`.trim();
+}
 
 export function AssistantChatPanel({
   quickPrompts,
@@ -79,6 +123,7 @@ export function AssistantChatPanel({
     remainingMessages,
     dailyLimit,
     cooldownRemaining,
+    resetAt,
     assistantStatusMessage,
   } = useAssistantSession();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -188,14 +233,17 @@ export function AssistantChatPanel({
   const showUsageSummary =
     typeof remainingMessages === "number" && typeof dailyLimit === "number";
   const usageSummaryText = showUsageSummary
-    ? `${remainingMessages} / ${dailyLimit} AI messages remaining today`
-    : "AI usage is limited each day.";
+    ? `${remainingMessages} / ${dailyLimit} AI messages remaining in the current limit window`
+    : "AI usage is limited in a 24-hour window.";
+  const resetTimeLabel = formatResetTimeLabel(resetAt);
   const cooldownText =
     cooldownRemaining > 0
       ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
       : remainingMessages === 0
-        ? assistantStatusMessage ||
-          `You've reached today's AI assistant limit. Limit will reset on ${AI_ASSISTANT_RESET_TIME_LABEL}.`
+        ? resetAt
+          ? `You've reached your AI assistant limit. Limit will reset on ${resetTimeLabel}.`
+          : assistantStatusMessage ||
+            `You've reached your AI assistant limit. Limit will reset on ${resetTimeLabel}.`
         : null;
 
   const scrollToBottom = useCallback(() => {
