@@ -181,6 +181,10 @@ function usageResponseMetadata(row: AiUsageRow) {
 
 function stringifyContext(financialContext: Record<string, unknown>) {
   const summary = (financialContext.summary ?? {}) as Record<string, unknown>;
+  const budgetsSummary = (financialContext.budgetsSummary ?? {}) as Record<
+    string,
+    unknown
+  >;
   const period = (financialContext.currentPeriod ?? {}) as Record<
     string,
     unknown
@@ -195,6 +199,7 @@ function stringifyContext(financialContext: Record<string, unknown>) {
     ? financialContext.recentTransactions
     : [];
   const goals = (financialContext.goals ?? {}) as Record<string, unknown>;
+  const goalItems = Array.isArray(goals.items) ? goals.items : [];
   const insights = Array.isArray(financialContext.insights)
     ? financialContext.insights
     : [];
@@ -203,12 +208,13 @@ function stringifyContext(financialContext: Record<string, unknown>) {
     `Currency: ${financialContext.currencyCode ?? "PHP"}`,
     `Summary: balance=${summary.totalBalance ?? 0}, income=${summary.totalIncome ?? 0}, expenses=${summary.totalExpenses ?? 0}, cash_flow=${summary.netCashFlow ?? 0}`,
     `Current period: ${period.label ?? "This Month"}, income=${period.totalIncome ?? 0}, expenses=${period.totalExpenses ?? 0}, net_savings=${period.netSavings ?? 0}, top_category=${period.topCategory ?? "none"}, budget_health=${period.budgetHealthTone ?? "Unknown"} (${period.budgetHealthScore ?? 0})`,
+    `Budget totals: active=${budgetsSummary.activeBudgetCount ?? 0}, total_budgeted=${budgetsSummary.totalBudgeted ?? 0}, total_spent=${budgetsSummary.totalSpent ?? 0}, total_remaining=${budgetsSummary.totalRemaining ?? 0}`,
     `Budgets: ${
       budgets.length
         ? budgets
             .map((item) => {
               const budget = item as Record<string, unknown>;
-              return `${budget.title ?? "Budget"} ${budget.progress ?? 0}% ${budget.status ?? "healthy"}`;
+              return `${budget.title ?? "Budget"} amount=${budget.amount ?? 0} spent=${budget.spent ?? 0} remaining=${budget.remaining ?? 0} progress=${budget.progressPercent ?? 0}% status=${budget.status ?? "healthy"}`;
             })
             .join("; ")
         : "none"
@@ -233,7 +239,17 @@ function stringifyContext(financialContext: Record<string, unknown>) {
             .join("; ")
         : "none"
     }`,
-    `Goals: active=${goals.activeGoalsCount ?? 0}, completed=${goals.completedGoalsCount ?? 0}, saved=${goals.totalSaved ?? 0}, target=${goals.totalTarget ?? 0}`,
+    `Goals: active=${goals.activeGoalsCount ?? 0}, completed=${goals.completedGoalsCount ?? 0}, saved=${goals.totalSaved ?? 0}, target=${goals.totalTarget ?? 0}, remaining=${goals.totalRemaining ?? 0}`,
+    `Goal items: ${
+      goalItems.length
+        ? goalItems
+            .map((item) => {
+              const goal = item as Record<string, unknown>;
+              return `${goal.title ?? "Goal"} saved=${goal.currentAmount ?? 0} target=${goal.targetAmount ?? 0} remaining=${goal.remaining ?? 0} progress=${goal.progressPercent ?? 0}% completed=${goal.isCompleted ? "yes" : "no"}`;
+            })
+            .join("; ")
+        : "none"
+    }`,
     `Insights: ${insights.length ? insights.join(" | ") : "none"}`,
   ].join("\n");
 }
@@ -283,6 +299,7 @@ function buildGroqMessages(input: {
       content: [
         "You are Eyrie, a concise personal finance assistant inside a mobile expense and budget tracker.",
         "Use the provided financial context first.",
+        "When the user asks about budgets or goals, answer from the exact numeric values in the context before giving advice.",
         "Be practical, supportive, and specific.",
         "Keep answers short to medium length.",
         "Avoid markdown tables.",

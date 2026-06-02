@@ -28,9 +28,18 @@ export type AssistantFinancialContext = {
     netSavings: number;
     topCategory: string | null;
   };
+  budgetsSummary: {
+    activeBudgetCount: number;
+    totalBudgeted: number;
+    totalSpent: number;
+    totalRemaining: number;
+  };
   budgets: Array<{
     title: string;
-    progress: number;
+    amount: number;
+    spent: number;
+    remaining: number;
+    progressPercent: number;
     status: "over" | "limit" | "healthy";
     spentLabel: string;
     remainingLabel: string;
@@ -51,10 +60,14 @@ export type AssistantFinancialContext = {
     completedGoalsCount: number;
     totalSaved: number;
     totalTarget: number;
-    topGoals: Array<{
+    totalRemaining: number;
+    items: Array<{
       title: string;
-      progress: number;
+      currentAmount: number;
+      targetAmount: number;
       remaining: number;
+      progressPercent: number;
+      isCompleted: boolean;
     }>;
   };
   insights: string[];

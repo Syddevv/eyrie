@@ -48,6 +48,9 @@ export type DashboardRecentTransaction = {
 export type DashboardBudgetProgress = {
   id: string;
   title: string;
+  amount: number;
+  spent: number;
+  remaining: number;
   spentLabel: string;
   remainingLabel: string;
   progress: number;
@@ -427,6 +430,9 @@ function mapBudgetProgress(
   return {
     id: source.id,
     title: source.category?.name ?? "Budget",
+    amount: source.amount,
+    spent: source.spent,
+    remaining: source.remaining,
     spentLabel: `Spent ${formatBudgetLabel(source.spent)} of ${formatBudgetLabel(source.amount)}`,
     remainingLabel: formatBudgetLabel(source.remaining),
     progress: source.progress / 100,

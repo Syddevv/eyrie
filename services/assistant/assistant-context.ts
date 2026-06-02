@@ -31,14 +31,29 @@ export function buildAssistantContext(
   const summary = input.summary ?? {
     totalBalance: 0,
     totalIncome: 0,
-    totalExpenses: 0,
-    netCashFlow: 0,
+      totalExpenses: 0,
+      netCashFlow: 0,
   };
-  const topGoals = input.goals.slice(0, 3).map((goal) => ({
-    title: goal.title,
-    progress: round(goal.progress),
-    remaining: round(goal.remaining),
-  }));
+  const activeGoals = input.goals.filter((goal) => !goal.isCompleted);
+  const completedGoals = input.goals.filter((goal) => goal.isCompleted);
+  const totalBudgeted = round(
+    input.budgets.reduce((sum, budget) => sum + budget.amount, 0),
+  );
+  const totalSpent = round(
+    input.budgets.reduce((sum, budget) => sum + budget.spent, 0),
+  );
+  const totalRemaining = round(
+    input.goals.reduce((sum, goal) => sum + goal.remaining, 0),
+  );
+  const totalSaved = round(
+    input.goals.reduce((sum, goal) => sum + goal.currentAmount, 0),
+  );
+  const totalTarget = round(
+    input.goals.reduce((sum, goal) => sum + goal.targetAmount, 0),
+  );
+  const totalBudgetRemaining = round(
+    input.budgets.reduce((sum, budget) => sum + budget.remaining, 0),
+  );
 
   return {
     currencyCode,
@@ -47,6 +62,12 @@ export function buildAssistantContext(
       totalIncome: round(summary.totalIncome),
       totalExpenses: round(summary.totalExpenses),
       netCashFlow: round(summary.netCashFlow),
+    },
+    budgetsSummary: {
+      activeBudgetCount: input.budgets.length,
+      totalBudgeted,
+      totalSpent,
+      totalRemaining: totalBudgetRemaining,
     },
     currentPeriod: {
       label: input.analytics.range.label,
@@ -57,9 +78,12 @@ export function buildAssistantContext(
       netSavings: round(input.analytics.incomeVsExpenses.netSavings),
       topCategory: input.analytics.spendingBreakdown.topCategory,
     },
-    budgets: input.budgets.slice(0, 4).map((budget) => ({
+    budgets: input.budgets.map((budget) => ({
       title: budget.title,
-      progress: round(budget.progress),
+      amount: round(budget.amount),
+      spent: round(budget.spent),
+      remaining: round(budget.remaining),
+      progressPercent: round(budget.progress * 100),
       status: budget.status,
       spentLabel: budget.spentLabel,
       remainingLabel: budget.remainingLabel,
@@ -76,15 +100,19 @@ export function buildAssistantContext(
       typeLabel: item.typeLabel,
     })),
     goals: {
-      activeGoalsCount: input.goals.filter((goal) => !goal.isCompleted).length,
-      completedGoalsCount: input.goals.filter((goal) => goal.isCompleted).length,
-      totalSaved: round(
-        input.goals.reduce((sum, goal) => sum + goal.currentAmount, 0),
-      ),
-      totalTarget: round(
-        input.goals.reduce((sum, goal) => sum + goal.targetAmount, 0),
-      ),
-      topGoals,
+      activeGoalsCount: activeGoals.length,
+      completedGoalsCount: completedGoals.length,
+      totalSaved,
+      totalTarget,
+      totalRemaining,
+      items: input.goals.map((goal) => ({
+        title: goal.title,
+        currentAmount: round(goal.currentAmount),
+        targetAmount: round(goal.targetAmount),
+        remaining: round(goal.remaining),
+        progressPercent: round(goal.progress),
+        isCompleted: Boolean(goal.isCompleted),
+      })),
     },
     insights: input.analytics.insights.slice(0, 3).map((item) => item.message),
   };
