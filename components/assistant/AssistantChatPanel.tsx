@@ -56,6 +56,7 @@ type QuickPrompt = {
 };
 
 const BOTTOM_NAV_RESERVED_HEIGHT = 64;
+const AI_ASSISTANT_RESET_TIME_LABEL = "8:00 AM";
 
 export function AssistantChatPanel({
   quickPrompts,
@@ -81,6 +82,7 @@ export function AssistantChatPanel({
     assistantStatusMessage,
   } = useAssistantSession();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
 
   const pageStyles = useMemo(
     () => ({
@@ -124,7 +126,7 @@ export function AssistantChatPanel({
           : withOpacity(colors.secondary, 0.92),
       },
       sendButtonIcon: {
-        color: colors.primaryForeground,
+        color: isDark ? "#081120" : "#FFFFFF",
       },
       sendButtonIconDisabled: {
         color: isDark
@@ -175,6 +177,10 @@ export function AssistantChatPanel({
   );
   const footerBottomOffset =
     keyboardHeight > 0 ? keyboardHeight : composerBottomInset;
+  const listFooterHeight =
+    Math.max(footerBottomOffset, composerBottomInset) +
+    footerHeight +
+    (hasUserMessages ? 28 : 20);
   const showUsageSummary =
     typeof remainingMessages === "number" && typeof dailyLimit === "number";
   const usageSummaryText = showUsageSummary
@@ -185,7 +191,7 @@ export function AssistantChatPanel({
       ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
       : remainingMessages === 0
         ? assistantStatusMessage ||
-          "You've reached today's AI assistant limit. Please try again tomorrow."
+          `You've reached today's AI assistant limit. Limit will reset on ${AI_ASSISTANT_RESET_TIME_LABEL}.`
         : null;
 
   const scrollToBottom = useCallback(() => {
@@ -206,6 +212,12 @@ export function AssistantChatPanel({
       scrollToBottom();
     }
   }, [keyboardHeight, scrollToBottom]);
+
+  useEffect(() => {
+    if (footerHeight > 0) {
+      scrollToBottom();
+    }
+  }, [footerBottomOffset, footerHeight, scrollToBottom]);
 
   useEffect(() => {
     const handleKeyboardShow = (event: KeyboardEvent) => {
@@ -281,15 +293,14 @@ export function AssistantChatPanel({
           contentContainerStyle={[
             styles.messagesContent,
             {
-              paddingBottom:
-                Math.max(footerBottomOffset, composerBottomInset) +
-                (hasUserMessages ? 112 : 158),
+              paddingBottom: 24,
             },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={scrollToBottom}
-          ListFooterComponent={
+          ListFooterComponent={<View style={{ height: listFooterHeight }} />}
+          ListHeaderComponent={
             isOffline ? (
               <View style={[styles.offlineCard, pageStyles.offlineCard]}>
                 <Feather name="wifi-off" size={16} color="#EF4444" />
@@ -309,6 +320,12 @@ export function AssistantChatPanel({
               paddingBottom: 2,
             },
           ]}
+          onLayout={(event) => {
+            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+            setFooterHeight((current) =>
+              current === nextHeight ? current : nextHeight,
+            );
+          }}
         >
           {!hasUserMessages ? (
             <Animated.View
@@ -423,7 +440,7 @@ export function AssistantChatPanel({
                 />
               ) : (
                 <Ionicons
-                  name="paper-plane-outline"
+                  name="paper-plane"
                   size={20}
                   color={
                     isSendDisabled

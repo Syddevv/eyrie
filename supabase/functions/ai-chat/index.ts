@@ -16,10 +16,10 @@ const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
 const GROQ_MODEL = Deno.env.get("GROQ_MODEL") ?? "llama-3.1-8b-instant";
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CONVERSATION_MESSAGES = 12;
-const FREE_DAILY_MESSAGE_LIMIT = 25;
+const FREE_DAILY_MESSAGE_LIMIT = 20;
 const COOLDOWN_SECONDS = 3;
 const AI_USAGE_LIMIT_MESSAGE =
-  "You've reached today's AI assistant limit. Please try again tomorrow.";
+  "You've reached today's AI assistant limit. Limit will reset on 8:00 AM.";
 const AI_COOLDOWN_MESSAGE =
   "You're sending messages too quickly. Please wait a few seconds before trying again.";
 

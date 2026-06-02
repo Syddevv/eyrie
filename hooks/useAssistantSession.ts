@@ -23,7 +23,7 @@ import { useAssistantSessionStore } from "@/store/useAssistantSessionStore";
 import { useOfflineState } from "@/src/sync/hooks";
 
 const MAX_CONVERSATION_MESSAGES = 12;
-const DEFAULT_DAILY_LIMIT = 25;
+const DEFAULT_DAILY_LIMIT = 20;
 const EMPTY_SESSION = {
   messages: [],
   input: "",
