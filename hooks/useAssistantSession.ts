@@ -303,7 +303,8 @@ export function useAssistantSession() {
             hasResolved: true,
           }));
         } catch {
-          return;
+          // If the startup usage preflight fails, fall back to the normal send
+          // path and let the backend enforce the quota.
         }
       }
 
