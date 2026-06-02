@@ -238,7 +238,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, pageStyles.background]}>
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      style={[styles.safeArea, pageStyles.background]}
+    >
       <View style={styles.flex}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
