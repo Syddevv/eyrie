@@ -168,6 +168,7 @@ import smart from "../assets/merchant-logos/Smart.webp";
 import spotify from "../assets/merchant-logos/Spotify.png";
 import starbucks from "../assets/merchant-logos/Starbucks.png";
 import steam from "../assets/merchant-logos/Steam.jpg";
+import tiktok from "../assets/merchant-logos/Tiktok.jpg";
 import timHortons from "../assets/merchant-logos/Tim-Hortons.png";
 import tnt from "../assets/merchant-logos/TNT.webp";
 import uniqlo from "../assets/merchant-logos/UNIQLO.webp";
@@ -225,6 +226,8 @@ export const MERCHANT_LOGOS: Record<string, any> = {
   spotify: spotify,
   starbucks: starbucks,
   steam: steam,
+  tiktok: tiktok,
+  "tiktok shop": tiktok,
   "tim hortons": timHortons,
   tnt: tnt,
   uniqlo: uniqlo,

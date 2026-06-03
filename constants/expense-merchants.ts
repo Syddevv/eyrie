@@ -93,6 +93,13 @@ const merchantCatalog: Record<string, MerchantSeed[]> = {
     merchant("merchant_shopee", "Shopee", "S", "#EE4D2D", "shopping-outline"),
     merchant("merchant_lazada", "Lazada", "L", "#7C3AED", "shopping-outline"),
     merchant(
+      "merchant_tiktok_shop",
+      "Tiktok Shop",
+      "TT",
+      "#111827",
+      "shopping-outline",
+    ),
+    merchant(
       "merchant_sm_store",
       "SM Store",
       "SM",
