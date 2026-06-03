@@ -1055,6 +1055,18 @@ export default function HomeScreen() {
     () => getGreetingForHour(currentTime.getHours()),
     [currentTime],
   );
+  const userInitials = useMemo(() => {
+    if (!currentUser?.full_name) {
+      return "YU";
+    }
+
+    return currentUser.full_name
+      .split(/\s+/)
+      .map((segment) => segment[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  }, [currentUser?.full_name]);
   const balanceContextLabel = useMemo(
     () => formatHomeContextDate(currentTime),
     [currentTime],
@@ -1251,11 +1263,17 @@ export default function HomeScreen() {
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
               <View style={styles.avatarFrame}>
-                <Image
-                  contentFit="cover"
-                  source={require("@/assets/images/Eyrie_Mascot_1.png")}
-                  style={styles.avatar}
-                />
+                {currentUser?.avatar_url ? (
+                  <Image
+                    contentFit="cover"
+                    source={{ uri: currentUser.avatar_url }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarInitials}>{userInitials}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.headerCopy}>
                 {shouldShowHeaderSkeleton ? (
@@ -2546,6 +2564,21 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.full,
+  },
+  avatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    backgroundColor: "#1495FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitials: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: fontWeights.bold,
+    color: "#08121D",
   },
   greeting: {
     fontFamily: fontFamilies.sans,
