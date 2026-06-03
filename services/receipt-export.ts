@@ -102,7 +102,7 @@ export async function exportReceiptImage(
 
   try {
     const permissionResponse =
-      await mediaLibraryModule.requestPermissionsAsync();
+      await mediaLibraryModule.requestPermissionsAsync(false, ["photo"]);
 
     if (!permissionResponse.granted) {
       return permission(

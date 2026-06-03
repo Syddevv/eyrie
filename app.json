@@ -28,7 +28,8 @@
         {
           "photosPermission": "Allow Eyrie to access your photos so receipt images can be saved.",
           "savePhotosPermission": "Allow Eyrie to save receipt images to your gallery.",
-          "isAccessMediaLocationEnabled": false
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": ["photo"]
         }
       ]
     ],
