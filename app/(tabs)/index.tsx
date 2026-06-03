@@ -2349,6 +2349,9 @@ export default function HomeScreen() {
                     const hasMerchantLogo = Boolean(
                       getMerchantLogo(item.merchant),
                     );
+                    const usesUploadedCategoryImage =
+                      item.categoryIconType === "uploaded_image" &&
+                      Boolean(item.categoryIconImageUri);
 
                     return (
                       <View key={item.id} style={styles.transactionRow}>
@@ -2356,21 +2359,45 @@ export default function HomeScreen() {
                           style={[
                             styles.transactionIconWrap,
                             {
-                              backgroundColor: hasMerchantLogo
+                              backgroundColor: hasMerchantLogo ||
+                                usesUploadedCategoryImage
                                 ? "transparent"
                                 : item.iconBackground,
                             },
                           ]}
                         >
-                          <MerchantLogo
-                            merchant={item.merchant}
-                            size={46}
-                            fallbackIcon={{
-                              library: item.iconLibrary,
-                              name: item.iconName,
-                              color: item.iconColor,
-                            }}
-                          />
+                          {hasMerchantLogo ? (
+                            <MerchantLogo
+                              merchant={item.merchant}
+                              size={46}
+                              fallbackIcon={{
+                                library: item.iconLibrary,
+                                name: item.iconName,
+                                color: item.iconColor,
+                              }}
+                            />
+                          ) : item.categoryIconType ? (
+                            <CategoryAvatar
+                              category={{
+                                iconType: item.categoryIconType,
+                                iconName: item.categoryIconName,
+                                iconImageUri: item.categoryIconImageUri,
+                                emoji: item.categoryEmoji,
+                                color: item.categoryColor ?? item.iconColor,
+                              }}
+                              size={usesUploadedCategoryImage ? 42 : 24}
+                            />
+                          ) : (
+                            <MerchantLogo
+                              merchant={item.merchant}
+                              size={46}
+                              fallbackIcon={{
+                                library: item.iconLibrary,
+                                name: item.iconName,
+                                color: item.iconColor,
+                              }}
+                            />
+                          )}
                         </View>
                         <View style={styles.transactionContent}>
                           <View style={styles.transactionDetails}>

@@ -149,6 +149,7 @@ export function CategoryEditorSheet({
     ...draft,
     label: draft.name.trim() || "New Category",
   };
+  const usesUploadedImage = draft.iconType === "uploaded_image";
   const isKeyboardOpen = keyboardHeight > 0;
   const maxSheetHeight = Math.min(
     windowHeight * 0.86,
@@ -391,37 +392,43 @@ export function CategoryEditorSheet({
               </View>
             ) : null}
 
-            <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
-              <Text style={[styles.label, ui.title]}>Color</Text>
-              <View style={[styles.colorGrid, isKeyboardOpen && styles.colorGridCompact]}>
-                {CATEGORY_COLOR_PRESETS.map((color) => {
-                  const isSelected = draft.color === color;
-                  return (
-                    <Pressable
-                      key={color}
-                      style={[
-                        styles.colorSwatch,
-                        isKeyboardOpen && styles.colorSwatchCompact,
-                        { backgroundColor: color },
-                        isSelected && styles.colorSwatchSelected,
-                      ]}
-                      onPress={async () => {
-                        await Haptics.selectionAsync();
-                        setDraft((current) => ({ ...current, color }));
-                      }}>
-                      {isSelected ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
-                    </Pressable>
-                  );
-                })}
+            {!usesUploadedImage ? (
+              <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
+                <Text style={[styles.label, ui.title]}>Color</Text>
+                <View style={[styles.colorGrid, isKeyboardOpen && styles.colorGridCompact]}>
+                  {CATEGORY_COLOR_PRESETS.map((color) => {
+                    const isSelected = draft.color === color;
+                    return (
+                      <Pressable
+                        key={color}
+                        style={[
+                          styles.colorSwatch,
+                          isKeyboardOpen && styles.colorSwatchCompact,
+                          { backgroundColor: color },
+                          isSelected && styles.colorSwatchSelected,
+                        ]}
+                        onPress={async () => {
+                          await Haptics.selectionAsync();
+                          setDraft((current) => ({ ...current, color }));
+                        }}>
+                        {isSelected ? <Feather name="check" size={16} color="#FFFFFF" /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            ) : null}
 
             <View style={[styles.section, isKeyboardOpen && styles.sectionCompact]}>
               <Text style={[styles.label, ui.title]}>Live preview</Text>
               <View style={[styles.previewCard, ui.fieldSurface]}>
-                <View style={[styles.previewIconWrap, { backgroundColor: `${draft.color}22` }]}>
-                  <CategoryAvatar category={previewCategory} size={22} />
-                </View>
+                {usesUploadedImage ? (
+                  <CategoryAvatar category={previewCategory} size={40} />
+                ) : (
+                  <View style={[styles.previewIconWrap, { backgroundColor: `${draft.color}22` }]}>
+                    <CategoryAvatar category={previewCategory} size={22} />
+                  </View>
+                )}
                 <View style={styles.previewTextBlock}>
                   <Text style={[styles.previewTitle, ui.title]}>{previewCategory.label}</Text>
                   <Text style={[styles.previewSubtitle, ui.muted]}>

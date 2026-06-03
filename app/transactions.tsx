@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { themeColors } from "@/constants/colors";
+import { CategoryAvatar } from "@/components/category-avatar";
 import MerchantLogo from "@/components/merchant-logo";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -80,6 +81,9 @@ const TransactionRow = memo(function TransactionRow({
   onPress: (transactionId: string) => void;
 }) {
   const hasMerchantLogo = Boolean(getMerchantLogo(item.merchant));
+  const usesUploadedCategoryImage =
+    item.categoryIconType === "uploaded_image" &&
+    Boolean(item.categoryIconImageUri);
 
   return (
     <Pressable style={styles.recordRow} onPress={() => onPress(item.id)}>
@@ -88,7 +92,7 @@ const TransactionRow = memo(function TransactionRow({
           style={[
             styles.recordIconWrap,
             {
-              backgroundColor: hasMerchantLogo
+              backgroundColor: hasMerchantLogo || usesUploadedCategoryImage
                 ? "transparent"
                 : isDark
                   ? item.iconBackgroundDark
@@ -96,15 +100,38 @@ const TransactionRow = memo(function TransactionRow({
             },
           ]}
         >
-          <MerchantLogo
-            merchant={item.merchant}
-            size={46}
-            fallbackIcon={{
-              library: item.iconLibrary,
-              name: item.iconName,
-              color: item.iconColor,
-            }}
-          />
+          {hasMerchantLogo ? (
+            <MerchantLogo
+              merchant={item.merchant}
+              size={46}
+              fallbackIcon={{
+                library: item.iconLibrary,
+                name: item.iconName,
+                color: item.iconColor,
+              }}
+            />
+          ) : item.categoryIconType ? (
+            <CategoryAvatar
+              category={{
+                iconType: item.categoryIconType,
+                iconName: item.categoryIconName,
+                iconImageUri: item.categoryIconImageUri,
+                emoji: item.categoryEmoji,
+                color: item.categoryColor ?? item.iconColor,
+              }}
+              size={usesUploadedCategoryImage ? 42 : 24}
+            />
+          ) : (
+            <MerchantLogo
+              merchant={item.merchant}
+              size={46}
+              fallbackIcon={{
+                library: item.iconLibrary,
+                name: item.iconName,
+                color: item.iconColor,
+              }}
+            />
+          )}
         </View>
 
         <View>

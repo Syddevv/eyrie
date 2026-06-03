@@ -20,6 +20,7 @@ import {
   onGoalsChanged,
   onTransactionsChanged,
 } from "@/src/lib/dbSync";
+import type { CategoryIconType } from "@/hooks/useCategories";
 
 type IconLibrary = "feather" | "material";
 
@@ -42,6 +43,11 @@ export type DashboardRecentTransaction = {
   iconName: string;
   iconColor: string;
   iconBackground: string;
+  categoryIconType: CategoryIconType | null;
+  categoryIconName: string | null;
+  categoryIconImageUri: string | null;
+  categoryEmoji: string | null;
+  categoryColor: string | null;
   isIncome: boolean;
 };
 
@@ -415,6 +421,11 @@ function mapRecentTransaction(
           ? "Income"
           : "Expense",
     ...visual,
+    categoryIconType: source.category?.iconType ?? null,
+    categoryIconName: source.category?.icon ?? null,
+    categoryIconImageUri: source.category?.iconImageUri ?? null,
+    categoryEmoji: source.category?.emoji ?? null,
+    categoryColor: source.category?.color ?? null,
     isIncome,
   };
 }

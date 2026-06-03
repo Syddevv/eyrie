@@ -104,6 +104,10 @@ export default function TransactionDetailsModal() {
   const receiptRef = useRef<View | null>(null);
   const hasMerchantLogo = Boolean(getMerchantLogo(transaction?.merchant));
   const { isRunning: isSavingReceipt, run: runSaveReceipt } = useAsyncAction();
+  const hasCategoryAvatar = Boolean(transaction?.categoryIconType);
+  const usesUploadedCategoryImage =
+    transaction?.categoryIconType === "uploaded_image" &&
+    Boolean(transaction.categoryIconImageUri);
 
   const selectedCategory = useMemo(() => {
     if (!transaction?.categoryId) {
@@ -327,25 +331,53 @@ export default function TransactionDetailsModal() {
             <View style={[styles.handle, ui.handle]} />
 
             <View style={styles.headerRow}>
-              <MerchantLogo
-                merchant={transaction?.merchant}
-                size={48}
-                style={styles.iconWrap}
-                backgroundColor={
-                  transaction
-                    ? hasMerchantLogo
-                      ? "transparent"
-                      : isDark
-                        ? transaction.iconBackgroundDark
-                        : transaction.iconBackgroundLight
-                    : getMutedSurface(isDark)
-                }
-                fallbackIcon={{
-                  library: transaction?.iconLibrary,
-                  name: transaction?.iconName ?? "circle",
-                  color: transaction?.iconColor ?? "#94A3B8",
-                }}
-              />
+              <View
+                style={[
+                  styles.iconWrap,
+                  {
+                    backgroundColor: transaction
+                      ? hasMerchantLogo || usesUploadedCategoryImage
+                        ? "transparent"
+                        : isDark
+                          ? transaction.iconBackgroundDark
+                          : transaction.iconBackgroundLight
+                      : getMutedSurface(isDark),
+                  },
+                ]}
+              >
+                {hasMerchantLogo ? (
+                  <MerchantLogo
+                    merchant={transaction?.merchant}
+                    size={48}
+                    fallbackIcon={{
+                      library: transaction?.iconLibrary,
+                      name: transaction?.iconName ?? "circle",
+                      color: transaction?.iconColor ?? "#94A3B8",
+                    }}
+                  />
+                ) : hasCategoryAvatar && transaction ? (
+                  <CategoryAvatar
+                    category={{
+                      iconType: transaction.categoryIconType!,
+                      iconName: transaction.categoryIconName,
+                      iconImageUri: transaction.categoryIconImageUri,
+                      emoji: transaction.categoryEmoji,
+                      color: transaction.categoryColor ?? transaction.iconColor,
+                    }}
+                    size={usesUploadedCategoryImage ? 48 : 28}
+                  />
+                ) : (
+                  <MerchantLogo
+                    merchant={transaction?.merchant}
+                    size={48}
+                    fallbackIcon={{
+                      library: transaction?.iconLibrary,
+                      name: transaction?.iconName ?? "circle",
+                      color: transaction?.iconColor ?? "#94A3B8",
+                    }}
+                  />
+                )}
+              </View>
               <View style={styles.headerText}>
                 <Text style={[styles.title, ui.title]}>
                   {transaction?.title ?? "Transaction"}
@@ -522,12 +554,35 @@ export default function TransactionDetailsModal() {
               >
                 <View style={[styles.receiptCard, ui.receiptCard]}>
                   <View style={styles.receiptLogoWrap}>
-                    {transaction?.merchant ? (
+                    {transaction?.merchant && hasMerchantLogo ? (
                       <MerchantLogo
                         merchant={transaction.merchant}
                         size={72}
                         style={styles.receiptMerchantLogo}
                       />
+                    ) : hasCategoryAvatar && transaction ? (
+                      <View
+                        style={[
+                          styles.receiptCategoryLogo,
+                          {
+                            backgroundColor: usesUploadedCategoryImage
+                              ? "transparent"
+                              : `${transaction.categoryColor ?? transaction.iconColor}18`,
+                          },
+                        ]}
+                      >
+                        <CategoryAvatar
+                          category={{
+                            iconType: transaction.categoryIconType!,
+                            iconName: transaction.categoryIconName,
+                            iconImageUri: transaction.categoryIconImageUri,
+                            emoji: transaction.categoryEmoji,
+                            color:
+                              transaction.categoryColor ?? transaction.iconColor,
+                          }}
+                          size={usesUploadedCategoryImage ? 72 : 38}
+                        />
+                      </View>
                     ) : selectedCategory ? (
                       <View
                         style={[

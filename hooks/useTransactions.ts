@@ -2,6 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import type { CategoryIconType } from "@/hooks/useCategories";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { resolveBrandLabel } from "@/hooks/usePaymentMethods";
 import { transactionsService } from "@/src/db/services";
@@ -45,6 +46,11 @@ export type TransactionListItem = {
   iconColor: string;
   iconBackgroundLight: string;
   iconBackgroundDark: string;
+  categoryIconType: CategoryIconType | null;
+  categoryIconName: string | null;
+  categoryIconImageUri: string | null;
+  categoryEmoji: string | null;
+  categoryColor: string | null;
   amountColor: "income" | "default";
 };
 
@@ -371,6 +377,11 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
     typeValue: source.type as TransactionTypeValue,
     currencyCode: source.currencyCode,
     notes: source.notes ?? null,
+    categoryIconType: source.category?.iconType ?? null,
+    categoryIconName: source.category?.icon ?? null,
+    categoryIconImageUri: source.category?.iconImageUri ?? null,
+    categoryEmoji: source.category?.emoji ?? null,
+    categoryColor: source.category?.color ?? null,
     ...visual,
     amountColor: isIncome ? "income" : "default",
   };
