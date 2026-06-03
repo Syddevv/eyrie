@@ -198,6 +198,29 @@ function usageResponseMetadata(row: AiUsageRow) {
   };
 }
 
+function logUsageSnapshot(args: {
+  requestId: string;
+  userId: string;
+  source: "status" | "reset" | "limit_reached";
+  row: AiUsageRow;
+}) {
+  console.log(
+    JSON.stringify({
+      scope: "ai-chat",
+      requestId: args.requestId,
+      userId: args.userId,
+      event: "usage_snapshot",
+      source: args.source,
+      messageCount: args.row.message_count,
+      reservedCount: args.row.reserved_count,
+      dailyLimit: args.row.daily_limit,
+      lastReset: args.row.last_reset,
+      resetAt: args.row.limit_reset_at,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
 function stringifyContext(financialContext: Record<string, unknown>) {
   const summary = (financialContext.summary ?? {}) as Record<string, unknown>;
   const budgetsSummary = (financialContext.budgetsSummary ?? {}) as Record<
@@ -534,37 +557,40 @@ async function fetchOrCreateUsageRow(
         throw retry.error;
       }
 
-      return normalizeUsageRow(retry.data ?? null, userId, currentDate);
+      return ensureCanonicalDailyLimit(
+        client,
+        normalizeUsageRow(retry.data ?? null, userId, currentDate),
+      );
     }
 
-    return normalizeUsageRow(insertResult.data ?? null, userId, currentDate);
+    return ensureCanonicalDailyLimit(
+      client,
+      normalizeUsageRow(insertResult.data ?? null, userId, currentDate),
+    );
   }
 
-  return normalizeUsageRow(data, userId, currentDate);
+  return ensureCanonicalDailyLimit(
+    client,
+    normalizeUsageRow(data, userId, currentDate),
+  );
 }
 
-async function ensureLimitResetAt(
+async function ensureCanonicalDailyLimit(
   client: ReturnType<typeof createClient>,
   row: AiUsageRow,
 ) {
-  if (row.limit_reset_at || row.message_count < row.daily_limit) {
+  if (row.daily_limit === FREE_DAILY_MESSAGE_LIMIT) {
     return row;
   }
-
-  const baseIso = row.last_request_at || row.updated_at || row.created_at;
-  const baseTime = new Date(baseIso);
-  const nextResetAt = Number.isNaN(baseTime.getTime())
-    ? new Date(Date.now() + 24 * 60 * 60 * 1000)
-    : new Date(baseTime.getTime() + 24 * 60 * 60 * 1000);
 
   const { data, error } = await client
     .from("ai_usage")
     .update({
-      limit_reset_at: nextResetAt.toISOString(),
+      daily_limit: FREE_DAILY_MESSAGE_LIMIT,
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", row.user_id)
-    .is("limit_reset_at", null)
+    .neq("daily_limit", FREE_DAILY_MESSAGE_LIMIT)
     .select(
       "user_id, plan_tier, daily_limit, message_count, reserved_count, last_reset, last_request_at, limit_reset_at, created_at, updated_at",
     )
@@ -575,7 +601,11 @@ async function ensureLimitResetAt(
   }
 
   return normalizeUsageRow(
-    (data as Partial<AiUsageRow> | null) ?? row,
+    (data as Partial<AiUsageRow> | null) ??
+      {
+        ...row,
+        daily_limit: FREE_DAILY_MESSAGE_LIMIT,
+      },
     row.user_id,
     row.last_reset,
   );
@@ -733,9 +763,18 @@ Deno.serve(async (request: Request) => {
       const currentDate = new Date().toISOString().slice(0, 10);
 
       try {
-        const usageRow = await fetchOrCreateUsageRow(supabase, user.id, currentDate)
-          .then((row) => ensureLimitResetAt(supabase, row));
+        const usageRow = await fetchOrCreateUsageRow(
+          supabase,
+          user.id,
+          currentDate,
+        );
         const cooldownRemaining = cooldownRemainingSeconds(usageRow);
+        logUsageSnapshot({
+          requestId,
+          userId: user.id,
+          source: "status",
+          row: usageRow,
+        });
 
         return jsonResponse(200, {
           ...usageResponseMetadata(usageRow),
@@ -788,13 +827,22 @@ Deno.serve(async (request: Request) => {
         ? ((body.requestMeta as Record<string, unknown>).action as string)
         : null;
 
-    if (request.method === "GET" || requestAction === "status") {
+    if (requestAction === "status") {
       const currentDate = new Date().toISOString().slice(0, 10);
 
       try {
-        const usageRow = await fetchOrCreateUsageRow(supabase, user.id, currentDate)
-          .then((row) => ensureLimitResetAt(supabase, row));
+        const usageRow = await fetchOrCreateUsageRow(
+          supabase,
+          user.id,
+          currentDate,
+        );
         const cooldownRemaining = cooldownRemainingSeconds(usageRow);
+        logUsageSnapshot({
+          requestId,
+          userId: user.id,
+          source: "status",
+          row: usageRow,
+        });
 
         return jsonResponse(200, {
           ...usageResponseMetadata(usageRow),
@@ -834,8 +882,10 @@ Deno.serve(async (request: Request) => {
 
     const currentDate = new Date().toISOString().slice(0, 10);
 
+    let usageRowForRequest: AiUsageRow | null = null;
     try {
       const usageRow = await fetchOrCreateUsageRow(supabase, user.id, currentDate);
+      usageRowForRequest = usageRow;
 
       const cooldownRemaining = cooldownRemainingSeconds(usageRow);
       if (cooldownRemaining > 0) {
@@ -907,8 +957,15 @@ Deno.serve(async (request: Request) => {
         user.id,
         currentDate,
       )
-        .then((row) => ensureLimitResetAt(supabase, row))
         .catch(() => null);
+      if (usageRow?.limit_reset_at) {
+        logUsageSnapshot({
+          requestId,
+          userId: user.id,
+          source: "limit_reached",
+          row: usageRow,
+        });
+      }
       return jsonResponse(429, {
         error: AI_USAGE_LIMIT_MESSAGE,
         remainingMessages: usageRow ? getRemainingDailyMessages(usageRow) : 0,
@@ -1046,6 +1103,26 @@ Deno.serve(async (request: Request) => {
       let finalizedUsage: AiUsageRow | null = null;
       try {
         finalizedUsage = await finalizeUsageSlot(supabase, true);
+        if (usageRowForRequest && usageWindowExpired(usageRowForRequest)) {
+          logUsageSnapshot({
+            requestId,
+            userId: user.id,
+            source: "reset",
+            row: finalizedUsage,
+          });
+        }
+        if (
+          reservedUsage &&
+          finalizedUsage.limit_reset_at &&
+          finalizedUsage.limit_reset_at !== reservedUsage.limit_reset_at
+        ) {
+          logUsageSnapshot({
+            requestId,
+            userId: user.id,
+            source: "limit_reached",
+            row: finalizedUsage,
+          });
+        }
       } catch (finalizeError) {
         await releaseUsageSlot(supabase).catch((releaseError) => {
           console.error(

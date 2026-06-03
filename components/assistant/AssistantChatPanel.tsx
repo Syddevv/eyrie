@@ -57,14 +57,13 @@ type QuickPrompt = {
 
 const BOTTOM_NAV_RESERVED_HEIGHT = 64;
 function formatResetTimeLabel(resetAt: string | null) {
-  const date = resetAt ? new Date(resetAt) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+  if (!resetAt) {
+    return null;
+  }
+
+  const date = new Date(resetAt);
   if (Number.isNaN(date.getTime())) {
-    return new Intl.DateTimeFormat(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    return null;
   }
 
   const parts = new Intl.DateTimeFormat(undefined, {
@@ -243,10 +242,9 @@ export function AssistantChatPanel({
     cooldownRemaining > 0
       ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
       : remainingMessages === 0
-        ? resetAt
+        ? resetAt && resetTimeLabel
           ? `You've reached your AI assistant limit. Limit will reset on ${resetTimeLabel}.`
-          : assistantStatusMessage ||
-            `You've reached your AI assistant limit. Limit will reset on ${resetTimeLabel}.`
+          : assistantStatusMessage || "You've reached your AI assistant limit."
         : null;
 
   const scrollToBottom = useCallback(() => {

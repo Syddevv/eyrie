@@ -6,7 +6,12 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
-import { assertSupabaseConfigured, supabase } from "@/lib/supabase";
+import {
+  assertSupabaseConfigured,
+  clearLocalSupabaseSession,
+  isInvalidRefreshTokenError,
+  supabase,
+} from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { accountsService } from "@/src/db/services";
 
@@ -561,6 +566,14 @@ export async function signOut() {
     store.closeOtpModal();
     store.showSnackbar("Signed out.", "success");
   } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      await clearLocalSupabaseSession();
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      store.closeOtpModal();
+      store.showSnackbar("Signed out.", "success");
+      return;
+    }
+
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     const message =
       error instanceof Error ? error.message : "Unable to sign out right now. ";

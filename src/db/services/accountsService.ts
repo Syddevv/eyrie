@@ -20,6 +20,9 @@ import {
 } from "@/src/sync/helpers";
 import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { usersRepository } from "../repositories/usersRepository";
+import { usersService } from "./usersService";
 
 const defaultCashAccountRequests = new Map<
   string,
@@ -43,6 +46,48 @@ function hasMeaningfulBalance(account: Pick<Account, "balance">) {
 
 function isDefaultCashAccount(account: Pick<Account, "id" | "userId">) {
   return account.id === getDefaultCashAccountId(account.userId);
+}
+
+async function ensureLocalUserRow(
+  userId: string,
+  currencyCode?: string | null,
+) {
+  const existingUser = await usersRepository.findById(userId);
+  if (existingUser) {
+    return existingUser;
+  }
+
+  const authUser = useAuthStore.getState().user;
+  if (authUser?.id === userId) {
+    try {
+      const syncedUser = await usersService.syncFromSupabaseUser(authUser);
+      if (syncedUser) {
+        console.log(`[accounts:user] Synced local user row for ${userId}`);
+        return syncedUser;
+      }
+    } catch (error) {
+      console.warn(
+        `[accounts:user] Failed to sync local user row from auth payload for ${userId}:`,
+        error,
+      );
+    }
+  }
+
+  const timestamp = nowIso();
+  const createdUser = await usersRepository.create({
+    id: userId,
+    fullName: null,
+    email: null,
+    avatarUrl: null,
+    currencyCode: currencyCode ?? DEFAULT_CURRENCY_CODE,
+    currentStreak: 0,
+    lastActiveDate: null,
+    longestStreak: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  console.log(`[accounts:user] Created placeholder local user row for ${userId}`);
+  return createdUser;
 }
 
 function accountLabel(type: string) {
@@ -208,6 +253,8 @@ export class AccountsService {
     assertRequiredText(input.name, "account name");
     assertAccountType(input.type);
     assertNonNegativeAmount(input.balance ?? 0, "balance");
+
+    await ensureLocalUserRow(input.userId, input.currencyCode);
 
     const timestamp = nowIso();
 
