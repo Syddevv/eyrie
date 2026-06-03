@@ -46,7 +46,14 @@ function save(message: string) {
 }
 
 export function canExportReceiptImage() {
-  return Boolean(requireOptionalNativeModule("ExpoMediaLibraryNext"));
+  try {
+    return Boolean(
+      requireOptionalNativeModule("ExpoMediaLibrary") ??
+      requireOptionalNativeModule("ExpoMediaLibraryNext"),
+    );
+  } catch {
+    return false;
+  }
 }
 
 function loadViewShotModule() {
@@ -69,10 +76,6 @@ function loadViewShotModule() {
 }
 
 function loadMediaLibraryModule() {
-  if (!canExportReceiptImage()) {
-    return null;
-  }
-
   try {
     return require("expo-media-library") as typeof import("expo-media-library");
   } catch {

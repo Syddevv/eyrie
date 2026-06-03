@@ -100,6 +100,7 @@ export default function TransactionDetailsModal() {
   const { categories: incomeCategories } = useIncomeCategories();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [isReceiptPreviewReady, setIsReceiptPreviewReady] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [receiptGeneratedAt, setReceiptGeneratedAt] = useState<Date | null>(
     null,
@@ -259,6 +260,7 @@ export default function TransactionDetailsModal() {
     }
 
     setReceiptGeneratedAt(new Date());
+    setIsReceiptPreviewReady(false);
     setShowReceiptPreview(true);
   };
 
@@ -518,6 +520,10 @@ export default function TransactionDetailsModal() {
                 ref={(node) => {
                   receiptRef.current = node;
                 }}
+                collapsable={false}
+                onLayout={() => {
+                  setIsReceiptPreviewReady(true);
+                }}
               >
                 <View style={[styles.receiptCard, ui.receiptCard]}>
                   <View style={styles.receiptLogoWrap}>
@@ -545,7 +551,8 @@ export default function TransactionDetailsModal() {
                             iconImageUri: transaction.categoryIconImageUri,
                             emoji: transaction.categoryEmoji,
                             color:
-                              transaction.categoryColor ?? transaction.iconColor,
+                              transaction.categoryColor ??
+                              transaction.iconColor,
                           }}
                           size={usesUploadedCategoryImage ? 72 : 38}
                         />
@@ -723,7 +730,7 @@ export default function TransactionDetailsModal() {
                 label="Download Receipt"
                 loadingLabel="Saving..."
                 loading={isSavingReceipt}
-                disabled={!canDownloadReceipt}
+                disabled={!canDownloadReceipt || !isReceiptPreviewReady}
                 haptic="default"
                 style={styles.downloadButton}
                 textStyle={styles.downloadButtonText}
