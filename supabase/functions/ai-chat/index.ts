@@ -234,6 +234,9 @@ function stringifyContext(financialContext: Record<string, unknown>) {
   const budgets = Array.isArray(financialContext.budgets)
     ? financialContext.budgets
     : [];
+  const budgetedCategories = Array.isArray(financialContext.budgetedCategories)
+    ? financialContext.budgetedCategories
+    : [];
   const categories = Array.isArray(financialContext.categories)
     ? financialContext.categories
     : [];
@@ -251,12 +254,15 @@ function stringifyContext(financialContext: Record<string, unknown>) {
     `Summary: balance=${summary.totalBalance ?? 0}, income=${summary.totalIncome ?? 0}, expenses=${summary.totalExpenses ?? 0}, cash_flow=${summary.netCashFlow ?? 0}`,
     `Current period: ${period.label ?? "This Month"}, income=${period.totalIncome ?? 0}, expenses=${period.totalExpenses ?? 0}, net_savings=${period.netSavings ?? 0}, top_category=${period.topCategory ?? "none"}, budget_health=${period.budgetHealthTone ?? "Unknown"} (${period.budgetHealthScore ?? 0})`,
     `Budget totals: active=${budgetsSummary.activeBudgetCount ?? 0}, total_budgeted=${budgetsSummary.totalBudgeted ?? 0}, total_spent=${budgetsSummary.totalSpent ?? 0}, total_remaining=${budgetsSummary.totalRemaining ?? 0}`,
+    `Budgeted categories: ${
+      budgetedCategories.length ? budgetedCategories.join("; ") : "none"
+    }`,
     `Budgets: ${
       budgets.length
         ? budgets
             .map((item) => {
               const budget = item as Record<string, unknown>;
-              return `${budget.title ?? "Budget"} amount=${budget.amount ?? 0} spent=${budget.spent ?? 0} remaining=${budget.remaining ?? 0} progress=${budget.progressPercent ?? 0}% status=${budget.status ?? "healthy"}`;
+              return `${budget.categoryName ?? budget.title ?? "Budget"} amount=${budget.amount ?? 0} spent=${budget.spent ?? 0} remaining=${budget.remaining ?? 0} progress=${budget.progressPercent ?? 0}% status=${budget.status ?? "healthy"}`;
             })
             .join("; ")
         : "none"
@@ -342,6 +348,8 @@ function buildGroqMessages(input: {
         "You are Eyrie, a concise personal finance assistant inside a mobile expense and budget tracker.",
         "Use the provided financial context first.",
         "When the user asks about budgets or goals, answer from the exact numeric values in the context before giving advice.",
+        "Treat only categories listed under 'Budgeted categories' or 'Budgets' as having a budget set.",
+        "Do not say a category has no budget if that category appears in the budget list, even if it also appears in the spending categories list.",
         "Be practical, supportive, and specific.",
         "Keep answers short to medium length.",
         "Avoid markdown tables.",

@@ -54,6 +54,9 @@ export function buildAssistantContext(
   const totalBudgetRemaining = round(
     input.budgets.reduce((sum, budget) => sum + budget.remaining, 0),
   );
+  const budgetedCategories = input.budgets
+    .map((budget) => budget.title.trim())
+    .filter(Boolean);
 
   return {
     currencyCode,
@@ -69,6 +72,7 @@ export function buildAssistantContext(
       totalSpent,
       totalRemaining: totalBudgetRemaining,
     },
+    budgetedCategories,
     currentPeriod: {
       label: input.analytics.range.label,
       budgetHealthScore: round(input.analytics.budgetHealth.score),
@@ -79,6 +83,7 @@ export function buildAssistantContext(
       topCategory: input.analytics.spendingBreakdown.topCategory,
     },
     budgets: input.budgets.map((budget) => ({
+      categoryName: budget.title,
       title: budget.title,
       amount: round(budget.amount),
       spent: round(budget.spent),

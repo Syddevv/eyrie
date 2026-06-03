@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalytics } from "@/hooks/useAnalytics";
 import {
-  useBudgetProgress,
   useDashboardBootstrap,
   useGoalsProgress,
   useRecentTransactions,
   useDashboardSummary,
   useSpendingBreakdown,
 } from "@/hooks/use-dashboard";
+import { useBudgets } from "@/hooks/useBudgets";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
   ASSISTANT_FALLBACK_ERROR_MESSAGE,
@@ -100,7 +100,7 @@ export function useAssistantSession() {
   const userId = user?.id ?? null;
   const { isOffline } = useOfflineState();
   const summary = useDashboardSummary();
-  const budgets = useBudgetProgress();
+  const { budgets: sharedBudgets } = useBudgets("monthly");
   const spendingBreakdown = useSpendingBreakdown();
   const recentTransactions = useRecentTransactions();
   const goals = useGoalsProgress();
@@ -108,6 +108,31 @@ export function useAssistantSession() {
   const [clockTick, setClockTick] = useState(() => Date.now());
 
   useDashboardBootstrap(userId);
+
+  const budgets = useMemo(
+    () =>
+      sharedBudgets.map((budget) => ({
+        id: budget.id,
+        title: budget.categoryName,
+        amount: budget.budgetLimit,
+        spent: budget.amountSpent,
+        remaining: budget.remainingAmount,
+        spentLabel: `Spent ${budget.amountSpent} of ${budget.budgetLimit}`,
+        remainingLabel: `${budget.remainingAmount} remaining`,
+        progress: budget.progress,
+        status:
+          budget.amountSpent > budget.budgetLimit
+            ? ("over" as const)
+            : budget.progress >= 0.8
+              ? ("limit" as const)
+              : ("healthy" as const),
+        iconLibrary: "material" as const,
+        iconName: budget.categoryIcon,
+        iconColor: budget.categoryColor,
+        iconBackground: budget.categoryColor,
+      })),
+    [sharedBudgets],
+  );
 
   const session = useAssistantSessionStore(
     useCallback(

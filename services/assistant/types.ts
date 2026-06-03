@@ -34,7 +34,9 @@ export type AssistantFinancialContext = {
     totalSpent: number;
     totalRemaining: number;
   };
+  budgetedCategories: string[];
   budgets: Array<{
+    categoryName: string;
     title: string;
     amount: number;
     spent: number;
