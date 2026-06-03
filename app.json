@@ -3,7 +3,7 @@
     "name": "Eyrie",
     "slug": "eyrie",
     "scheme": "eyrie",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "icon": "./assets/Logos/eyrie-logo.png",
     "splash": {
       "image": "./assets/Logos/eyrie-logo.png",
@@ -17,7 +17,7 @@
       },
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.sydu.eyrie",
-      "versionCode": 2
+      "versionCode": 3
     },
     "extra": {
       "eas": {
