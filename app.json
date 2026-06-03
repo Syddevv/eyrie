@@ -16,9 +16,22 @@
         "backgroundColor": "#019042"
       },
       "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "READ_MEDIA_IMAGES"
+      ],
       "package": "com.sydu.eyrie",
       "versionCode": 3
     },
+    "plugins": [
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Eyrie to access your photos so receipt images can be saved.",
+          "savePhotosPermission": "Allow Eyrie to save receipt images to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "94d94149-f973-4cec-bb7a-230a1cda5ca2"

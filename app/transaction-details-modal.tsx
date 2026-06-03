@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { requireOptionalNativeModule } from "expo-modules-core";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -36,10 +35,14 @@ import {
   useTransaction,
 } from "@/hooks/useTransactions";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import {
+  canExportReceiptImage,
+  exportReceiptImage,
+  type ReceiptImageFormat,
+} from "@/services/receipt-export";
 import { transactionsService } from "@/src/db/services";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
-type ReceiptImageFormat = "png" | "jpg";
 const DEFAULT_RECEIPT_FORMAT: ReceiptImageFormat = "png";
 
 function formatReceiptId(transactionId: string, transactionDate: string) {
@@ -137,6 +140,7 @@ export default function TransactionDetailsModal() {
     receiptGeneratedAt ?? new Date(),
   );
   const colors = themeColors[colorScheme];
+  const canDownloadReceipt = canExportReceiptImage();
 
   const ui = useMemo(
     () => ({
@@ -258,66 +262,29 @@ export default function TransactionDetailsModal() {
     setShowReceiptPreview(true);
   };
 
-  const persistReceipt = async (format: ReceiptImageFormat) => {
-    if (!receiptRef.current || !transaction) {
-      return;
-    }
-
-    const mediaLibraryNative = requireOptionalNativeModule(
-      "ExpoMediaLibraryNext",
-    );
-    if (!mediaLibraryNative) {
-      throw new Error(
-        "Receipt saving needs a fresh native rebuild for the new export modules.",
-      );
-    }
-
-    const { captureRef: captureReceiptRef } =
-      require("react-native-view-shot") as {
-        captureRef: typeof import("react-native-view-shot").captureRef;
-      };
-    const MediaLibrary =
-      require("expo-media-library") as typeof import("expo-media-library");
-
-    const permission = await MediaLibrary.requestPermissionsAsync();
-    if (!permission.granted) {
-      throw new Error("Photo library permission is required to save receipts.");
-    }
-
-    const uri = await captureReceiptRef(receiptRef, {
-      format,
-      quality: 1,
-      result: "tmpfile",
-    });
-
-    await MediaLibrary.saveToLibraryAsync(uri);
-  };
-
   const handleDownloadReceipt = () => {
     if (!transaction) {
       return;
     }
 
     void runSaveReceipt(async () => {
-      try {
-        await persistReceipt(DEFAULT_RECEIPT_FORMAT);
+      const result = await exportReceiptImage(
+        receiptRef.current,
+        DEFAULT_RECEIPT_FORMAT,
+      );
+
+      if (result.ok) {
         await Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => undefined);
         Alert.alert("Receipt saved", "Saved to your photo library.");
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unable to save receipt.";
-        await Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Error,
-        ).catch(() => undefined);
-        Alert.alert(
-          "Save failed",
-          message.includes("native module")
-            ? "Receipt saving needs a fresh native rebuild for the new export modules."
-            : message,
-        );
+        return;
       }
+
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      ).catch(() => undefined);
+      Alert.alert("Save failed", result.message);
     });
   };
 
@@ -748,12 +715,15 @@ export default function TransactionDetailsModal() {
                 Download Receipt
               </Text>
               <Text style={[styles.previewActionSubtitle, ui.previewHint]}>
-                Save this receipt as an image
+                {canDownloadReceipt
+                  ? "Save this receipt as an image"
+                  : "Receipt download is temporarily unavailable."}
               </Text>
               <LoadingActionButton
                 label="Download Receipt"
                 loadingLabel="Saving..."
                 loading={isSavingReceipt}
+                disabled={!canDownloadReceipt}
                 haptic="default"
                 style={styles.downloadButton}
                 textStyle={styles.downloadButtonText}
