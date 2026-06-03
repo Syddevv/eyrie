@@ -1,4 +1,5 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -18,12 +19,14 @@ import {
 
 import { BANKS } from "@/constants/banks";
 import LOGO_MAP from "@/constants/logoMap";
+import { LoadingActionButton } from "@/components/loading-action-button";
 import Logo from "@/components/logo";
 import MerchantLogo from "@/components/merchant-logo";
 import { WALLETS } from "@/constants/wallets";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useExpenseCategories } from "@/hooks/useExpenseCategories";
@@ -45,6 +48,7 @@ import {
   useTransaction,
 } from "@/hooks/useTransactions";
 import { transactionsService } from "@/src/db/services";
+import { toTransactionIso } from "@/src/db/utils/time";
 import { getMerchantLogo } from "@/utils/getMerchantLogo";
 
 function formatAmount(value: string) {
@@ -52,6 +56,84 @@ function formatAmount(value: string) {
     .replace(/[^\d.]/g, "")
     .replace(/^(\d*\.?\d{0,2}).*$/, "$1")
     .slice(0, 12);
+}
+
+const monthNames = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatDateLabel(date: Date) {
+  const now = new Date();
+
+  if (isSameDay(date, now)) {
+    return "Today";
+  }
+
+  return `${monthNames[date.getMonth()].slice(0, 3)} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+function buildCalendarDays(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const lastDay = new Date(
+    monthDate.getFullYear(),
+    monthDate.getMonth() + 1,
+    0,
+  );
+  const leadingDays = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  const cells: { key: string; date: Date; inMonth: boolean }[] = [];
+
+  for (let index = 0; index < leadingDays; index += 1) {
+    const date = new Date(
+      monthDate.getFullYear(),
+      monthDate.getMonth(),
+      index - leadingDays + 1,
+    );
+    cells.push({ key: `prev-${index}`, date, inMonth: false });
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+    cells.push({ key: `current-${day}`, date, inMonth: true });
+  }
+
+  const remainder = cells.length % 7;
+
+  if (remainder !== 0) {
+    const trailing = 7 - remainder;
+
+    for (let index = 1; index <= trailing; index += 1) {
+      const date = new Date(
+        monthDate.getFullYear(),
+        monthDate.getMonth() + 1,
+        index,
+      );
+      cells.push({ key: `next-${index}`, date, inMonth: false });
+    }
+  }
+
+  return cells;
 }
 
 function withOpacity(hex: string, opacity: number) {
@@ -128,11 +210,14 @@ export default function EditTransactionModal() {
   const [accountId, setAccountId] = useState<string | null>(null);
   const [showAccountOptions, setShowAccountOptions] = useState(false);
   const [showCategoryOptions, setShowCategoryOptions] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [showCalendar, setShowCalendar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isSaving, setIsSaving] = useState(false);
   const [hasInsufficientBalance, setHasInsufficientBalance] = useState(false);
   const [hasInsufficientReversalBalance, setHasInsufficientReversalBalance] =
     useState(false);
+  const { isRunning: isSaving, run: runSave } = useAsyncAction();
   const isIncomeTransaction = transaction?.typeValue === "income";
   const { merchants: expenseMerchantOptions } = useExpenseMerchants();
   const accountById = useMemo(
@@ -214,6 +299,13 @@ export default function EditTransactionModal() {
     setAmount(String(transaction.amount));
     setCategoryId(transaction.categoryId);
     setAccountId(transaction.accountId);
+    const initialDate = new Date(transaction.transactionDate);
+    if (!Number.isNaN(initialDate.getTime())) {
+      setSelectedDate(initialDate);
+      setCalendarMonth(
+        new Date(initialDate.getFullYear(), initialDate.getMonth(), 1),
+      );
+    }
   }, [transaction]);
 
   useEffect(() => {
@@ -254,6 +346,10 @@ export default function EditTransactionModal() {
         option.label.toLowerCase() === merchantQuery.trim().toLowerCase(),
     ) ??
     null;
+  const calendarDays = useMemo(
+    () => buildCalendarDays(calendarMonth),
+    [calendarMonth],
+  );
 
   useEffect(() => {
     if (isIncomeTransaction) {
@@ -408,7 +504,7 @@ export default function EditTransactionModal() {
   const previewSubtitle = [
     selectedCategory?.label ?? transaction?.category,
     selectedAccount?.label ?? transaction?.accountLabel,
-    transaction?.dateLabel,
+    formatDateLabel(selectedDate),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -462,37 +558,47 @@ export default function EditTransactionModal() {
       }
     }
 
-    setIsSaving(true);
+    Keyboard.dismiss();
 
-    try {
-      await transactionsService.update(transaction.id, {
-        accountId,
-        merchantId: isIncomeTransaction
-          ? null
-          : (expenseMerchantOptions.find(
-              (option) =>
-                option.label.trim().toLowerCase() ===
-                (selectedMerchantOption?.label ?? merchantQuery)
-                  .trim()
-                  .toLowerCase(),
-            )?.merchantId ?? null),
-        merchantName: normalizedMerchant,
-        amount: numericAmount,
-        type: normalizedType,
-        categoryId,
-      });
+    void runSave(async () => {
+      try {
+        await transactionsService.update(transaction.id, {
+          accountId,
+          merchantId: isIncomeTransaction
+            ? null
+            : (expenseMerchantOptions.find(
+                (option) =>
+                  option.label.trim().toLowerCase() ===
+                  (selectedMerchantOption?.label ?? merchantQuery)
+                    .trim()
+                    .toLowerCase(),
+              )?.merchantId ?? null),
+          merchantName: normalizedMerchant,
+          amount: numericAmount,
+          type: normalizedType,
+          categoryId,
+          transactionDate: toTransactionIso(
+            selectedDate,
+            new Date(transaction.transactionDate),
+          ),
+        });
 
-      router.back();
-    } catch (error) {
-      Alert.alert(
-        "Save failed",
-        error instanceof Error
-          ? error.message
-          : "Unable to update transaction.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => undefined);
+        router.back();
+      } catch (error) {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Error,
+        ).catch(() => undefined);
+        Alert.alert(
+          "Save failed",
+          error instanceof Error
+            ? error.message
+            : "Unable to update transaction.",
+        );
+      }
+    });
   };
 
   return (
@@ -931,6 +1037,32 @@ export default function EditTransactionModal() {
             ) : null}
 
             <View style={styles.formSection}>
+              <Text style={[styles.label, ui.label]}>Date</Text>
+              <Pressable
+                style={[
+                  styles.fieldSurface,
+                  ui.fieldSurface,
+                  styles.dropdownField,
+                ]}
+                onPress={() => {
+                  setShowCalendar(true);
+                  setShowAccountOptions(false);
+                  setShowCategoryOptions(false);
+                  setShowMerchantOptions(false);
+                }}
+              >
+                <Text style={[styles.fieldInput, ui.fieldText]}>
+                  {formatDateLabel(selectedDate)}
+                </Text>
+                <Feather
+                  name="calendar"
+                  size={18}
+                  color={ui.fieldText.color}
+                />
+              </Pressable>
+            </View>
+
+            <View style={styles.formSection}>
               <Text style={[styles.label, ui.label]}>Amount</Text>
               <View
                 style={[
@@ -981,10 +1113,9 @@ export default function EditTransactionModal() {
                 Cancel
               </Text>
             </Pressable>
-            <Pressable
+            <LoadingActionButton
               disabled={
                 !transaction ||
-                isSaving ||
                 hasInsufficientBalance ||
                 hasInsufficientReversalBalance
               }
@@ -997,18 +1128,129 @@ export default function EditTransactionModal() {
                   hasInsufficientReversalBalance) &&
                   styles.disabledButton,
               ]}
-              onPress={handleSave}
-            >
-              <Feather
-                name="check"
-                size={16}
-                color={ui.primaryButtonText.color}
-              />
-              <Text style={[styles.primaryButtonText, ui.primaryButtonText]}>
-                {isSaving ? "Saving..." : "Save Changes"}
-              </Text>
-            </Pressable>
+              onPress={() => void handleSave()}
+              loading={isSaving}
+              loadingLabel="Saving..."
+              haptic="default"
+              textStyle={[styles.primaryButtonText, ui.primaryButtonText]}
+              spinnerColor={ui.primaryButtonText.color}
+              label="Save Changes"
+              leftAdornment={
+                <Feather
+                  name="check"
+                  size={16}
+                  color={ui.primaryButtonText.color}
+                />
+              }
+            />
           </View>
+
+          {showCalendar ? (
+            <View style={styles.calendarOverlay}>
+              <Pressable
+                style={styles.calendarBackdrop}
+                onPress={() => setShowCalendar(false)}
+              />
+              <View style={[styles.calendarCard, ui.sheet, shadows.card]}>
+                <View style={styles.calendarHeader}>
+                  <Pressable
+                    style={[styles.calendarArrow, ui.fieldSurface]}
+                    onPress={() =>
+                      setCalendarMonth(
+                        (current) =>
+                          new Date(
+                            current.getFullYear(),
+                            current.getMonth() - 1,
+                            1,
+                          ),
+                      )
+                    }
+                  >
+                    <Feather
+                      name="chevron-left"
+                      size={16}
+                      color={ui.fieldText.color}
+                    />
+                  </Pressable>
+
+                  <Text style={[styles.calendarTitle, ui.fieldText]}>
+                    {monthNames[calendarMonth.getMonth()]}{" "}
+                    {calendarMonth.getFullYear()}
+                  </Text>
+
+                  <Pressable
+                    style={[styles.calendarArrow, ui.fieldSurface]}
+                    onPress={() =>
+                      setCalendarMonth(
+                        (current) =>
+                          new Date(
+                            current.getFullYear(),
+                            current.getMonth() + 1,
+                            1,
+                          ),
+                      )
+                    }
+                  >
+                    <Feather
+                      name="chevron-right"
+                      size={16}
+                      color={ui.fieldText.color}
+                    />
+                  </Pressable>
+                </View>
+
+                <View style={styles.weekdayRow}>
+                  {weekdayLabels.map((label) => (
+                    <Text key={label} style={[styles.weekdayLabel, ui.subtitle]}>
+                      {label}
+                    </Text>
+                  ))}
+                </View>
+
+                <View style={styles.calendarGrid}>
+                  {calendarDays.map((day) => {
+                    const isSelected = isSameDay(day.date, selectedDate);
+                    const isToday = isSameDay(day.date, new Date());
+
+                    return (
+                      <Pressable
+                        key={day.key}
+                        style={[
+                          styles.dayCell,
+                          isSelected && ui.primaryButton,
+                          !isSelected && isToday && styles.todayCell,
+                          !isSelected &&
+                            isToday && { borderColor: ui.primaryButton.backgroundColor },
+                        ]}
+                        onPress={() => {
+                          setSelectedDate(day.date);
+                          setCalendarMonth(
+                            new Date(
+                              day.date.getFullYear(),
+                              day.date.getMonth(),
+                              1,
+                            ),
+                          );
+                          setShowCalendar(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.dayLabel,
+                            ui.fieldText,
+                            !day.inMonth && ui.placeholder,
+                            isSelected && styles.selectedDayText,
+                          ]}
+                        >
+                          {day.date.getDate()}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -1221,6 +1463,83 @@ const styles = StyleSheet.create({
     marginTop: 16,
     flexDirection: "row",
     gap: 12,
+  },
+  calendarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  calendarBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  calendarCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  calendarArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 0,
+  },
+  calendarTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+  },
+  weekdayRow: {
+    flexDirection: "row",
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  weekdayLabel: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dayCell: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  todayCell: {
+    borderWidth: 1,
+  },
+  dayLabel: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+  },
+  selectedDayText: {
+    color: "#FFFFFF",
   },
   secondaryButton: {
     flex: 1,
