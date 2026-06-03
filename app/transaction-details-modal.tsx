@@ -130,7 +130,9 @@ export default function TransactionDetailsModal() {
 
   const receiptBrandTitle =
     transaction?.merchant || transaction?.category || "Eyrie";
-  const receiptTypeLabel = transaction?.type ?? "Expense";
+  const receiptPaymentLabel = transaction?.accountLabel ?? "Unknown account";
+  const receiptAccountLabel =
+    transaction?.typeValue === "income" ? "RECEIVING ACCOUNT" : "PAYMENT TYPE";
   const receiptDateLabel = transaction?.transactionDate
     ? formatReceiptTransactionDate(transaction.transactionDate)
     : "Unavailable";
@@ -205,24 +207,24 @@ export default function TransactionDetailsModal() {
         borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "#D8E2EF",
       },
       receiptCard: {
-        backgroundColor: isDark ? "#20314A" : "#FFFFFF",
-        borderColor: isDark ? "rgba(255,255,255,0.06)" : "#E6ECF5",
-        shadowColor: isDark ? "#020617" : "#7B93B6",
+        backgroundColor: "#FFFFFF",
+        borderColor: "#E6ECF5",
+        shadowColor: "#7B93B6",
       },
-      receiptBrandTitle: { color: colors.foreground },
-      receiptCaption: { color: colors.mutedForeground },
-      receiptMetaLabel: { color: isDark ? "#89A3C7" : "#5B78A2" },
-      receiptAmountValue: { color: colors.foreground },
-      receiptInfoValue: { color: colors.foreground },
+      receiptBrandTitle: { color: "#111827" },
+      receiptCaption: { color: "#64748B" },
+      receiptMetaLabel: { color: "#5B78A2" },
+      receiptAmountValue: { color: "#111827" },
+      receiptInfoValue: { color: "#111827" },
       receiptTypePill: {
-        backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "#E8EEF8",
+        backgroundColor: "#E8EEF8",
       },
-      receiptTypePillText: { color: isDark ? "#D6E4F7" : "#5B78A2" },
+      receiptTypePillText: { color: "#5B78A2" },
       receiptDashedDivider: {
-        borderColor: isDark ? "rgba(255,255,255,0.1)" : "#DBE4F1",
+        borderColor: "#DBE4F1",
       },
       receiptSolidDivider: {
-        borderColor: isDark ? "rgba(255,255,255,0.12)" : "#D8E2EF",
+        borderColor: "#D8E2EF",
       },
       ticketNotch: {
         backgroundColor: isDark ? "#162033" : "#EAF1FB",
@@ -635,7 +637,7 @@ export default function TransactionDetailsModal() {
                     <Text
                       style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
                     >
-                      TYPE
+                      {receiptAccountLabel}
                     </Text>
                     <View style={[styles.receiptTypePill, ui.receiptTypePill]}>
                       <Text
@@ -644,7 +646,7 @@ export default function TransactionDetailsModal() {
                           ui.receiptTypePillText,
                         ]}
                       >
-                        {receiptTypeLabel}
+                        {receiptPaymentLabel}
                       </Text>
                     </View>
                   </View>
@@ -1075,12 +1077,15 @@ const styles = StyleSheet.create({
   receiptMetaGrid: {
     flexDirection: "row",
     gap: 10,
+    justifyContent: "space-between",
   },
   receiptMetaCell: {
     flex: 1,
     gap: 4,
+    alignItems: "center",
   },
   receiptMetaValueCompact: {
+    textAlign: "center",
     fontFamily: fontFamilies.sans,
     fontSize: 11,
     lineHeight: 14,
