@@ -120,7 +120,8 @@ export default function TransactionDetailsModal() {
     transaction?.typeValue,
   ]);
 
-  const receiptBrandTitle = transaction?.merchant || transaction?.category || "Eyrie";
+  const receiptBrandTitle =
+    transaction?.merchant || transaction?.category || "Eyrie";
   const receiptTypeLabel = transaction?.type ?? "Expense";
   const receiptDateLabel = transaction?.transactionDate
     ? formatReceiptTransactionDate(transaction.transactionDate)
@@ -128,7 +129,9 @@ export default function TransactionDetailsModal() {
   const receiptId = transaction
     ? formatReceiptId(transaction.id, transaction.transactionDate)
     : "ERY-00000000-000";
-  const generatedLabel = formatReceiptTimestamp(receiptGeneratedAt ?? new Date());
+  const generatedLabel = formatReceiptTimestamp(
+    receiptGeneratedAt ?? new Date(),
+  );
   const colors = themeColors[colorScheme];
 
   const ui = useMemo(
@@ -168,19 +171,30 @@ export default function TransactionDetailsModal() {
       },
       deleteIcon: { color: "#FF5C73" },
       previewBackdrop: {
-        backgroundColor: isDark ? "rgba(2, 6, 23, 0.74)" : "rgba(15, 23, 42, 0.16)",
+        backgroundColor: isDark
+          ? "rgba(2, 6, 23, 0.74)"
+          : "rgba(15, 23, 42, 0.16)",
       },
       previewShell: {
         backgroundColor: isDark ? "#162033" : "#EAF1FB",
-        borderColor: isDark ? "rgba(96, 165, 250, 0.18)" : "rgba(255,255,255,0.78)",
+        borderColor: isDark
+          ? "rgba(96, 165, 250, 0.18)"
+          : "rgba(255,255,255,0.78)",
       },
       previewTitle: { color: colors.foreground },
       previewHint: { color: colors.mutedForeground },
       previewCloseButton: {
-        backgroundColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.8)",
-        borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(223,227,232,0.9)",
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(255,255,255,0.8)",
+        borderColor: isDark
+          ? "rgba(255,255,255,0.08)"
+          : "rgba(223,227,232,0.9)",
       },
       previewCloseIcon: { color: colors.foreground },
+      previewActionArea: {
+        borderTopColor: isDark ? "rgba(255,255,255,0.08)" : "#D8E2EF",
+      },
       receiptCard: {
         backgroundColor: isDark ? "#20314A" : "#FFFFFF",
         borderColor: isDark ? "rgba(255,255,255,0.06)" : "#E6ECF5",
@@ -245,17 +259,21 @@ export default function TransactionDetailsModal() {
       return;
     }
 
-    const mediaLibraryNative = requireOptionalNativeModule("ExpoMediaLibraryNext");
+    const mediaLibraryNative = requireOptionalNativeModule(
+      "ExpoMediaLibraryNext",
+    );
     if (!mediaLibraryNative) {
       throw new Error(
         "Receipt saving needs a fresh native rebuild for the new export modules.",
       );
     }
 
-    const { captureRef: captureReceiptRef } = require("react-native-view-shot") as {
-      captureRef: typeof import("react-native-view-shot").captureRef;
-    };
-    const MediaLibrary = require("expo-media-library") as typeof import("expo-media-library");
+    const { captureRef: captureReceiptRef } =
+      require("react-native-view-shot") as {
+        captureRef: typeof import("react-native-view-shot").captureRef;
+      };
+    const MediaLibrary =
+      require("expo-media-library") as typeof import("expo-media-library");
 
     const permission = await MediaLibrary.requestPermissionsAsync();
     if (!permission.granted) {
@@ -309,30 +327,25 @@ export default function TransactionDetailsModal() {
             <View style={[styles.handle, ui.handle]} />
 
             <View style={styles.headerRow}>
-              <View
-                style={[
-                  styles.iconWrap,
-                  {
-                    backgroundColor: transaction
-                      ? hasMerchantLogo
-                        ? "transparent"
-                        : isDark
-                          ? transaction.iconBackgroundDark
-                          : transaction.iconBackgroundLight
-                      : getMutedSurface(isDark),
-                  },
-                ]}
-              >
-                <MerchantLogo
-                  merchant={transaction?.merchant}
-                  size={48}
-                  fallbackIcon={{
-                    library: transaction?.iconLibrary,
-                    name: transaction?.iconName ?? "circle",
-                    color: transaction?.iconColor ?? "#94A3B8",
-                  }}
-                />
-              </View>
+              <MerchantLogo
+                merchant={transaction?.merchant}
+                size={48}
+                style={styles.iconWrap}
+                backgroundColor={
+                  transaction
+                    ? hasMerchantLogo
+                      ? "transparent"
+                      : isDark
+                        ? transaction.iconBackgroundDark
+                        : transaction.iconBackgroundLight
+                    : getMutedSurface(isDark)
+                }
+                fallbackIcon={{
+                  library: transaction?.iconLibrary,
+                  name: transaction?.iconName ?? "circle",
+                  color: transaction?.iconColor ?? "#94A3B8",
+                }}
+              />
               <View style={styles.headerText}>
                 <Text style={[styles.title, ui.title]}>
                   {transaction?.title ?? "Transaction"}
@@ -366,13 +379,17 @@ export default function TransactionDetailsModal() {
 
             <View style={styles.detailList}>
               <View style={[styles.detailCard, ui.detailCard]}>
-                <Text style={[styles.detailLabel, ui.detailLabel]}>Merchant</Text>
+                <Text style={[styles.detailLabel, ui.detailLabel]}>
+                  Merchant
+                </Text>
                 <Text style={[styles.detailValue, ui.detailValue]}>
                   {transaction?.merchant ?? "Unknown merchant"}
                 </Text>
               </View>
               <View style={[styles.detailCard, ui.detailCard]}>
-                <Text style={[styles.detailLabel, ui.detailLabel]}>Category</Text>
+                <Text style={[styles.detailLabel, ui.detailLabel]}>
+                  Category
+                </Text>
                 <Text style={[styles.detailValue, ui.detailValue]}>
                   {transaction?.category ?? "Uncategorized"}
                 </Text>
@@ -445,9 +462,7 @@ export default function TransactionDetailsModal() {
                   }
                 >
                   <Feather name="edit-2" size={16} color={ui.editText.color} />
-                  <Text style={[styles.editText, ui.editText]}>
-                    Edit
-                  </Text>
+                  <Text style={[styles.editText, ui.editText]}>Edit</Text>
                 </Pressable>
                 <Pressable
                   disabled={!transaction}
@@ -458,7 +473,11 @@ export default function TransactionDetailsModal() {
                   ]}
                   onPress={() => setShowDeleteConfirm(true)}
                 >
-                  <Feather name="trash-2" size={18} color={ui.deleteIcon.color} />
+                  <Feather
+                    name="trash-2"
+                    size={18}
+                    color={ui.deleteIcon.color}
+                  />
                 </Pressable>
               </View>
             </View>
@@ -475,9 +494,13 @@ export default function TransactionDetailsModal() {
       >
         <View style={styles.previewOverlay}>
           <View style={styles.previewBackdrop} />
-          <View style={[styles.previewScreen, ui.previewShell, shadows.floating]}>
+          <View
+            style={[styles.previewScreen, ui.previewShell, shadows.floating]}
+          >
             <View style={styles.previewHeaderRow}>
-              <Text style={[styles.previewTitle, ui.previewTitle]}>Receipt Preview</Text>
+              <Text style={[styles.previewTitle, ui.previewTitle]}>
+                Receipt Preview
+              </Text>
               <Pressable
                 style={[styles.previewCloseButton, ui.previewCloseButton]}
                 onPress={() => setShowReceiptPreview(false)}
@@ -485,13 +508,6 @@ export default function TransactionDetailsModal() {
                 <Feather name="x" size={22} color={ui.previewCloseIcon.color} />
               </Pressable>
             </View>
-
-            <Text style={[styles.previewSubtitleText, ui.previewHint]}>
-              This is how your receipt will look.
-            </Text>
-            <Text style={[styles.previewSubtitleText, ui.previewHint, styles.previewSubtitleTight]}>
-              Tap download to save it as an image.
-            </Text>
 
             <ScrollView
               style={styles.previewScroll}
@@ -544,64 +560,120 @@ export default function TransactionDetailsModal() {
                     )}
                   </View>
 
-                  <Text style={[styles.receiptBrandTitle, ui.receiptBrandTitle]}>
+                  <Text
+                    style={[styles.receiptBrandTitle, ui.receiptBrandTitle]}
+                  >
                     {receiptBrandTitle}
                   </Text>
                   <Text style={[styles.receiptCaption, ui.receiptCaption]}>
                     Transaction Receipt
                   </Text>
 
-                  <View style={[styles.receiptDashedDivider, ui.receiptDashedDivider]} />
+                  <View
+                    style={[
+                      styles.receiptDashedDivider,
+                      ui.receiptDashedDivider,
+                    ]}
+                  />
 
                   <View style={styles.receiptTopRow}>
-                    <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>AMOUNT</Text>
-                    <Text style={[styles.receiptAmountValue, ui.receiptAmountValue]}>
+                    <Text
+                      style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                    >
+                      AMOUNT
+                    </Text>
+                    <Text
+                      style={[styles.receiptAmountValue, ui.receiptAmountValue]}
+                    >
                       {transaction?.signedAmountLabel ?? "-₱0"}
                     </Text>
                   </View>
 
                   <View style={styles.receiptInfoRow}>
-                    <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>CATEGORY</Text>
-                    <Text style={[styles.receiptInfoValue, ui.receiptInfoValue]}>
+                    <Text
+                      style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                    >
+                      CATEGORY
+                    </Text>
+                    <Text
+                      style={[styles.receiptInfoValue, ui.receiptInfoValue]}
+                    >
                       {transaction?.category ?? "Uncategorized"}
                     </Text>
                   </View>
 
                   <View style={styles.receiptInfoRow}>
-                    <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>TYPE</Text>
+                    <Text
+                      style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                    >
+                      TYPE
+                    </Text>
                     <View style={[styles.receiptTypePill, ui.receiptTypePill]}>
-                      <Text style={[styles.receiptTypePillText, ui.receiptTypePillText]}>
+                      <Text
+                        style={[
+                          styles.receiptTypePillText,
+                          ui.receiptTypePillText,
+                        ]}
+                      >
                         {receiptTypeLabel}
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.receiptInfoRow}>
-                    <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>DATE</Text>
-                    <Text style={[styles.receiptInfoValue, ui.receiptInfoValue]}>
+                    <Text
+                      style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                    >
+                      DATE
+                    </Text>
+                    <Text
+                      style={[styles.receiptInfoValue, ui.receiptInfoValue]}
+                    >
                       {receiptDateLabel}
                     </Text>
                   </View>
 
-                  <View style={[styles.receiptSolidDivider, ui.receiptSolidDivider]} />
+                  <View
+                    style={[styles.receiptSolidDivider, ui.receiptSolidDivider]}
+                  />
 
                   <View style={styles.receiptMetaGrid}>
                     <View style={styles.receiptMetaCell}>
-                      <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>
+                      <Text
+                        style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                      >
                         RECEIPT ID
                       </Text>
-                      <Text style={[styles.receiptMetaValueCompact, ui.receiptInfoValue]}>
+                      <Text
+                        style={[
+                          styles.receiptMetaValueCompact,
+                          ui.receiptInfoValue,
+                        ]}
+                      >
                         {receiptId}
                       </Text>
                     </View>
                     <View style={styles.receiptMetaCell}>
-                      <Text style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}>
+                      <Text
+                        style={[styles.receiptMetaLabel, ui.receiptMetaLabel]}
+                      >
                         GENERATED
                       </Text>
-                      <Text style={[styles.receiptMetaValueCompact, ui.receiptInfoValue]}>
+                      <Text
+                        style={[
+                          styles.receiptMetaValueCompact,
+                          ui.receiptInfoValue,
+                        ]}
+                      >
                         {generatedLabel}
                       </Text>
                     </View>
+                  </View>
+
+                  <View style={styles.receiptFooter}>
+                    <Text style={[styles.receiptFooterText, ui.receiptCaption]}>
+                      Recorded securely in Eyrie
+                    </Text>
                   </View>
 
                   <View style={styles.ticketEdgeRow}>
@@ -616,19 +688,27 @@ export default function TransactionDetailsModal() {
               </View>
             </ScrollView>
 
-            <LoadingActionButton
-              label="Download Receipt"
-              loadingLabel="Saving..."
-              loading={isSavingReceipt}
-              haptic="default"
-              style={styles.downloadButton}
-              textStyle={styles.downloadButtonText}
-              spinnerColor="#FFFFFF"
-              leftAdornment={
-                <Feather name="download" size={18} color="#FFFFFF" />
-              }
-              onPress={handleDownloadReceipt}
-            />
+            <View style={[styles.previewActionArea, ui.previewActionArea]}>
+              <Text style={[styles.previewActionTitle, ui.previewTitle]}>
+                Download Receipt
+              </Text>
+              <Text style={[styles.previewActionSubtitle, ui.previewHint]}>
+                Save this receipt as an image
+              </Text>
+              <LoadingActionButton
+                label="Download Receipt"
+                loadingLabel="Saving..."
+                loading={isSavingReceipt}
+                haptic="default"
+                style={styles.downloadButton}
+                textStyle={styles.downloadButtonText}
+                spinnerColor="#FFFFFF"
+                leftAdornment={
+                  <Feather name="download" size={18} color="#FFFFFF" />
+                }
+                onPress={handleDownloadReceipt}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -851,7 +931,7 @@ const styles = StyleSheet.create({
   },
   previewScrollContent: {
     paddingTop: 10,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   receiptCaptureWrap: {
     alignItems: "center",
@@ -861,12 +941,12 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     paddingTop: 16,
     paddingHorizontal: 14,
-    paddingBottom: 26,
+    paddingBottom: 14,
     overflow: "hidden",
     borderWidth: 1,
     shadowOpacity: 0.22,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 14 },
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 18 },
     elevation: 12,
   },
   receiptLogoWrap: {
@@ -974,19 +1054,48 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: fontWeights.semibold,
   },
+  receiptFooter: {
+    marginTop: 14,
+    alignItems: "center",
+  },
+  receiptFooterText: {
+    textAlign: "center",
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+  },
   ticketEdgeRow: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -10,
+    marginTop: 12,
+    marginHorizontal: -14,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 8,
   },
   ticketNotch: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 19,
+    height: 19,
+    borderRadius: 9.5,
+  },
+  previewActionArea: {
+    width: "100%",
+    marginTop: 18,
+    paddingTop: 16,
+    paddingBottom: 2,
+    borderTopWidth: 1,
+  },
+  previewActionTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: fontWeights.semibold,
+    textAlign: "center",
+  },
+  previewActionSubtitle: {
+    marginTop: 4,
+    textAlign: "center",
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
   },
   downloadButton: {
     height: 50,
@@ -994,7 +1103,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1681DD",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 14,
     marginBottom: 14,
   },
   downloadButtonText: {
