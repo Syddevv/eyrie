@@ -119,6 +119,51 @@ function AppShell() {
         }}
       />
       <Stack.Screen
+        name="add-paylater-modal"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
+        name="paylater-details-modal"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
+        name="paylater-repayment-modal"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
+        name="paylater-info-modal"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
+        name="edit-paylater-modal"
+        options={{
+          headerShown: false,
+          presentation: "transparentModal",
+          animation: "fade",
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
+      <Stack.Screen
         name="personal-details-modal"
         options={{
           headerShown: false,

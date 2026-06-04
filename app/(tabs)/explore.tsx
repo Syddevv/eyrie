@@ -22,6 +22,11 @@ import {
 } from "react-native-safe-area-context";
 
 import { CategoryAvatar } from "@/components/category-avatar";
+import {
+  PAYLATERS_ITEMS,
+  PAYLATERS_NEXT_DUE,
+  PAYLATERS_SUMMARY,
+} from "@/constants/paylater-records";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
@@ -47,6 +52,55 @@ import { showSuccessToast } from "@/store/useToastStore";
 import { useBottomNavStore } from "@/store/useBottomNavStore";
 
 type BudgetCard = ReturnType<typeof useBudgets>["budgets"][number];
+
+const PAYLATERS_EMPTY_BRANDS = [
+  {
+    id: "shopee",
+    label: "Shopee",
+    icon: require("../../assets/merchant-logos/Shopee.webp"),
+  },
+  {
+    id: "tiktok",
+    label: "TikTok Shop",
+    icon: require("../../assets/merchant-logos/Tiktok.jpg"),
+  },
+  {
+    id: "lazada",
+    label: "Lazada",
+    icon: require("../../assets/merchant-logos/Lazada.png"),
+  },
+] as const;
+
+const PAYLATERS_EMPTY_FEATURES = [
+  {
+    id: "track-payments",
+    title: "Track Payments",
+    subtitle: "Record each installment",
+    icon: "check-circle" as const,
+    iconColor: "#22C55E",
+  },
+  {
+    id: "smart-insights",
+    title: "Smart Insights",
+    subtitle: "See payment progress",
+    icon: "zap" as const,
+    iconColor: "#3B82F6",
+  },
+  {
+    id: "due-reminders",
+    title: "Due Reminders",
+    subtitle: "Never miss deadlines",
+    icon: "clock" as const,
+    iconColor: "#A855F7",
+  },
+  {
+    id: "full-control",
+    title: "Full Control",
+    subtitle: "Edit & manage easily",
+    icon: "sliders" as const,
+    iconColor: "#F59E0B",
+  },
+] as const;
 
 function sanitizeBudgetInput(value: string) {
   return value.replace(/[^0-9.]/g, "").replace(/^(\d*\.?\d{0,2}).*$/, "$1");
@@ -104,14 +158,18 @@ export default function BudgetScreen() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const [selectedCycle, setSelectedCycle] = useState<BudgetCycle>("monthly");
-  const { budgets, summary, isLoading, refresh, nextResetDate } =
-    useBudgets(selectedCycle, undefined, { syncCycle: true });
+  const { budgets, summary, isLoading, refresh, nextResetDate } = useBudgets(
+    selectedCycle,
+    undefined,
+    { syncCycle: true },
+  );
   const [editingBudget, setEditingBudget] = useState<BudgetCard | null>(null);
   const [draftBudgetValue, setDraftBudgetValue] = useState("");
   const [budgetPendingDelete, setBudgetPendingDelete] =
     useState<BudgetCard | null>(null);
   const [isDeletingBudget, setIsDeletingBudget] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const activePaylaterItems = PAYLATERS_ITEMS;
 
   const pageStyles = useMemo(
     () => ({
@@ -247,6 +305,31 @@ export default function BudgetScreen() {
         borderColor:
           colorScheme === "light"
             ? withOpacity(colors.border, 0.96)
+            : "rgba(255,255,255,0.04)",
+      },
+      paylatersCard: {
+        backgroundColor: colorScheme === "light" ? colors.card : "#101722",
+        borderColor:
+          colorScheme === "light"
+            ? withOpacity(colors.border, 0.9)
+            : "rgba(255,255,255,0.05)",
+      },
+      paylatersMutedText: {
+        color: colorScheme === "light" ? "#667085" : "#98A2B3",
+      },
+      paylatersTrack: {
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(15, 23, 42, 0.08)"
+            : "rgba(255,255,255,0.08)",
+      },
+      paylatersPrimaryButton: {
+        backgroundColor: colorScheme === "light" ? "#168CF3" : "#1697FF",
+      },
+      paylatersSecondaryButton: {
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(22, 140, 243, 0.08)"
             : "rgba(255,255,255,0.04)",
       },
       totalOverText: { color: colorScheme === "light" ? "#FFE2E0" : "#FFE2E0" },
@@ -876,6 +959,399 @@ export default function BudgetScreen() {
               </Pressable>
             </View>
           )}
+
+          <View style={styles.paylatersSection}>
+            <View style={styles.paylatersHeader}>
+              <Text style={[styles.paylatersTitle, pageStyles.title]}>
+                Paylaters
+              </Text>
+              <Pressable
+                style={styles.paylatersAddButton}
+                onPress={() => router.push("/add-paylater-modal")}
+              >
+                <Feather name="plus" size={18} color="#168CF3" />
+              </Pressable>
+            </View>
+
+            {activePaylaterItems.length === 0 ? (
+              <View
+                style={[
+                  styles.paylatersEmptyCard,
+                  pageStyles.paylatersCard,
+                  shadows.soft,
+                ]}
+              >
+                <View style={styles.paylatersEmptyHero}>
+                  <View style={styles.paylatersEmptyIconBubble}>
+                    <Feather name="shopping-cart" size={20} color="#FFFFFF" />
+                  </View>
+                  <Text style={[styles.paylatersEmptyTitle, pageStyles.title]}>
+                    Track Your Paylater Purchases
+                  </Text>
+                  <Text
+                    style={[
+                      styles.paylatersEmptySubtitle,
+                      pageStyles.paylatersMutedText,
+                    ]}
+                  >
+                    Manage all your Shopee, TikTok, and Lazada installments in
+                    one place
+                  </Text>
+                </View>
+
+                <View style={styles.paylatersEmptyBrandRow}>
+                  {PAYLATERS_EMPTY_BRANDS.map((brand) => (
+                    <View
+                      key={brand.id}
+                      style={[
+                        styles.paylatersEmptyBrandPill,
+                        pageStyles.paylatersCard,
+                      ]}
+                    >
+                      <Image
+                        source={brand.icon}
+                        style={styles.paylatersBrandIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.paylatersBrandPillText,
+                          pageStyles.title,
+                        ]}
+                      >
+                        {brand.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.paylatersEmptyFeatureGrid}>
+                  {PAYLATERS_EMPTY_FEATURES.map((feature) => (
+                    <View
+                      key={feature.id}
+                      style={[
+                        styles.paylatersEmptyFeatureCard,
+                        pageStyles.emptyCard,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.paylatersFeatureIconBubble,
+                          {
+                            backgroundColor: withOpacity(
+                              feature.iconColor,
+                              0.14,
+                            ),
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name={feature.icon}
+                          size={14}
+                          color={feature.iconColor}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.paylatersEmptyFeatureTitle,
+                          pageStyles.title,
+                        ]}
+                      >
+                        {feature.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.paylatersEmptyFeatureSubtitle,
+                          pageStyles.paylatersMutedText,
+                        ]}
+                      >
+                        {feature.subtitle}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable
+                  style={[
+                    styles.paylatersEmptyCta,
+                    pageStyles.paylatersPrimaryButton,
+                  ]}
+                  onPress={() => router.push("/add-paylater-modal")}
+                >
+                  <Feather name="plus" size={18} color="#FFFFFF" />
+                  <Text style={styles.paylatersEmptyCtaText}>
+                    Add Your First Paylater
+                  </Text>
+                </Pressable>
+
+                <Text
+                  style={[
+                    styles.paylatersEmptyFooter,
+                    pageStyles.paylatersMutedText,
+                  ]}
+                >
+                  Keep all your shopping installments organized and never miss a
+                  payment deadline again
+                </Text>
+              </View>
+            ) : (
+              <>
+                <View
+                  style={[
+                    styles.paylatersDueCard,
+                    pageStyles.paylatersCard,
+                    shadows.soft,
+                  ]}
+                >
+                  <Text style={styles.paylatersEyebrow}>NEXT PAYMENT DUE</Text>
+                  <Text style={[styles.paylatersDueTitle, pageStyles.title]}>
+                    {PAYLATERS_NEXT_DUE.title}
+                  </Text>
+
+                  <View style={styles.paylatersDueRow}>
+                    <View>
+                      <Text
+                        style={[
+                          styles.paylatersMetaLabel,
+                          pageStyles.paylatersMutedText,
+                        ]}
+                      >
+                        Due Amount
+                      </Text>
+                      <Text style={styles.paylatersDueAmount}>
+                        {PAYLATERS_NEXT_DUE.amount}
+                      </Text>
+                    </View>
+
+                    <View style={styles.paylatersDueRight}>
+                      <Text
+                        style={[
+                          styles.paylatersMetaLabel,
+                          pageStyles.paylatersMutedText,
+                        ]}
+                      >
+                        Due in
+                      </Text>
+                      <Text style={styles.paylatersDueDays}>
+                        {PAYLATERS_NEXT_DUE.dueInLabel}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <LinearGradient
+                  colors={["#8A2BE2", "#9C27F4", "#4F46E5"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.paylatersSummaryCard}
+                >
+                  <View style={styles.paylatersSummaryTopRow}>
+                    <View>
+                      <Text style={styles.paylatersSummaryLabel}>
+                        Total Outstanding
+                      </Text>
+                      <Text style={styles.paylatersSummaryAmount}>
+                        {PAYLATERS_SUMMARY.totalOutstanding}
+                      </Text>
+                    </View>
+
+                    <View style={styles.paylatersSummaryRight}>
+                      <Text style={styles.paylatersSummaryLabel}>
+                        {PAYLATERS_SUMMARY.activeCountLabel}
+                      </Text>
+                      <Text style={styles.paylatersSummaryInstallment}>
+                        {PAYLATERS_SUMMARY.nextInstallment}
+                      </Text>
+                      <Text style={styles.paylatersSummarySubtext}>
+                        Next Installment
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paylatersSummaryTrack}>
+                    <View
+                      style={[
+                        styles.paylatersSummaryFill,
+                        { width: `${PAYLATERS_SUMMARY.progressRatio * 100}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.paylatersSummaryProgressLabel}>
+                    {PAYLATERS_SUMMARY.progressLabel}
+                  </Text>
+                </LinearGradient>
+
+                <Text
+                  style={[styles.paylatersActiveLabel, pageStyles.mutedText]}
+                >
+                  ACTIVE PAYLATERS
+                </Text>
+
+                <View style={styles.paylatersList}>
+                  {activePaylaterItems.map((item) => {
+                    const isUpcoming = item.statusTone === "upcoming";
+
+                    return (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.paylatersItemCard,
+                          pageStyles.paylatersCard,
+                          shadows.soft,
+                        ]}
+                      >
+                        <View style={styles.paylatersItemTopRow}>
+                          <View style={styles.paylatersItemIdentity}>
+                            <Text
+                              style={[
+                                styles.paylatersItemTitle,
+                                pageStyles.title,
+                              ]}
+                            >
+                              {item.title}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.paylatersItemProvider,
+                                pageStyles.paylatersMutedText,
+                              ]}
+                            >
+                              {item.provider}
+                            </Text>
+                          </View>
+
+                          <View style={styles.paylatersStatusRow}>
+                            <Feather
+                              name={
+                                isUpcoming ? "check-circle" : "alert-circle"
+                              }
+                              size={15}
+                              color={isUpcoming ? "#22C55E" : "#EF4444"}
+                            />
+                            <Text
+                              style={[
+                                styles.paylatersStatusText,
+                                {
+                                  color: isUpcoming ? "#667085" : "#B42318",
+                                },
+                              ]}
+                            >
+                              {item.status}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          style={[
+                            styles.paylatersItemTrack,
+                            pageStyles.paylatersTrack,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.paylatersItemFill,
+                              { width: `${item.progressRatio * 100}%` },
+                            ]}
+                          />
+                        </View>
+
+                        <Text
+                          style={[
+                            styles.paylatersProgressText,
+                            pageStyles.paylatersMutedText,
+                          ]}
+                        >
+                          {item.progressLabel}
+                        </Text>
+
+                        <View style={styles.paylatersAmountsRow}>
+                          <View>
+                            <Text
+                              style={[
+                                styles.paylatersMetaLabel,
+                                pageStyles.paylatersMutedText,
+                              ]}
+                            >
+                              Balance
+                            </Text>
+                            <Text style={styles.paylatersBalanceValue}>
+                              {item.balance}
+                            </Text>
+                          </View>
+
+                          <View style={styles.paylatersAmountRight}>
+                            <Text
+                              style={[
+                                styles.paylatersMetaLabel,
+                                pageStyles.paylatersMutedText,
+                              ]}
+                            >
+                              Installment
+                            </Text>
+                            <Text
+                              style={[
+                                styles.paylatersInstallmentValue,
+                                pageStyles.title,
+                              ]}
+                            >
+                              {item.installment}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.paylatersItemDivider} />
+
+                        <View style={styles.paylatersActionsRow}>
+                          <Pressable
+                            style={[
+                              styles.paylatersPrimaryButton,
+                              pageStyles.paylatersPrimaryButton,
+                            ]}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/paylater-repayment-modal",
+                                params: {
+                                  paylaterName: item.title,
+                                  currentBalance: item.balance,
+                                },
+                              })
+                            }
+                          >
+                            <Text style={styles.paylatersPrimaryButtonText}>
+                              Record Payment
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            style={[
+                              styles.paylatersSecondaryButton,
+                              pageStyles.paylatersSecondaryButton,
+                            ]}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/paylater-info-modal",
+                                params: {
+                                  paylaterId: item.id,
+                                },
+                              })
+                            }
+                          >
+                            <Text
+                              style={[
+                                styles.paylatersSecondaryButtonText,
+                                pageStyles.title,
+                              ]}
+                            >
+                              Details
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </View>
         </ScrollView>
       </View>
 
@@ -1481,6 +1957,404 @@ function createStyles() {
       lineHeight: 18,
       fontWeight: fontWeights.bold,
       color: "#FFFFFF",
+    },
+    paylatersEmptyCard: {
+      marginTop: 14,
+      borderRadius: 28,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingTop: 18,
+      paddingBottom: 18,
+    },
+    paylatersEmptyHero: {
+      alignItems: "center",
+    },
+    paylatersEmptyIconBubble: {
+      width: 54,
+      height: 54,
+      borderRadius: radius.full,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+      backgroundColor: "#2563EB",
+      shadowColor: "#1D4ED8",
+      shadowOpacity: 0.2,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
+    },
+    paylatersEmptyTitle: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 17,
+      lineHeight: 24,
+      fontWeight: fontWeights.bold,
+      textAlign: "center",
+    },
+    paylatersEmptySubtitle: {
+      marginTop: 8,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: "center",
+    },
+    paylatersEmptyBrandRow: {
+      marginTop: 14,
+      flexDirection: "row",
+      justifyContent: "center",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    paylatersEmptyBrandPill: {
+      minHeight: 38,
+      paddingHorizontal: 14,
+      borderRadius: radius.full,
+      borderWidth: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: "rgba(255,255,255,0.9)",
+      borderColor: "rgba(148,163,184,0.22)",
+    },
+    paylatersBrandIcon: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+    },
+    paylatersBrandPillText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersEmptyFeatureGrid: {
+      marginTop: 18,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    paylatersEmptyFeatureCard: {
+      width: "48%",
+      minHeight: 88,
+      borderRadius: 18,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
+    paylatersFeatureIconBubble: {
+      width: 26,
+      height: 26,
+      borderRadius: radius.full,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    paylatersEmptyFeatureTitle: {
+      marginTop: 10,
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 17,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersEmptyFeatureSubtitle: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    paylatersEmptyCta: {
+      marginTop: 16,
+      height: 44,
+      borderRadius: radius.full,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    paylatersEmptyCtaText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 15,
+      lineHeight: 18,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersEmptyFooter: {
+      marginTop: 14,
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: "center",
+    },
+    paylatersSection: {
+      marginTop: 22,
+    },
+    paylatersHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    paylatersTitle: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersAddButton: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.full,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(22, 140, 243, 0.12)",
+    },
+    paylatersDueCard: {
+      marginTop: 14,
+      borderRadius: 24,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    paylatersEyebrow: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
+      color: "#0F3DA9",
+    },
+    paylatersDueTitle: {
+      marginTop: 8,
+      fontFamily: fontFamilies.sans,
+      fontSize: 17,
+      lineHeight: 22,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersDueRow: {
+      marginTop: 8,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+    },
+    paylatersDueRight: {
+      alignItems: "flex-end",
+    },
+    paylatersMetaLabel: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    paylatersDueAmount: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: fontWeights.bold,
+      color: "#168CF3",
+    },
+    paylatersDueDays: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 18,
+      lineHeight: 24,
+      fontWeight: fontWeights.bold,
+      color: "#1E40AF",
+    },
+    paylatersSummaryCard: {
+      marginTop: 12,
+      borderRadius: 24,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 14,
+      overflow: "hidden",
+    },
+    paylatersSummaryTopRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    paylatersSummaryRight: {
+      alignItems: "flex-end",
+    },
+    paylatersSummaryLabel: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      color: "rgba(255,255,255,0.86)",
+    },
+    paylatersSummaryAmount: {
+      marginTop: 4,
+      fontFamily: fontFamilies.sans,
+      fontSize: 22,
+      lineHeight: 28,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersSummaryInstallment: {
+      marginTop: 4,
+      fontFamily: fontFamilies.sans,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersSummarySubtext: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
+      color: "rgba(255,255,255,0.82)",
+    },
+    paylatersSummaryTrack: {
+      marginTop: 14,
+      height: 6,
+      borderRadius: radius.full,
+      overflow: "hidden",
+      backgroundColor: "rgba(255,255,255,0.22)",
+    },
+    paylatersSummaryFill: {
+      height: "100%",
+      borderRadius: radius.full,
+      backgroundColor: "rgba(255,255,255,0.72)",
+    },
+    paylatersSummaryProgressLabel: {
+      marginTop: 10,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
+      color: "#FFFFFF",
+    },
+    paylatersActiveLabel: {
+      marginTop: 10,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersList: {
+      marginTop: 10,
+      gap: 12,
+    },
+    paylatersItemCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 12,
+    },
+    paylatersItemTopRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    paylatersItemIdentity: {
+      flex: 1,
+    },
+    paylatersItemTitle: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 17,
+      lineHeight: 22,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersItemProvider: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+    },
+    paylatersStatusRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    paylatersStatusText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
+    },
+    paylatersItemTrack: {
+      marginTop: 10,
+      height: 5,
+      borderRadius: radius.full,
+      overflow: "hidden",
+    },
+    paylatersItemFill: {
+      height: "100%",
+      borderRadius: radius.full,
+      backgroundColor: "#7C4DFF",
+    },
+    paylatersProgressText: {
+      marginTop: 8,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+    },
+    paylatersAmountsRow: {
+      marginTop: 12,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    paylatersAmountRight: {
+      alignItems: "flex-start",
+      minWidth: 116,
+    },
+    paylatersBalanceValue: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: fontWeights.bold,
+      color: "#168CF3",
+    },
+    paylatersInstallmentValue: {
+      marginTop: 2,
+      fontFamily: fontFamilies.sans,
+      fontSize: 16,
+      lineHeight: 20,
+      fontWeight: fontWeights.bold,
+    },
+    paylatersItemDivider: {
+      marginTop: 14,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: "rgba(148, 163, 184, 0.22)",
+    },
+    paylatersActionsRow: {
+      marginTop: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    paylatersPrimaryButton: {
+      flex: 1,
+      height: 40,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    paylatersPrimaryButtonText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersSecondaryButton: {
+      width: 96,
+      height: 40,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    paylatersSecondaryButtonText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
     },
     modalWrap: {
       ...StyleSheet.absoluteFillObject,

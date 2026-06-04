@@ -1,0 +1,329 @@
+import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+import { themeColors } from "@/constants/colors";
+import { PAYLATERS_ITEMS } from "@/constants/paylater-records";
+import { radius, shadows } from "@/constants/theme";
+import { fontFamilies, fontWeights } from "@/constants/typography";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+
+function getParamValue(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+export default function EditPaylaterModal() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+    paylaterId?: string | string[];
+    paylaterName?: string | string[];
+    currentBalance?: string | string[];
+    installmentAmount?: string | string[];
+    dueDate?: string | string[];
+  }>();
+  const colorScheme = useColorScheme() ?? "light";
+  const colors = themeColors[colorScheme];
+  const isDark = colorScheme === "dark";
+
+  const paylater = useMemo(() => {
+    const paylaterId = getParamValue(params.paylaterId);
+    return PAYLATERS_ITEMS.find((item) => item.id === paylaterId) ?? PAYLATERS_ITEMS[0];
+  }, [params.paylaterId]);
+
+  const [remainingBalance, setRemainingBalance] = useState(() =>
+    digitsOnly(getParamValue(params.currentBalance) || paylater.balance),
+  );
+  const [installmentAmount, setInstallmentAmount] = useState(() =>
+    digitsOnly(getParamValue(params.installmentAmount) || paylater.installment),
+  );
+  const [dueDate, setDueDate] = useState(() =>
+    digitsOnly(getParamValue(params.dueDate) || paylater.dueDateLabel),
+  );
+
+  const ui = useMemo(
+    () => ({
+      overlay: {
+        backgroundColor: isDark
+          ? "rgba(2, 6, 23, 0.56)"
+          : "rgba(15, 23, 42, 0.26)",
+      },
+      sheet: {
+        backgroundColor: colors.card,
+        borderColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(15, 23, 42, 0.06)",
+      },
+      handle: {
+        backgroundColor: isDark ? "#64748B" : "#CBD5E1",
+      },
+      title: {
+        color: colors.foreground,
+      },
+      closeButton: {
+        backgroundColor: isDark
+          ? "rgba(255,255,255,0.06)"
+          : "rgba(241, 245, 249, 0.98)",
+      },
+      closeIcon: {
+        color: isDark ? "#D4DCE6" : "#202733",
+      },
+      label: {
+        color: colors.foreground,
+      },
+      fieldSurface: {
+        backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "#EEF2F7",
+        borderColor: isDark ? "rgba(255,255,255,0.04)" : "#E6EBF2",
+      },
+      fieldText: {
+        color: colors.foreground,
+      },
+      placeholder: {
+        color: isDark ? "#8F9CAF" : "#8A94A6",
+      },
+      peso: {
+        color: isDark ? "#A9B6C8" : "#6B7280",
+      },
+      cancelButton: {
+        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7",
+      },
+      cancelText: {
+        color: colors.foreground,
+      },
+      saveButton: {
+        backgroundColor: "#168CF3",
+      },
+      saveButtonText: {
+        color: "#FFFFFF",
+      },
+      helperText: {
+        color: isDark ? "#A9B6C8" : "#6B7280",
+      },
+    }),
+    [colors, isDark],
+  );
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+      style={styles.keyboardWrap}
+    >
+      <View style={[styles.overlay, ui.overlay]}>
+        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+
+        <View style={[styles.sheet, ui.sheet, shadows.floating]}>
+          <View style={[styles.handle, ui.handle]} />
+
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, ui.title]}>{getParamValue(params.paylaterName) || paylater.title}</Text>
+            <Pressable
+              style={[styles.closeButton, ui.closeButton]}
+              onPress={() => router.back()}
+            >
+              <Feather name="x" size={20} color={ui.closeIcon.color} />
+            </Pressable>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Remaining Balance</Text>
+              <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
+                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <TextInput
+                  value={remainingBalance}
+                  onChangeText={(value) => setRemainingBalance(digitsOnly(value))}
+                  placeholder="0"
+                  placeholderTextColor={ui.placeholder.color}
+                  keyboardType="number-pad"
+                  selectionColor="#6DB2EE"
+                  style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Installment Amount</Text>
+              <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
+                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <TextInput
+                  value={installmentAmount}
+                  onChangeText={(value) => setInstallmentAmount(digitsOnly(value))}
+                  placeholder="0"
+                  placeholderTextColor={ui.placeholder.color}
+                  keyboardType="number-pad"
+                  selectionColor="#6DB2EE"
+                  style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Due Date (Day of Month)</Text>
+              <View style={[styles.fieldSurface, ui.fieldSurface]}>
+                <TextInput
+                  value={dueDate}
+                  onChangeText={(value) => setDueDate(digitsOnly(value))}
+                  placeholder="1"
+                  placeholderTextColor={ui.placeholder.color}
+                  keyboardType="number-pad"
+                  selectionColor="#6DB2EE"
+                  style={[styles.fieldInput, ui.fieldText]}
+                />
+              </View>
+            </View>
+
+            <Text style={[styles.helperText, ui.helperText]}>
+              Changes update the paylater record after saving.
+            </Text>
+
+            <View style={styles.actionRow}>
+              <Pressable style={[styles.actionButton, ui.cancelButton]} onPress={() => router.back()}>
+                <Text style={[styles.actionText, ui.cancelText]}>Cancel</Text>
+              </Pressable>
+
+              <Pressable style={[styles.actionButton, ui.saveButton]} onPress={() => router.back()}>
+                <Feather name="check" size={16} color={ui.saveButtonText.color} />
+                <Text style={[styles.actionText, ui.saveButtonText]}>Save Changes</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  keyboardWrap: {
+    flex: 1,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 28,
+    maxHeight: "88%",
+  },
+  handle: {
+    alignSelf: "center",
+    width: 50,
+    height: 6,
+    borderRadius: radius.full,
+    marginBottom: 18,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  title: {
+    flex: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 21,
+    lineHeight: 28,
+    fontWeight: fontWeights.bold,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  form: {
+    paddingTop: 20,
+  },
+  section: {
+    marginBottom: 18,
+  },
+  label: {
+    marginBottom: 10,
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+  },
+  fieldSurface: {
+    minHeight: 48,
+    borderRadius: 19,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    justifyContent: "center",
+  },
+  fieldInput: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: fontWeights.regular,
+    paddingVertical: 0,
+  },
+  flexFieldInput: {
+    flex: 1,
+  },
+  currencyField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "flex-start",
+  },
+  peso: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: fontWeights.medium,
+  },
+  helperText: {
+    marginTop: 2,
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  actionRow: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    minHeight: 44,
+    flex: 1,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 18,
+  },
+  actionText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: fontWeights.bold,
+  },
+});
