@@ -67,7 +67,7 @@ function formatResetTimeLabel(resetAt: string | null) {
   }
 
   const parts = new Intl.DateTimeFormat(undefined, {
-    month: "short",
+    month: "long",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
@@ -243,9 +243,11 @@ export function AssistantChatPanel({
       ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
       : remainingMessages === 0
         ? resetAt && resetTimeLabel
-          ? `You've reached your AI assistant limit. Limit will reset on ${resetTimeLabel}.`
-          : assistantStatusMessage || "You've reached your AI assistant limit."
+          ? `AI assistant limit reached. Your limit will reset on ${resetTimeLabel}.`
+          : assistantStatusMessage || "AI assistant limit reached."
         : null;
+  const helperStatusText =
+    cooldownText || (!hasReachedLimit ? assistantStatusMessage : null);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -426,7 +428,7 @@ export function AssistantChatPanel({
             <Text style={[styles.helperText, pageStyles.helper]}>
               {usageSummaryText}
             </Text>
-            {cooldownText ? (
+            {helperStatusText ? (
               <Text
                 style={[
                   styles.helperText,
@@ -434,12 +436,14 @@ export function AssistantChatPanel({
                   pageStyles.subtitle,
                 ]}
               >
-                {cooldownText}
+                {helperStatusText}
               </Text>
             ) : null}
-            <Text style={[styles.helperText, pageStyles.helper]}>
-              AI Assistant requires an internet connection.
-            </Text>
+            {isOffline ? (
+              <Text style={[styles.helperText, pageStyles.helper]}>
+                AI Assistant requires an internet connection.
+              </Text>
+            ) : null}
           </View>
 
           <View

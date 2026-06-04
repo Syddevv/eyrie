@@ -88,17 +88,19 @@ export type AssistantRequestInput = {
   };
 };
 
-export type AssistantResponse = {
-  reply: string;
+export type AssistantUsageDetails = {
   remainingMessages?: number;
   dailyLimit?: number;
   cooldownRemaining?: number;
   resetAt?: string | null;
+  messageCount?: number;
+  reservedCount?: number;
+  lastReset?: string | null;
+  lastRequestAt?: string | null;
 };
 
-export type AssistantUsageStatus = {
-  remainingMessages?: number;
-  dailyLimit?: number;
-  cooldownRemaining?: number;
-  resetAt?: string | null;
-};
+export type AssistantResponse = {
+  reply: string;
+} & AssistantUsageDetails;
+
+export type AssistantUsageStatus = AssistantUsageDetails;

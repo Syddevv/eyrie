@@ -16,6 +16,10 @@ export class AssistantFunctionError extends Error {
   dailyLimit?: number;
   cooldownRemaining?: number;
   resetAt?: string | null;
+  messageCount?: number;
+  reservedCount?: number;
+  lastReset?: string | null;
+  lastRequestAt?: string | null;
 
   constructor(
     message: string,
@@ -25,6 +29,10 @@ export class AssistantFunctionError extends Error {
       dailyLimit?: number;
       cooldownRemaining?: number;
       resetAt?: string | null;
+      messageCount?: number;
+      reservedCount?: number;
+      lastReset?: string | null;
+      lastRequestAt?: string | null;
     } = {},
   ) {
     super(message);
@@ -34,6 +42,10 @@ export class AssistantFunctionError extends Error {
     this.dailyLimit = options.dailyLimit;
     this.cooldownRemaining = options.cooldownRemaining;
     this.resetAt = options.resetAt ?? null;
+    this.messageCount = options.messageCount;
+    this.reservedCount = options.reservedCount;
+    this.lastReset = options.lastReset ?? null;
+    this.lastRequestAt = options.lastRequestAt ?? null;
   }
 }
 
@@ -87,6 +99,10 @@ async function readFunctionError(error: unknown) {
     dailyLimit: parseNumber(payload?.dailyLimit),
     cooldownRemaining: parseNumber(payload?.cooldownRemaining),
     resetAt: parseString(payload?.resetAt) ?? null,
+    messageCount: parseNumber(payload?.messageCount),
+    reservedCount: parseNumber(payload?.reservedCount),
+    lastReset: parseString(payload?.lastReset) ?? null,
+    lastRequestAt: parseString(payload?.lastRequestAt) ?? null,
   };
 }
 
@@ -149,6 +165,10 @@ export async function askAssistant(
       dailyLimit: parseNumber(data?.dailyLimit),
       cooldownRemaining: parseNumber(data?.cooldownRemaining),
       resetAt: parseString(data?.resetAt) ?? null,
+      messageCount: parseNumber(data?.messageCount),
+      reservedCount: parseNumber(data?.reservedCount),
+      lastReset: parseString(data?.lastReset) ?? null,
+      lastRequestAt: parseString(data?.lastRequestAt) ?? null,
     };
   } catch (error) {
     if (error instanceof AssistantFunctionError) {
@@ -202,6 +222,10 @@ export async function getAssistantUsageStatus(): Promise<AssistantUsageStatus> {
       dailyLimit: parseNumber(data?.dailyLimit),
       cooldownRemaining: parseNumber(data?.cooldownRemaining),
       resetAt: parseString(data?.resetAt) ?? null,
+      messageCount: parseNumber(data?.messageCount),
+      reservedCount: parseNumber(data?.reservedCount),
+      lastReset: parseString(data?.lastReset) ?? null,
+      lastRequestAt: parseString(data?.lastRequestAt) ?? null,
     };
   } catch (error) {
     if (error instanceof AssistantFunctionError) {

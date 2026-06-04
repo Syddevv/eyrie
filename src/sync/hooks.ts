@@ -44,10 +44,12 @@ export function usePendingSyncCount() {
 
 export function useOfflineState() {
   const isOnline = useSyncStore((state) => state.isOnline);
+  const networkReady = useSyncStore((state) => state.networkReady);
 
   return {
-    isOnline,
-    isOffline: !isOnline,
+    isOnline: networkReady ? isOnline : true,
+    isOffline: networkReady ? !isOnline : false,
+    networkReady,
   } as const;
 }
 

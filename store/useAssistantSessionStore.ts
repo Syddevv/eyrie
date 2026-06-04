@@ -9,7 +9,14 @@ type AssistantUsageSnapshot = {
   dailyLimit: number | null;
   cooldownUntil: number | null;
   resetAt: string | null;
+  messageCount: number | null;
+  reservedCount: number | null;
+  lastReset: string | null;
+  lastRequestAt: string | null;
   statusMessage: string | null;
+  validationError: string | null;
+  lastSyncedAt: number | null;
+  isRefreshing: boolean;
   hasResolved: boolean;
 };
 
@@ -58,7 +65,14 @@ function createEmptyUsageState(): AssistantUsageSnapshot {
     dailyLimit: 20,
     cooldownUntil: null,
     resetAt: null,
+    messageCount: null,
+    reservedCount: null,
+    lastReset: null,
+    lastRequestAt: null,
     statusMessage: null,
+    validationError: null,
+    lastSyncedAt: null,
+    isRefreshing: false,
     hasResolved: false,
   };
 }

@@ -18,7 +18,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CONVERSATION_MESSAGES = 12;
 const FREE_DAILY_MESSAGE_LIMIT = 20;
 const COOLDOWN_SECONDS = 3;
-const AI_USAGE_LIMIT_MESSAGE = "You've reached your AI assistant limit.";
+const AI_USAGE_LIMIT_MESSAGE = "AI assistant limit reached.";
 const AI_COOLDOWN_MESSAGE =
   "You're sending messages too quickly. Please wait a few seconds before trying again.";
 
@@ -151,12 +151,20 @@ function usageWindowExpired(row: AiUsageRow, now = new Date()) {
   return resetAt.getTime() <= now.getTime();
 }
 
+function getUsedDailyMessages(row: AiUsageRow, now = new Date()) {
+  if (usageWindowExpired(row, now)) {
+    return 0;
+  }
+
+  return Math.max(row.message_count + row.reserved_count, 0);
+}
+
 function getRemainingDailyMessages(row: AiUsageRow, now = new Date()) {
   if (usageWindowExpired(row, now)) {
     return row.daily_limit;
   }
 
-  return Math.max(row.daily_limit - row.message_count, 0);
+  return Math.max(row.daily_limit - getUsedDailyMessages(row, now), 0);
 }
 
 function usageMetadata(row: AiUsageRow) {
@@ -167,6 +175,7 @@ function usageMetadata(row: AiUsageRow) {
     reservedCount: row.reserved_count,
     remainingDailyMessages: getRemainingDailyMessages(row),
     lastReset: row.last_reset,
+    lastRequestAt: row.last_request_at,
     resetAt: row.limit_reset_at,
   };
 }
@@ -195,6 +204,10 @@ function usageResponseMetadata(row: AiUsageRow) {
     remainingMessages: getRemainingDailyMessages(row),
     dailyLimit: row.daily_limit,
     resetAt: row.limit_reset_at,
+    messageCount: row.message_count,
+    reservedCount: row.reserved_count,
+    lastReset: row.last_reset,
+    lastRequestAt: row.last_request_at,
   };
 }
 
@@ -565,22 +578,25 @@ async function fetchOrCreateUsageRow(
         throw retry.error;
       }
 
-      return ensureCanonicalDailyLimit(
+      const canonicalRow = await ensureCanonicalDailyLimit(
         client,
         normalizeUsageRow(retry.data ?? null, userId, currentDate),
       );
+      return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
     }
 
-    return ensureCanonicalDailyLimit(
+    const canonicalRow = await ensureCanonicalDailyLimit(
       client,
       normalizeUsageRow(insertResult.data ?? null, userId, currentDate),
     );
+    return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
   }
 
-  return ensureCanonicalDailyLimit(
+  const canonicalRow = await ensureCanonicalDailyLimit(
     client,
     normalizeUsageRow(data, userId, currentDate),
   );
+  return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
 }
 
 async function ensureCanonicalDailyLimit(
@@ -618,6 +634,52 @@ async function ensureCanonicalDailyLimit(
     row.last_reset,
   );
 }
+
+async function resetUsageWindowIfExpired(
+  client: ReturnType<typeof createClient>,
+  row: AiUsageRow,
+  currentDate: string,
+) {
+  if (!usageWindowExpired(row)) {
+    return row;
+  }
+
+  const nextUpdatedAt = new Date().toISOString();
+  const { data, error } = await client
+    .from("ai_usage")
+    .update({
+      message_count: 0,
+      reserved_count: 0,
+      last_reset: currentDate,
+      last_request_at: null,
+      limit_reset_at: null,
+      updated_at: nextUpdatedAt,
+    })
+    .eq("user_id", row.user_id)
+    .select(
+      "user_id, plan_tier, daily_limit, message_count, reserved_count, last_reset, last_request_at, limit_reset_at, created_at, updated_at",
+    )
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeUsageRow(
+    (data as Partial<AiUsageRow> | null) ?? {
+      ...row,
+      message_count: 0,
+      reserved_count: 0,
+      last_reset: currentDate,
+      last_request_at: null,
+      limit_reset_at: null,
+      updated_at: nextUpdatedAt,
+    },
+    row.user_id,
+    currentDate,
+  );
+}
+
 async function reserveUsageSlot(
   client: ReturnType<typeof createClient>,
   limit: number,
@@ -906,9 +968,7 @@ Deno.serve(async (request: Request) => {
         return jsonResponse(429, {
           error: AI_COOLDOWN_MESSAGE,
           cooldownRemaining,
-          remainingMessages: getRemainingDailyMessages(usageRow),
-          dailyLimit: usageRow.daily_limit,
-          resetAt: usageRow.limit_reset_at,
+          ...usageResponseMetadata(usageRow),
         });
       }
     } catch (error) {
@@ -976,9 +1036,17 @@ Deno.serve(async (request: Request) => {
       }
       return jsonResponse(429, {
         error: AI_USAGE_LIMIT_MESSAGE,
-        remainingMessages: usageRow ? getRemainingDailyMessages(usageRow) : 0,
-        dailyLimit: usageRow?.daily_limit ?? FREE_DAILY_MESSAGE_LIMIT,
-        resetAt: usageRow?.limit_reset_at ?? null,
+        ...(usageRow
+          ? usageResponseMetadata(usageRow)
+          : {
+              remainingMessages: 0,
+              dailyLimit: FREE_DAILY_MESSAGE_LIMIT,
+              resetAt: null,
+              messageCount: null,
+              reservedCount: null,
+              lastReset: currentDate,
+              lastRequestAt: null,
+            }),
       });
     }
 
@@ -1184,11 +1252,7 @@ Deno.serve(async (request: Request) => {
       return jsonResponse(200, {
         ...(upstreamResult.payload as Record<string, unknown>),
         reply: reply,
-        remainingMessages: getRemainingDailyMessages(
-          finalizedUsage ?? reservedUsage,
-        ),
-        dailyLimit: (finalizedUsage ?? reservedUsage).daily_limit,
-        resetAt: (finalizedUsage ?? reservedUsage).limit_reset_at,
+        ...usageResponseMetadata(finalizedUsage ?? reservedUsage),
       });
     } catch (error) {
       await releaseUsageSlot(supabase).catch((releaseError) => {

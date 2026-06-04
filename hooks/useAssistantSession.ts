@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { useAnalytics } from "@/hooks/useAnalytics";
 import {
@@ -37,7 +38,14 @@ const EMPTY_USAGE_STATE = {
   dailyLimit: DEFAULT_DAILY_LIMIT,
   cooldownUntil: null,
   resetAt: null,
+  messageCount: null,
+  reservedCount: null,
+  lastReset: null,
+  lastRequestAt: null,
   statusMessage: null,
+  validationError: null,
+  lastSyncedAt: null,
+  isRefreshing: false,
   hasResolved: false,
 } as const;
 
@@ -46,9 +54,80 @@ type AssistantUsageState = {
   dailyLimit: number | null;
   cooldownUntil: number | null;
   resetAt: string | null;
+  messageCount: number | null;
+  reservedCount: number | null;
+  lastReset: string | null;
+  lastRequestAt: string | null;
   statusMessage: string | null;
+  validationError: string | null;
+  lastSyncedAt: number | null;
+  isRefreshing: boolean;
   hasResolved: boolean;
 };
+
+type AssistantUsagePayload = {
+  remainingMessages?: number;
+  dailyLimit?: number;
+  cooldownRemaining?: number;
+  resetAt?: string | null;
+  messageCount?: number;
+  reservedCount?: number;
+  lastReset?: string | null;
+  lastRequestAt?: string | null;
+};
+
+function applyUsagePayload(
+  current: AssistantUsageState,
+  payload: AssistantUsagePayload,
+  options?: {
+    statusMessage?: string | null;
+    validationError?: string | null;
+    hasResolved?: boolean;
+    isRefreshing?: boolean;
+  },
+): AssistantUsageState {
+  const nextCooldownUntil =
+    typeof payload.cooldownRemaining === "number" && payload.cooldownRemaining > 0
+      ? Date.now() + payload.cooldownRemaining * 1000
+      : null;
+
+  return {
+    remainingMessages:
+      typeof payload.remainingMessages === "number"
+        ? payload.remainingMessages
+        : current.remainingMessages,
+    dailyLimit:
+      typeof payload.dailyLimit === "number"
+        ? payload.dailyLimit
+        : current.dailyLimit,
+    cooldownUntil:
+      typeof payload.cooldownRemaining === "number"
+        ? nextCooldownUntil
+        : current.cooldownUntil,
+    resetAt: payload.resetAt ?? current.resetAt,
+    messageCount:
+      typeof payload.messageCount === "number"
+        ? payload.messageCount
+        : current.messageCount,
+    reservedCount:
+      typeof payload.reservedCount === "number"
+        ? payload.reservedCount
+        : current.reservedCount,
+    lastReset: payload.lastReset ?? current.lastReset,
+    lastRequestAt: payload.lastRequestAt ?? current.lastRequestAt,
+    statusMessage:
+      options && "statusMessage" in options
+        ? options.statusMessage ?? null
+        : current.statusMessage,
+    validationError:
+      options && "validationError" in options
+        ? options.validationError ?? null
+        : current.validationError,
+    lastSyncedAt: Date.now(),
+    isRefreshing: options?.isRefreshing ?? false,
+    hasResolved: options?.hasResolved ?? true,
+  };
+}
 
 function createMessageId(prefix: string) {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -167,6 +246,62 @@ export function useAssistantSession() {
   );
   const setUsageState = useAssistantSessionStore((state) => state.setUsageState);
 
+  const syncUsageFromServer = useCallback(
+    async (
+      reason: "mount" | "focus" | "send",
+      options?: {
+        blockOnError?: boolean;
+      },
+    ) => {
+      if (!userId || isOffline) {
+        return null;
+      }
+
+      setUsageState(userId, (current) => ({
+        ...current,
+        isRefreshing: true,
+        validationError: null,
+        hasResolved: reason === "send" ? current.hasResolved : false,
+      }));
+
+      try {
+        const status = await getAssistantUsageStatus();
+
+        setUsageState(userId, (current) =>
+          applyUsagePayload(current, status, {
+            statusMessage: null,
+            validationError: null,
+            hasResolved: true,
+            isRefreshing: false,
+          }),
+        );
+
+        return status;
+      } catch (error) {
+        const message =
+          error instanceof AssistantFunctionError
+            ? error.message
+            : "We couldn't verify your AI assistant limit right now. Please try again.";
+
+        setUsageState(userId, (current) => ({
+          ...current,
+          isRefreshing: false,
+          validationError: message,
+          statusMessage: reason === "send" ? message : current.statusMessage,
+          hasResolved: false,
+        }));
+
+        if (options?.blockOnError) {
+          setError(userId, message);
+          throw error;
+        }
+
+        return null;
+      }
+    },
+    [isOffline, setError, setUsageState, userId],
+  );
+
   useEffect(() => {
     if (!userId) {
       return;
@@ -213,57 +348,35 @@ export function useAssistantSession() {
   }, [cooldownRemaining, setUsageState, usageState.cooldownUntil, userId]);
 
   useEffect(() => {
-    if (!userId || isOffline) {
+    if (!userId) {
       return;
     }
 
-    let cancelled = false;
-
     setUsageState(userId, (current) => ({
       ...current,
+      statusMessage: null,
+      validationError: null,
       hasResolved: false,
+      isRefreshing: !isOffline,
     }));
 
-    void getAssistantUsageStatus()
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
+    if (isOffline) {
+      return;
+    }
 
-        setUsageState(userId, (current) => ({
-          remainingMessages:
-            typeof result.remainingMessages === "number"
-              ? result.remainingMessages
-              : current.remainingMessages,
-          dailyLimit:
-            typeof result.dailyLimit === "number"
-              ? result.dailyLimit
-              : current.dailyLimit,
-          cooldownUntil:
-            typeof result.cooldownRemaining === "number" &&
-            result.cooldownRemaining > 0
-              ? Date.now() + result.cooldownRemaining * 1000
-              : null,
-          resetAt: result.resetAt ?? current.resetAt,
-          statusMessage: current.statusMessage,
-          hasResolved: true,
-        }));
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
+    void syncUsageFromServer("mount");
+  }, [isOffline, setUsageState, syncUsageFromServer, userId]);
 
-        setUsageState(userId, (current) => ({
-          ...current,
-          hasResolved: false,
-        }));
-      });
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId || isOffline) {
+        return undefined;
+      }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isOffline, setUsageState, userId]);
+      void syncUsageFromServer("focus");
+      return undefined;
+    }, [isOffline, syncUsageFromServer, userId]),
+  );
 
   const financialContext = useMemo(
     () =>
@@ -296,41 +409,16 @@ export function useAssistantSession() {
       let resolvedRemainingMessages = remainingMessages;
       let resolvedCooldownRemaining = cooldownRemaining;
 
-      if (!usageState.hasResolved) {
-        try {
-          const status = await getAssistantUsageStatus();
-
-          resolvedRemainingMessages =
-            typeof status.remainingMessages === "number"
-              ? status.remainingMessages
-              : resolvedRemainingMessages;
-          resolvedCooldownRemaining =
-            typeof status.cooldownRemaining === "number"
-              ? status.cooldownRemaining
-              : resolvedCooldownRemaining;
-
-          setUsageState(userId, (current) => ({
-            remainingMessages:
-              typeof status.remainingMessages === "number"
-                ? status.remainingMessages
-                : current.remainingMessages,
-            dailyLimit:
-              typeof status.dailyLimit === "number"
-                ? status.dailyLimit
-                : current.dailyLimit,
-            cooldownUntil:
-              typeof status.cooldownRemaining === "number" &&
-              status.cooldownRemaining > 0
-                ? Date.now() + status.cooldownRemaining * 1000
-                : null,
-            resetAt: status.resetAt ?? current.resetAt,
-            statusMessage: current.statusMessage,
-            hasResolved: true,
-          }));
-        } catch {
-          // If the startup usage preflight fails, fall back to the normal send
-          // path and let the backend enforce the quota.
-        }
+      const status = await syncUsageFromServer("send");
+      if (status) {
+        resolvedRemainingMessages =
+          typeof status.remainingMessages === "number"
+            ? status.remainingMessages
+            : resolvedRemainingMessages;
+        resolvedCooldownRemaining =
+          typeof status.cooldownRemaining === "number"
+            ? status.cooldownRemaining
+            : resolvedCooldownRemaining;
       }
 
       if (
@@ -369,20 +457,14 @@ export function useAssistantSession() {
           },
         });
 
-        setUsageState(userId, (current) => ({
-          remainingMessages:
-            typeof result.remainingMessages === "number"
-              ? result.remainingMessages
-              : current.remainingMessages,
-          dailyLimit:
-            typeof result.dailyLimit === "number"
-              ? result.dailyLimit
-              : current.dailyLimit,
-          cooldownUntil: null,
-          resetAt: result.resetAt ?? current.resetAt,
-          statusMessage: null,
-          hasResolved: true,
-        }));
+        setUsageState(userId, (current) =>
+          applyUsagePayload(current, { ...result, cooldownRemaining: 0 }, {
+            statusMessage: null,
+            validationError: null,
+            hasResolved: true,
+            isRefreshing: false,
+          }),
+        );
 
         replaceMessage(
           userId,
@@ -405,24 +487,22 @@ export function useAssistantSession() {
             ? error.message
             : ASSISTANT_FALLBACK_ERROR_MESSAGE);
 
-        setUsageState(userId, (current) => ({
-          remainingMessages:
-            typeof assistantError?.remainingMessages === "number"
-              ? assistantError.remainingMessages
-              : current.remainingMessages,
-          dailyLimit:
-            typeof assistantError?.dailyLimit === "number"
-              ? assistantError.dailyLimit
-              : current.dailyLimit,
-          cooldownUntil:
-            typeof assistantError?.cooldownRemaining === "number" &&
-            assistantError.cooldownRemaining > 0
-              ? Date.now() + assistantError.cooldownRemaining * 1000
-              : current.cooldownUntil,
-          resetAt: assistantError?.resetAt ?? current.resetAt,
-          statusMessage: message,
-          hasResolved: true,
-        }));
+        setUsageState(userId, (current) =>
+          assistantError
+            ? applyUsagePayload(current, assistantError, {
+                statusMessage: message,
+                validationError: null,
+                hasResolved: true,
+                isRefreshing: false,
+              })
+            : {
+                ...current,
+                statusMessage: message,
+                validationError: null,
+                isRefreshing: false,
+                hasResolved: current.hasResolved,
+              },
+        );
 
         appendMessages(userId, [
           createMessage("assistant", message, "error", "system"),
@@ -446,6 +526,7 @@ export function useAssistantSession() {
       setSending,
       setStoreInput,
       setUsageState,
+      syncUsageFromServer,
       userId,
     ],
   );
