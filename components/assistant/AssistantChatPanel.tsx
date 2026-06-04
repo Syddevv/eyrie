@@ -56,50 +56,6 @@ type QuickPrompt = {
 };
 
 const BOTTOM_NAV_RESERVED_HEIGHT = 64;
-function formatResetTimeLabel(resetAt: string | null) {
-  if (!resetAt) {
-    return null;
-  }
-
-  const date = new Date(resetAt);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const parts = new Intl.DateTimeFormat(undefined, {
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-    .formatToParts(date)
-    .reduce(
-      (acc, part) => {
-        if (part.type === "month") {
-          acc.month = part.value;
-        } else if (part.type === "day") {
-          acc.day = part.value;
-        } else if (part.type === "hour") {
-          acc.hour = part.value;
-        } else if (part.type === "minute") {
-          acc.minute = part.value;
-        } else if (part.type === "dayPeriod") {
-          acc.dayPeriod = part.value;
-        }
-
-        return acc;
-      },
-      {
-        month: "",
-        day: "",
-        hour: "",
-        minute: "",
-        dayPeriod: "",
-      },
-    );
-
-  return `${parts.month} ${parts.day}, ${parts.hour}:${parts.minute} ${parts.dayPeriod}`.trim();
-}
 
 export function AssistantChatPanel({
   quickPrompts,
@@ -122,7 +78,6 @@ export function AssistantChatPanel({
     remainingMessages,
     dailyLimit,
     cooldownRemaining,
-    resetAt,
     assistantStatusMessage,
   } = useAssistantSession();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -237,14 +192,11 @@ export function AssistantChatPanel({
   const usageSummaryText = showUsageSummary
     ? `${remainingMessages} / ${dailyLimit} AI messages remaining in the current limit window`
     : "AI usage is limited in a 24-hour window.";
-  const resetTimeLabel = formatResetTimeLabel(resetAt);
   const cooldownText =
     cooldownRemaining > 0
       ? `Please wait ${cooldownRemaining} second${cooldownRemaining === 1 ? "" : "s"} before sending another message.`
       : remainingMessages === 0
-        ? resetAt && resetTimeLabel
-          ? `AI assistant limit reached. Your limit will reset on ${resetTimeLabel}.`
-          : assistantStatusMessage || "AI assistant limit reached."
+        ? "You've reached your AI Assistant chat limit."
         : null;
   const helperStatusText =
     cooldownText || (!hasReachedLimit ? assistantStatusMessage : null);
@@ -425,6 +377,9 @@ export function AssistantChatPanel({
           ) : null}
 
           <View style={styles.composerMeta}>
+            <Text style={[styles.helperText, pageStyles.helper]}>
+              Chat limit resets daily at 8:00 AM.
+            </Text>
             <Text style={[styles.helperText, pageStyles.helper]}>
               {usageSummaryText}
             </Text>

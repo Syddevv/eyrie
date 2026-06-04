@@ -18,7 +18,9 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CONVERSATION_MESSAGES = 12;
 const FREE_DAILY_MESSAGE_LIMIT = 20;
 const COOLDOWN_SECONDS = 3;
-const AI_USAGE_LIMIT_MESSAGE = "AI assistant limit reached.";
+const AI_USAGE_RESET_HOUR = 8;
+const AI_USAGE_RESET_OFFSET_MINUTES = 8 * 60;
+const AI_USAGE_LIMIT_MESSAGE = "You've reached your AI Assistant chat limit.";
 const AI_COOLDOWN_MESSAGE =
   "You're sending messages too quickly. Please wait a few seconds before trying again.";
 
@@ -138,36 +140,46 @@ function normalizeUsageRow(
   };
 }
 
-function usageWindowExpired(row: AiUsageRow, now = new Date()) {
-  if (!row.limit_reset_at) {
-    return false;
-  }
+function getUsageResetContext(now = new Date()) {
+  const offsetMs = AI_USAGE_RESET_OFFSET_MINUTES * 60 * 1000;
+  const localNow = new Date(now.getTime() + offsetMs);
+  const localYear = localNow.getUTCFullYear();
+  const localMonth = localNow.getUTCMonth();
+  const localDate = localNow.getUTCDate();
+  const localHour = localNow.getUTCHours();
+  const nextResetDayOffset = localHour >= AI_USAGE_RESET_HOUR ? 1 : 0;
+  const nextResetUtcMs =
+    Date.UTC(
+      localYear,
+      localMonth,
+      localDate + nextResetDayOffset,
+      AI_USAGE_RESET_HOUR,
+      0,
+      0,
+      0,
+    ) - offsetMs;
+  const currentCycleDate = new Date(nextResetUtcMs - 24 * 60 * 60 * 1000);
 
-  const resetAt = new Date(row.limit_reset_at);
-  if (Number.isNaN(resetAt.getTime())) {
-    return false;
-  }
-
-  return resetAt.getTime() <= now.getTime();
+  return {
+    currentCycleDate: currentCycleDate.toISOString().slice(0, 10),
+    nextResetAt: new Date(nextResetUtcMs).toISOString(),
+  };
 }
 
-function getUsedDailyMessages(row: AiUsageRow, now = new Date()) {
-  if (usageWindowExpired(row, now)) {
-    return 0;
-  }
+function usageWindowExpired(row: AiUsageRow, now = new Date()) {
+  return row.last_reset !== getUsageResetContext(now).currentCycleDate;
+}
 
+function getUsedDailyMessages(row: AiUsageRow) {
   return Math.max(row.message_count + row.reserved_count, 0);
 }
 
-function getRemainingDailyMessages(row: AiUsageRow, now = new Date()) {
-  if (usageWindowExpired(row, now)) {
-    return row.daily_limit;
-  }
-
-  return Math.max(row.daily_limit - getUsedDailyMessages(row, now), 0);
+function getRemainingDailyMessages(row: AiUsageRow) {
+  return Math.max(row.daily_limit - getUsedDailyMessages(row), 0);
 }
 
 function usageMetadata(row: AiUsageRow) {
+  const resetContext = getUsageResetContext();
   return {
     planTier: row.plan_tier,
     dailyLimit: row.daily_limit,
@@ -176,7 +188,7 @@ function usageMetadata(row: AiUsageRow) {
     remainingDailyMessages: getRemainingDailyMessages(row),
     lastReset: row.last_reset,
     lastRequestAt: row.last_request_at,
-    resetAt: row.limit_reset_at,
+    resetAt: row.limit_reset_at ?? resetContext.nextResetAt,
   };
 }
 
@@ -199,11 +211,12 @@ function cooldownRemainingSeconds(row: AiUsageRow, now = new Date()) {
 }
 
 function usageResponseMetadata(row: AiUsageRow) {
+  const resetContext = getUsageResetContext();
   return {
     reply: undefined,
     remainingMessages: getRemainingDailyMessages(row),
     dailyLimit: row.daily_limit,
-    resetAt: row.limit_reset_at,
+    resetAt: row.limit_reset_at ?? resetContext.nextResetAt,
     messageCount: row.message_count,
     reservedCount: row.reserved_count,
     lastReset: row.last_reset,
@@ -540,6 +553,7 @@ async function fetchOrCreateUsageRow(
   userId: string,
   currentDate: string,
 ) {
+  const resetContext = getUsageResetContext();
   const { data, error } = await selectUsageFields(client)
     .eq("user_id", userId)
     .maybeSingle();
@@ -559,7 +573,7 @@ async function fetchOrCreateUsageRow(
         reserved_count: 0,
         last_reset: currentDate,
         last_request_at: null,
-        limit_reset_at: null,
+        limit_reset_at: resetContext.nextResetAt,
       })
       .select(
         "user_id, plan_tier, daily_limit, message_count, reserved_count, last_reset, last_request_at, limit_reset_at, created_at, updated_at",
@@ -644,6 +658,7 @@ async function resetUsageWindowIfExpired(
     return row;
   }
 
+  const resetContext = getUsageResetContext();
   const nextUpdatedAt = new Date().toISOString();
   const { data, error } = await client
     .from("ai_usage")
@@ -652,10 +667,11 @@ async function resetUsageWindowIfExpired(
       reserved_count: 0,
       last_reset: currentDate,
       last_request_at: null,
-      limit_reset_at: null,
+      limit_reset_at: resetContext.nextResetAt,
       updated_at: nextUpdatedAt,
     })
     .eq("user_id", row.user_id)
+    .neq("last_reset", currentDate)
     .select(
       "user_id, plan_tier, daily_limit, message_count, reserved_count, last_reset, last_request_at, limit_reset_at, created_at, updated_at",
     )
@@ -672,7 +688,7 @@ async function resetUsageWindowIfExpired(
       reserved_count: 0,
       last_reset: currentDate,
       last_request_at: null,
-      limit_reset_at: null,
+      limit_reset_at: resetContext.nextResetAt,
       updated_at: nextUpdatedAt,
     },
     row.user_id,
@@ -830,7 +846,7 @@ Deno.serve(async (request: Request) => {
     recordRequestStart(user.id, requestId);
 
     if (request.method === "GET") {
-      const currentDate = new Date().toISOString().slice(0, 10);
+      const currentDate = getUsageResetContext().currentCycleDate;
 
       try {
         const usageRow = await fetchOrCreateUsageRow(
@@ -898,7 +914,7 @@ Deno.serve(async (request: Request) => {
         : null;
 
     if (requestAction === "status") {
-      const currentDate = new Date().toISOString().slice(0, 10);
+      const currentDate = getUsageResetContext().currentCycleDate;
 
       try {
         const usageRow = await fetchOrCreateUsageRow(
@@ -950,7 +966,7 @@ Deno.serve(async (request: Request) => {
       return safeErrorResponse(400, "Please enter a message before sending.");
     }
 
-    const currentDate = new Date().toISOString().slice(0, 10);
+    const currentDate = getUsageResetContext().currentCycleDate;
 
     let usageRowForRequest: AiUsageRow | null = null;
     try {
@@ -1041,7 +1057,7 @@ Deno.serve(async (request: Request) => {
           : {
               remainingMessages: 0,
               dailyLimit: FREE_DAILY_MESSAGE_LIMIT,
-              resetAt: null,
+              resetAt: getUsageResetContext().nextResetAt,
               messageCount: null,
               reservedCount: null,
               lastReset: currentDate,
