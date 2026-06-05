@@ -18,6 +18,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_CONVERSATION_MESSAGES = 12;
 const FREE_DAILY_MESSAGE_LIMIT = 20;
 const COOLDOWN_SECONDS = 3;
+const STALE_RESERVATION_SECONDS = 120;
 const AI_USAGE_RESET_HOUR = 8;
 const AI_USAGE_RESET_OFFSET_MINUTES = 8 * 60;
 const AI_USAGE_LIMIT_MESSAGE = "You've reached your AI Assistant chat limit.";
@@ -168,6 +169,38 @@ function getUsageResetContext(now = new Date()) {
 
 function usageWindowExpired(row: AiUsageRow, now = new Date()) {
   return row.last_reset !== getUsageResetContext(now).currentCycleDate;
+}
+
+function hasStaleReservation(row: AiUsageRow, now = new Date()) {
+  if (row.reserved_count <= 0) {
+    return false;
+  }
+
+  const updatedAt = new Date(row.updated_at);
+  if (Number.isNaN(updatedAt.getTime())) {
+    return false;
+  }
+
+  if (
+    (now.getTime() - updatedAt.getTime()) / 1000 <
+    STALE_RESERVATION_SECONDS
+  ) {
+    return false;
+  }
+
+  if (!row.last_request_at) {
+    return true;
+  }
+
+  const lastRequestAt = new Date(row.last_request_at);
+  if (Number.isNaN(lastRequestAt.getTime())) {
+    return true;
+  }
+
+  return (
+    (now.getTime() - lastRequestAt.getTime()) / 1000 >=
+    STALE_RESERVATION_SECONDS
+  );
 }
 
 function getUsedDailyMessages(row: AiUsageRow) {
@@ -596,21 +629,36 @@ async function fetchOrCreateUsageRow(
         client,
         normalizeUsageRow(retry.data ?? null, userId, currentDate),
       );
-      return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
+      const resetRow = await resetUsageWindowIfExpired(
+        client,
+        canonicalRow,
+        currentDate,
+      );
+      return releaseStaleReservedUsage(client, resetRow, currentDate);
     }
 
     const canonicalRow = await ensureCanonicalDailyLimit(
       client,
       normalizeUsageRow(insertResult.data ?? null, userId, currentDate),
     );
-    return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
+    const resetRow = await resetUsageWindowIfExpired(
+      client,
+      canonicalRow,
+      currentDate,
+    );
+    return releaseStaleReservedUsage(client, resetRow, currentDate);
   }
 
   const canonicalRow = await ensureCanonicalDailyLimit(
     client,
     normalizeUsageRow(data, userId, currentDate),
   );
-  return resetUsageWindowIfExpired(client, canonicalRow, currentDate);
+  const resetRow = await resetUsageWindowIfExpired(
+    client,
+    canonicalRow,
+    currentDate,
+  );
+  return releaseStaleReservedUsage(client, resetRow, currentDate);
 }
 
 async function ensureCanonicalDailyLimit(
@@ -688,6 +736,53 @@ async function resetUsageWindowIfExpired(
       reserved_count: 0,
       last_reset: currentDate,
       last_request_at: null,
+      limit_reset_at: resetContext.nextResetAt,
+      updated_at: nextUpdatedAt,
+    },
+    row.user_id,
+    currentDate,
+  );
+}
+
+async function releaseStaleReservedUsage(
+  client: ReturnType<typeof createClient>,
+  row: AiUsageRow,
+  currentDate: string,
+) {
+  if (!hasStaleReservation(row)) {
+    return row;
+  }
+
+  const resetContext = getUsageResetContext();
+  const nextUpdatedAt = new Date().toISOString();
+  const staleBefore = new Date(
+    Date.now() - STALE_RESERVATION_SECONDS * 1000,
+  ).toISOString();
+  const { data, error } = await client
+    .from("ai_usage")
+    .update({
+      reserved_count: 0,
+      last_reset: currentDate,
+      limit_reset_at: resetContext.nextResetAt,
+      updated_at: nextUpdatedAt,
+    })
+    .eq("user_id", row.user_id)
+    .gt("reserved_count", 0)
+    .lte("updated_at", staleBefore)
+    .select(
+      "user_id, plan_tier, daily_limit, message_count, reserved_count, last_reset, last_request_at, limit_reset_at, created_at, updated_at",
+    )
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeUsageRow(
+    (data as Partial<AiUsageRow> | null) ?? {
+      ...row,
+      reserved_count: 0,
+      last_reset: currentDate,
       limit_reset_at: resetContext.nextResetAt,
       updated_at: nextUpdatedAt,
     },

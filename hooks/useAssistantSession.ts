@@ -378,6 +378,39 @@ export function useAssistantSession() {
     }, [isOffline, syncUsageFromServer, userId]),
   );
 
+  useEffect(() => {
+    if (!userId || isOffline || !resetAt) {
+      return;
+    }
+
+    const resetTime = Date.parse(resetAt);
+    if (Number.isNaN(resetTime)) {
+      return;
+    }
+
+    const lastSyncedAt = usageState.lastSyncedAt ?? 0;
+    if (resetTime <= Date.now()) {
+      if (lastSyncedAt < resetTime) {
+        void syncUsageFromServer("focus");
+      }
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      void syncUsageFromServer("focus");
+    }, Math.min(resetTime - Date.now(), 2_147_483_647));
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [
+    isOffline,
+    resetAt,
+    syncUsageFromServer,
+    usageState.lastSyncedAt,
+    userId,
+  ]);
+
   const financialContext = useMemo(
     () =>
       buildAssistantContext({
