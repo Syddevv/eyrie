@@ -33,7 +33,6 @@ import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
 import {
   formatPaylaterAmount,
-  getPaylaterNextDueCopy,
   getPaylaterOption,
   getPaylaterStatusLabel,
   getPaylaterStatusTone,
@@ -167,6 +166,50 @@ function formatPaylaterCompletedLabel(value: string | null | undefined) {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `Completed on ${date.getFullYear()}-${month}-${day}`;
+}
+
+function getPaylaterDaysLeftLabel(date: Date | null | undefined) {
+  if (!date) {
+    return "No due date";
+  }
+
+  const today = new Date();
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const startOfDueDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const dayDifference = Math.round(
+    (startOfDueDate.getTime() - startOfToday.getTime()) / 86_400_000,
+  );
+
+  if (dayDifference < 0) {
+    const overdueDays = Math.abs(dayDifference);
+    return overdueDays === 1 ? "1 day overdue" : `${overdueDays} days overdue`;
+  }
+
+  if (dayDifference === 0) {
+    return "Due today";
+  }
+
+  if (dayDifference === 1) {
+    return "1 day left";
+  }
+
+  return `${dayDifference} days left`;
+}
+
+function formatPaylaterDueOnLabel(date: Date | null | undefined) {
+  if (!date) {
+    return "No due date";
+  }
+
+  return `${date.getDate()} of month`;
 }
 
 const FLOATING_TAB_BAR_CLEARANCE = 104;
@@ -1154,28 +1197,35 @@ export default function BudgetScreen() {
               <>
                 {activePaylaterItems.length > 0 ? (
                   <>
-                <View
-                  style={[
-                    styles.paylatersDueCard,
-                    pageStyles.paylatersCard,
-                    shadows.soft,
-                  ]}
+                <LinearGradient
+                  colors={["#1785E5", "#1F90EA", "#4F46E5"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.paylatersDueCard, shadows.soft]}
                 >
-                  <Text style={styles.paylatersEyebrow}>NEXT PAYMENT DUE</Text>
-                  <Text style={[styles.paylatersDueTitle, pageStyles.title]}>
+                  <View style={styles.paylatersDueTopRow}>
+                    <View style={styles.paylatersDueEyebrowRow}>
+                      <View style={styles.paylatersDueEyebrowDot} />
+                      <Text style={styles.paylatersEyebrow}>NEXT PAYMENT DUE</Text>
+                    </View>
+
+                    <View style={styles.paylatersDueBadge}>
+                      <Text style={styles.paylatersDueBadgeText}>
+                        {getPaylaterDaysLeftLabel(nextPaymentDue?.dueDate)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.paylatersDueFromLabel}>From</Text>
+                  <Text style={styles.paylatersDueTitle}>
                     {nextPaymentDue?.row.itemName ?? "No upcoming payments"}
                   </Text>
 
+                  <View style={styles.paylatersDueDivider} />
+
                   <View style={styles.paylatersDueRow}>
-                    <View>
-                      <Text
-                        style={[
-                          styles.paylatersMetaLabel,
-                          pageStyles.paylatersMutedText,
-                        ]}
-                      >
-                        Due Amount
-                      </Text>
+                    <View style={styles.paylatersDueAmountBlock}>
+                      <Text style={styles.paylatersDueMetaLabel}>Due Amount</Text>
                       <Text style={styles.paylatersDueAmount}>
                         {formatPaylaterAmount(
                           Number(nextPaymentDue?.row.installmentAmount ?? 0),
@@ -1184,24 +1234,35 @@ export default function BudgetScreen() {
                     </View>
 
                     <View style={styles.paylatersDueRight}>
-                      <Text
-                        style={[
-                          styles.paylatersMetaLabel,
-                          pageStyles.paylatersMutedText,
-                        ]}
-                      >
-                        {nextPaymentDue?.effectiveStatus === "overdue"
-                          ? "Status"
-                          : "Due in"}
-                      </Text>
-                      <Text style={styles.paylatersDueDays}>
-                        {nextPaymentDue
-                          ? getPaylaterNextDueCopy(nextPaymentDue.row)
-                          : "No due date"}
+                      <Text style={styles.paylatersDueMetaLabel}>Due on</Text>
+                      <Text style={styles.paylatersDueOnValue}>
+                        {formatPaylaterDueOnLabel(nextPaymentDue?.dueDate)}
                       </Text>
                     </View>
                   </View>
-                </View>
+
+                  <Pressable
+                    style={styles.paylatersDueButton}
+                    onPress={() => {
+                      if (!nextPaymentDue) {
+                        return;
+                      }
+
+                      router.push({
+                        pathname: "/paylater-repayment-modal",
+                        params: {
+                          paylaterId: nextPaymentDue.row.id,
+                          paylaterName: nextPaymentDue.row.itemName,
+                          currentBalance: formatPaylaterAmount(
+                            Number(nextPaymentDue.row.remainingBalance ?? 0),
+                          ),
+                        },
+                      });
+                    }}
+                  >
+                    <Text style={styles.paylatersDueButtonText}>Pay Now</Text>
+                  </Pressable>
+                </LinearGradient>
 
                 <LinearGradient
                   colors={["#8A2BE2", "#9C27F4", "#4F46E5"]}
@@ -1263,53 +1324,151 @@ export default function BudgetScreen() {
                   {activePaylaterItems.map((item) => {
                     const statusTone = getPaylaterStatusTone(item.status);
                     const isUpcoming = statusTone === "upcoming";
+                    const isOverdue = statusTone === "overdue";
                     const { progress, installmentsRemaining } =
                       toPaylaterProgressLabel(item);
                     const provider = getPaylaterOption(item.platform);
+                    const activeCardPalette =
+                      colorScheme === "light"
+                        ? isOverdue
+                          ? {
+                              cardBackground: "#FFF8F8",
+                              cardBorder: "rgba(255, 99, 99, 0.22)",
+                              providerBackground: "#E5E7EB",
+                              providerText: "#6B7280",
+                              statusBackground: "#FFE4E6",
+                              statusText: "#B42318",
+                              statusIcon: "#DC2626",
+                              progressTrack: "#FDE2E2",
+                              progressFill: "#FF1F2D",
+                              divider: "rgba(148, 163, 184, 0.18)",
+                              detailsButton: "#E9EEF5",
+                              detailsText: "#111827",
+                              subtitleText: "#6B7280",
+                              metaText: "#7A8597",
+                            }
+                          : {
+                              cardBackground: "#F7FBFF",
+                              cardBorder: "rgba(133, 191, 255, 0.28)",
+                              providerBackground: "#E5E7EB",
+                              providerText: "#6B7280",
+                              statusBackground: "#D9FBE9",
+                              statusText: "#0F8A45",
+                              statusIcon: "#16A34A",
+                              progressTrack: "#DCEBFB",
+                              progressFill: "#12C768",
+                              divider: "rgba(148, 163, 184, 0.18)",
+                              detailsButton: "#E9EEF5",
+                              detailsText: "#111827",
+                              subtitleText: "#6B7280",
+                              metaText: "#7A8597",
+                            }
+                        : isOverdue
+                          ? {
+                              cardBackground: "#120C14",
+                              cardBorder: "rgba(127, 29, 29, 0.72)",
+                              providerBackground: "#1F2230",
+                              providerText: "#8E95A5",
+                              statusBackground: "rgba(127, 29, 29, 0.7)",
+                              statusText: "#FFD2D5",
+                              statusIcon: "#FCA5A5",
+                              progressTrack: "rgba(127, 29, 29, 0.35)",
+                              progressFill: "#FF1F2D",
+                              divider: "rgba(255, 255, 255, 0.08)",
+                              detailsButton: "#1B2030",
+                              detailsText: "#F4F7FB",
+                              subtitleText: "#9AA4B2",
+                              metaText: "#8E95A5",
+                            }
+                          : {
+                              cardBackground: "#0A1020",
+                              cardBorder: "rgba(40, 95, 206, 0.55)",
+                              providerBackground: "#1F2230",
+                              providerText: "#8E95A5",
+                              statusBackground: "rgba(5, 86, 54, 0.78)",
+                              statusText: "#D5F7E5",
+                              statusIcon: "#86EFAC",
+                              progressTrack: "rgba(37, 99, 235, 0.2)",
+                              progressFill: "#0FBA68",
+                              divider: "rgba(255, 255, 255, 0.08)",
+                              detailsButton: "#1B2030",
+                              detailsText: "#F4F7FB",
+                              subtitleText: "#9AA4B2",
+                              metaText: "#8E95A5",
+                            };
 
                     return (
                       <View
                         key={item.id}
                         style={[
                           styles.paylatersItemCard,
-                          pageStyles.paylatersCard,
                           shadows.soft,
+                          {
+                            backgroundColor: activeCardPalette.cardBackground,
+                            borderColor: activeCardPalette.cardBorder,
+                          },
                         ]}
                       >
                         <View style={styles.paylatersItemTopRow}>
                           <View style={styles.paylatersItemIdentity}>
-                            <Text
-                              style={[
-                                styles.paylatersItemTitle,
-                                pageStyles.title,
-                              ]}
-                            >
-                              {item.itemName}
-                            </Text>
+                            <View style={styles.paylatersItemTitleRow}>
+                              <Text
+                                style={[
+                                  styles.paylatersItemTitle,
+                                  pageStyles.title,
+                                ]}
+                              >
+                                {item.itemName}
+                              </Text>
+                              <View
+                                style={[
+                                  styles.paylatersProviderPill,
+                                  {
+                                    backgroundColor:
+                                      activeCardPalette.providerBackground,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.paylatersProviderPillText,
+                                    { color: activeCardPalette.providerText },
+                                  ]}
+                                >
+                                  {provider.name}
+                                </Text>
+                              </View>
+                            </View>
                             <Text
                               style={[
                                 styles.paylatersItemProvider,
-                                pageStyles.paylatersMutedText,
+                                { color: activeCardPalette.subtitleText },
                               ]}
                             >
-                              {provider.name}
+                              {`${provider.name} PayLater`}
                             </Text>
                           </View>
 
-                          <View style={styles.paylatersStatusRow}>
+                          <View
+                            style={[
+                              styles.paylatersStatusRow,
+                              {
+                                backgroundColor:
+                                  activeCardPalette.statusBackground,
+                              },
+                            ]}
+                          >
                             <Feather
                               name={
                                 isUpcoming ? "check-circle" : "alert-circle"
                               }
-                              size={15}
-                              color={isUpcoming ? "#22C55E" : "#EF4444"}
+                              size={14}
+                              color={activeCardPalette.statusIcon}
                             />
                             <Text
                               style={[
                                 styles.paylatersStatusText,
-                                {
-                                  color: isUpcoming ? "#667085" : "#B42318",
-                                },
+                                { color: activeCardPalette.statusText },
                               ]}
                             >
                               {getPaylaterStatusLabel(item.status)}
@@ -1317,16 +1476,38 @@ export default function BudgetScreen() {
                           </View>
                         </View>
 
+                        <View style={styles.paylatersProgressHeader}>
+                          <Text
+                            style={[
+                              styles.paylatersProgressLabel,
+                              { color: activeCardPalette.metaText },
+                            ]}
+                          >
+                            Payment Progress
+                          </Text>
+                          <Text
+                            style={[
+                              styles.paylatersProgressPercent,
+                              pageStyles.title,
+                            ]}
+                          >
+                            {`${Math.round(progress * 100)}%`}
+                          </Text>
+                        </View>
+
                         <View
                           style={[
                             styles.paylatersItemTrack,
-                            pageStyles.paylatersTrack,
+                            { backgroundColor: activeCardPalette.progressTrack },
                           ]}
                         >
                           <View
                             style={[
                               styles.paylatersItemFill,
-                              { width: `${progress * 100}%` },
+                              {
+                                width: `${progress * 100}%`,
+                                backgroundColor: activeCardPalette.progressFill,
+                              },
                             ]}
                           />
                         </View>
@@ -1334,21 +1515,28 @@ export default function BudgetScreen() {
                         <Text
                           style={[
                             styles.paylatersProgressText,
-                            pageStyles.paylatersMutedText,
+                            { color: activeCardPalette.subtitleText },
                           ]}
                         >
-                          {`${Math.round(progress * 100)}% paid • ${installmentsRemaining} installments remaining`}
+                          {`${installmentsRemaining} payment${installmentsRemaining === 1 ? "" : "s"} left`}
                         </Text>
+
+                        <View
+                          style={[
+                            styles.paylatersItemDivider,
+                            { backgroundColor: activeCardPalette.divider },
+                          ]}
+                        />
 
                         <View style={styles.paylatersAmountsRow}>
                           <View>
                             <Text
                               style={[
                                 styles.paylatersMetaLabel,
-                                pageStyles.paylatersMutedText,
+                                { color: activeCardPalette.metaText },
                               ]}
                             >
-                              Balance
+                              Remaining Balance
                             </Text>
                             <Text style={styles.paylatersBalanceValue}>
                               {formatPaylaterAmount(
@@ -1361,10 +1549,10 @@ export default function BudgetScreen() {
                             <Text
                               style={[
                                 styles.paylatersMetaLabel,
-                                pageStyles.paylatersMutedText,
+                                { color: activeCardPalette.metaText },
                               ]}
                             >
-                              Installment
+                              Next Payment
                             </Text>
                             <Text
                               style={[
@@ -1378,8 +1566,6 @@ export default function BudgetScreen() {
                             </Text>
                           </View>
                         </View>
-
-                        <View style={styles.paylatersItemDivider} />
 
                         <View style={styles.paylatersActionsRow}>
                           <Pressable
@@ -1404,7 +1590,9 @@ export default function BudgetScreen() {
                           <Pressable
                             style={[
                               styles.paylatersSecondaryButton,
-                              pageStyles.paylatersSecondaryButton,
+                              {
+                                backgroundColor: activeCardPalette.detailsButton,
+                              },
                             ]}
                             onPress={() =>
                               router.push({
@@ -1418,7 +1606,7 @@ export default function BudgetScreen() {
                             <Text
                               style={[
                                 styles.paylatersSecondaryButtonText,
-                                pageStyles.title,
+                                { color: activeCardPalette.detailsText },
                               ]}
                             >
                               Details
@@ -2285,30 +2473,83 @@ function createStyles() {
     },
     paylatersDueCard: {
       marginTop: 14,
-      borderRadius: 24,
-      borderWidth: 1,
+      borderRadius: 22,
       paddingHorizontal: 16,
-      paddingVertical: 14,
+      paddingTop: 16,
+      paddingBottom: 16,
+      overflow: "hidden",
+    },
+    paylatersDueTopRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    paylatersDueEyebrowRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      minWidth: 0,
+    },
+    paylatersDueEyebrowDot: {
+      width: 10,
+      height: 10,
+      borderRadius: radius.full,
+      backgroundColor: "rgba(255,255,255,0.22)",
     },
     paylatersEyebrow: {
       fontFamily: fontFamilies.sans,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: fontWeights.bold,
+      color: "rgba(255,255,255,0.78)",
+      letterSpacing: 0.8,
+    },
+    paylatersDueBadge: {
+      minHeight: 24,
+      borderRadius: radius.full,
+      paddingHorizontal: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(53, 198, 205, 0.92)",
+    },
+    paylatersDueBadgeText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 10,
+      lineHeight: 12,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersDueFromLabel: {
+      marginTop: 16,
+      fontFamily: fontFamilies.sans,
+      fontSize: 12,
+      lineHeight: 16,
       fontWeight: fontWeights.medium,
-      color: "#0F3DA9",
+      color: "rgba(255,255,255,0.82)",
     },
     paylatersDueTitle: {
-      marginTop: 8,
+      marginTop: 4,
       fontFamily: fontFamilies.sans,
-      fontSize: 17,
-      lineHeight: 22,
+      fontSize: 22,
+      lineHeight: 28,
       fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersDueDivider: {
+      height: 1,
+      marginTop: 12,
+      backgroundColor: "rgba(255,255,255,0.22)",
     },
     paylatersDueRow: {
-      marginTop: 8,
+      marginTop: 12,
       flexDirection: "row",
-      alignItems: "flex-end",
+      alignItems: "flex-start",
       justifyContent: "space-between",
+      gap: 12,
+    },
+    paylatersDueAmountBlock: {
+      flex: 1,
     },
     paylatersDueRight: {
       alignItems: "flex-end",
@@ -2318,21 +2559,44 @@ function createStyles() {
       fontSize: 13,
       lineHeight: 18,
     },
-    paylatersDueAmount: {
-      marginTop: 2,
+    paylatersDueMetaLabel: {
       fontFamily: fontFamilies.sans,
-      fontSize: 18,
-      lineHeight: 24,
-      fontWeight: fontWeights.bold,
-      color: "#168CF3",
+      fontSize: 12,
+      lineHeight: 16,
+      color: "rgba(255,255,255,0.8)",
     },
-    paylatersDueDays: {
-      marginTop: 2,
+    paylatersDueAmount: {
+      marginTop: 4,
       fontFamily: fontFamilies.sans,
-      fontSize: 18,
-      lineHeight: 24,
+      fontSize: 26,
+      lineHeight: 30,
       fontWeight: fontWeights.bold,
-      color: "#1E40AF",
+      color: "#FFFFFF",
+    },
+    paylatersDueOnValue: {
+      marginTop: 4,
+      fontFamily: fontFamilies.sans,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
+    },
+    paylatersDueButton: {
+      marginTop: 14,
+      minHeight: 32,
+      borderRadius: radius.full,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(255,255,255,0.12)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.14)",
+    },
+    paylatersDueButtonText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 16,
+      fontWeight: fontWeights.bold,
+      color: "#FFFFFF",
     },
     paylatersSummaryCard: {
       marginTop: 12,
@@ -2427,27 +2691,50 @@ function createStyles() {
     paylatersItemIdentity: {
       flex: 1,
     },
+    paylatersItemTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      minWidth: 0,
+      flexWrap: "wrap",
+    },
     paylatersItemTitle: {
       fontFamily: fontFamilies.sans,
-      fontSize: 17,
-      lineHeight: 22,
+      fontSize: 16,
+      lineHeight: 21,
       fontWeight: fontWeights.bold,
     },
-    paylatersItemProvider: {
-      marginTop: 2,
+    paylatersProviderPill: {
+      minHeight: 24,
+      borderRadius: radius.full,
+      paddingHorizontal: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    paylatersProviderPillText: {
       fontFamily: fontFamilies.sans,
-      fontSize: 14,
+      fontSize: 12,
+      lineHeight: 14,
+      fontWeight: fontWeights.medium,
+    },
+    paylatersItemProvider: {
+      marginTop: 6,
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
       lineHeight: 18,
     },
     paylatersStatusRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4,
+      gap: 6,
+      borderRadius: radius.full,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
     },
     paylatersStatusText: {
       fontFamily: fontFamilies.sans,
       fontSize: 13,
-      lineHeight: 18,
+      lineHeight: 16,
       fontWeight: fontWeights.medium,
     },
     paidPaylaterCard: {
@@ -2501,50 +2788,67 @@ function createStyles() {
     },
     paylatersItemTrack: {
       marginTop: 10,
-      height: 5,
+      height: 7,
       borderRadius: radius.full,
       overflow: "hidden",
     },
     paylatersItemFill: {
       height: "100%",
       borderRadius: radius.full,
-      backgroundColor: "#7C4DFF",
+    },
+    paylatersProgressHeader: {
+      marginTop: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    paylatersProgressLabel: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
+    },
+    paylatersProgressPercent: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.bold,
     },
     paylatersProgressText: {
       marginTop: 8,
       fontFamily: fontFamilies.sans,
-      fontSize: 14,
+      fontSize: 13,
       lineHeight: 18,
     },
     paylatersAmountsRow: {
-      marginTop: 12,
+      marginTop: 14,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
     },
     paylatersAmountRight: {
-      alignItems: "flex-start",
+      alignItems: "flex-end",
       minWidth: 116,
     },
     paylatersBalanceValue: {
-      marginTop: 2,
+      marginTop: 6,
       fontFamily: fontFamilies.sans,
       fontSize: 16,
-      lineHeight: 20,
+      lineHeight: 22,
       fontWeight: fontWeights.bold,
       color: "#168CF3",
     },
     paylatersInstallmentValue: {
-      marginTop: 2,
+      marginTop: 6,
       fontFamily: fontFamilies.sans,
       fontSize: 16,
-      lineHeight: 20,
+      lineHeight: 22,
       fontWeight: fontWeights.bold,
     },
     paylatersItemDivider: {
       marginTop: 14,
       height: StyleSheet.hairlineWidth,
-      backgroundColor: "rgba(148, 163, 184, 0.22)",
     },
     paylatersActionsRow: {
       marginTop: 10,

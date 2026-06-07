@@ -104,6 +104,12 @@ function formatAmountInputValue(amount: number) {
   return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
 }
 
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 function buildCalendarDays(monthDate: Date) {
   const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
   const lastDay = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -446,6 +452,7 @@ export default function PaylaterRepaymentModal() {
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
+      await waitForNextFrame();
       if (!selectedPaymentMethodId) {
         setErrorMessage("Please select a wallet or card.");
         return;
