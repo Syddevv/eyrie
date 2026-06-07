@@ -488,13 +488,15 @@ export class PaylatersService {
       return;
     }
 
+    const isFullyPaid =
+      existing.status === "paid" || Number(existing.remainingBalance ?? 0) <= 0;
     const payments =
       await paylaterPaymentsRepository.findAllByPaylaterIdIncludingDeleted(id);
     const activePayments = payments.filter((payment) => !payment.deletedAt);
     const timestamp = nowIso();
 
     await db.transaction(async (tx) => {
-      if (activePayments.length > 0) {
+      if (!isFullyPaid && activePayments.length > 0) {
         for (const payment of activePayments) {
           const linkedTransaction =
             await transactionsService.softDeleteLinkedPaylaterRepaymentInTransaction(tx, {
@@ -536,11 +538,15 @@ export class PaylatersService {
     });
 
     emitPaylatersChanged();
-    emitAccountsChanged();
-    emitTransactionsChanged();
+    if (!isFullyPaid) {
+      emitAccountsChanged();
+      emitTransactionsChanged();
+    }
     showSuccessToast({
       title: "Paylater deleted",
-      message: "The paylater and its linked repayment expenses were removed.",
+      message: isFullyPaid
+        ? "The paid paylater was removed from your list. Past repayments were kept."
+        : "The paylater and its linked repayment expenses were removed.",
       dedupeKey: `paylater:delete:${existing.id}`,
       source: "paylaters-service",
     });

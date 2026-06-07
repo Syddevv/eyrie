@@ -941,7 +941,11 @@ export default function PaylaterInfoModal() {
       <DeleteConfirmationModal
         visible={showDeletePaylaterConfirm}
         title="Delete paylater?"
-        message="This will remove the paylater, its payment history, and the linked repayment expenses."
+        message={
+          isPaidPaylater
+            ? "This PayLater is already fully paid. Deleting it will only remove it from your PayLater list. Past repayment transactions will remain in your records and your balance will not be changed."
+            : "This will remove the paylater, its payment history, and the linked repayment expenses."
+        }
         isDeleting={isDeletingPaylater}
         onCancel={() => {
           if (!isDeletingPaylater) {
