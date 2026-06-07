@@ -110,6 +110,7 @@ export default function TransactionDetailsModal() {
   const { isRunning: isSavingReceipt, run: runSaveReceipt } = useAsyncAction();
   const hasCategoryAvatar = Boolean(transaction?.categoryIconType);
   const usesUploadedCategoryImage =
+    !transaction?.isPaylaterTransaction &&
     transaction?.categoryIconType === "uploaded_image" &&
     Boolean(transaction.categoryIconImageUri);
 
@@ -307,16 +308,30 @@ export default function TransactionDetailsModal() {
                   styles.iconWrap,
                   {
                     backgroundColor: transaction
-                      ? hasMerchantLogo || usesUploadedCategoryImage
-                        ? "transparent"
-                        : isDark
+                      ? transaction.isPaylaterTransaction
+                        ? isDark
                           ? transaction.iconBackgroundDark
                           : transaction.iconBackgroundLight
+                        : hasMerchantLogo || usesUploadedCategoryImage
+                          ? "transparent"
+                          : isDark
+                            ? transaction.iconBackgroundDark
+                            : transaction.iconBackgroundLight
                       : getMutedSurface(isDark),
                   },
                 ]}
               >
-                {hasMerchantLogo ? (
+                {transaction?.isPaylaterTransaction ? (
+                  <MerchantLogo
+                    merchant={null}
+                    size={48}
+                    fallbackIcon={{
+                      library: transaction?.iconLibrary,
+                      name: transaction?.iconName ?? "circle",
+                      color: transaction?.iconColor ?? "#94A3B8",
+                    }}
+                  />
+                ) : hasMerchantLogo ? (
                   <MerchantLogo
                     merchant={transaction?.merchant}
                     size={48}
@@ -529,7 +544,18 @@ export default function TransactionDetailsModal() {
               >
                 <View style={[styles.receiptCard, ui.receiptCard]}>
                   <View style={styles.receiptLogoWrap}>
-                    {transaction?.merchant && hasMerchantLogo ? (
+                    {transaction?.isPaylaterTransaction ? (
+                      <MerchantLogo
+                        merchant={null}
+                        size={72}
+                        backgroundColor="#E8EEF8"
+                        fallbackIcon={{
+                          library: transaction?.iconLibrary,
+                          name: transaction?.iconName ?? "circle",
+                          color: transaction?.iconColor ?? "#5B78A2",
+                        }}
+                      />
+                    ) : transaction?.merchant && hasMerchantLogo ? (
                       <MerchantLogo
                         merchant={transaction.merchant}
                         size={72}

@@ -39,6 +39,7 @@ import {
   getFieldBorder,
   getFieldSurface,
   getHandleColor,
+  isPaylaterTransactionReference,
   getPlaceholderColor,
   getSheetSurface,
   getSubtitleColor,
@@ -489,6 +490,9 @@ export default function EditTransactionModal() {
       "expense",
       {
         merchantName: selectedMerchantOption?.label ?? merchantQuery,
+        source: transaction.source,
+        referenceType: transaction.referenceType,
+        referenceId: transaction.referenceId,
       },
     );
   })();
@@ -496,7 +500,11 @@ export default function EditTransactionModal() {
   const previewMerchantLabel =
     selectedMerchantOption?.label ?? (merchantQuery.trim() || null);
   const hasPreviewMerchantLogo = Boolean(
-    getMerchantLogo(isIncomeTransaction ? null : previewMerchantLabel),
+    !isPaylaterTransactionReference({
+      source: transaction?.source,
+      referenceType: transaction?.referenceType,
+      referenceId: transaction?.referenceId,
+    }) && getMerchantLogo(isIncomeTransaction ? null : previewMerchantLabel),
   );
   const previewTitle = isIncomeTransaction
     ? (selectedCategory?.label ?? transaction?.category ?? transaction?.title)

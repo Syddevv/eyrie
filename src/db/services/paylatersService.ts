@@ -83,17 +83,6 @@ type RepaymentSummary = {
   overallProgress: number;
 };
 
-const PREFERRED_REPAYMENT_CATEGORIES = [
-  "PayLater",
-  "Pay Later",
-  "Debt",
-  "Loans",
-  "Repayments",
-  "Bills & Utilities",
-  "Bills",
-  "Shopping",
-] as const;
-
 function normalizeName(value?: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
@@ -640,17 +629,11 @@ export class PaylatersService {
   private async resolveRepaymentCategoryId(userId: string) {
     const categories = await categoriesService.fetch(userId, "expense");
 
-    for (const preferredName of PREFERRED_REPAYMENT_CATEGORIES) {
-      const match = categories.find(
-        (category) => normalizeName(category.name) === normalizeName(preferredName),
-      );
-      if (match) {
-        return categoriesService.resolveCanonicalCategoryId(match.id);
-      }
-    }
-
-    if (categories[0]) {
-      return categoriesService.resolveCanonicalCategoryId(categories[0].id);
+    const exactMatch = categories.find(
+      (category) => normalizeName(category.name) === normalizeName("PayLater"),
+    );
+    if (exactMatch) {
+      return categoriesService.resolveCanonicalCategoryId(exactMatch.id);
     }
 
     const created = await categoriesService.create({

@@ -8,6 +8,10 @@ import { resolveBrandLabel } from "@/hooks/usePaymentMethods";
 import { transactionsService } from "@/src/db/services";
 import { onAccountsChanged, onTransactionsChanged } from "@/src/lib/dbSync";
 import { getMerchantPresetByName } from "@/constants/expense-merchants";
+import {
+  PAYLATER_TRANSACTION_REFERENCE_TYPE,
+  PAYLATER_TRANSACTION_SOURCE,
+} from "@/src/db/utils/paylaters";
 
 type IconLibrary = "feather" | "material";
 type TransactionTypeValue = "expense" | "income" | "transfer";
@@ -41,6 +45,10 @@ export type TransactionListItem = {
   typeValue: TransactionTypeValue;
   currencyCode: string;
   notes: string | null;
+  source: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  isPaylaterTransaction: boolean;
   iconLibrary: IconLibrary;
   iconName: string;
   iconColor: string;
@@ -202,8 +210,21 @@ export function resolveTransactionVisual(
     merchantName?: string | null;
     categoryIcon?: string | null;
     categoryColor?: string | null;
+    source?: string | null;
+    referenceType?: string | null;
+    referenceId?: string | null;
   },
 ) {
+  if (isPaylaterTransactionReference(options)) {
+    return {
+      iconLibrary: "material" as const,
+      iconName: "calendar-clock-outline",
+      iconColor: "#168CF3",
+      iconBackgroundLight: "#DCEEFE",
+      iconBackgroundDark: "#11243B",
+    };
+  }
+
   const normalizedCategory = categoryKey(categoryName);
   const matchedMerchant = getMerchantPresetByName(options?.merchantName);
 
@@ -328,6 +349,29 @@ export function resolveTransactionVisual(
   };
 }
 
+export function isPaylaterTransactionReference(input?: {
+  source?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+}) {
+  if (!input) {
+    return false;
+  }
+
+  if (input.source === PAYLATER_TRANSACTION_SOURCE) {
+    return true;
+  }
+
+  if (
+    input.referenceType === PAYLATER_TRANSACTION_REFERENCE_TYPE ||
+    input.referenceType === "paylater"
+  ) {
+    return true;
+  }
+
+  return Boolean(input.referenceId && input.referenceType?.includes("paylater"));
+}
+
 function mapTransactionRow(source: TransactionRow): TransactionListItem {
   const merchant =
     source.merchant?.name ||
@@ -349,8 +393,16 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
       merchantName: merchant,
       categoryIcon: source.category?.icon ?? null,
       categoryColor: source.category?.color ?? null,
+      source: source.source ?? null,
+      referenceType: source.referenceType ?? null,
+      referenceId: source.referenceId ?? null,
     },
   );
+  const isPaylaterTransaction = isPaylaterTransactionReference({
+    source: source.source ?? null,
+    referenceType: source.referenceType ?? null,
+    referenceId: source.referenceId ?? null,
+  });
   const isIncome = source.type === "income";
   const isTransfer = source.type === "transfer";
   const accountLabel = source.account
@@ -377,6 +429,10 @@ function mapTransactionRow(source: TransactionRow): TransactionListItem {
     typeValue: source.type as TransactionTypeValue,
     currencyCode: source.currencyCode,
     notes: source.notes ?? null,
+    source: source.source ?? null,
+    referenceType: source.referenceType ?? null,
+    referenceId: source.referenceId ?? null,
+    isPaylaterTransaction,
     categoryIconType: source.category?.iconType ?? null,
     categoryIconName: source.category?.icon ?? null,
     categoryIconImageUri: source.category?.iconImageUri ?? null,

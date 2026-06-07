@@ -2368,6 +2368,7 @@ export default function HomeScreen() {
                       getMerchantLogo(item.merchant),
                     );
                     const usesUploadedCategoryImage =
+                      !item.isPaylaterTransaction &&
                       item.categoryIconType === "uploaded_image" &&
                       Boolean(item.categoryIconImageUri);
 
@@ -2379,12 +2380,24 @@ export default function HomeScreen() {
                             {
                               backgroundColor: hasMerchantLogo ||
                                 usesUploadedCategoryImage
-                                ? "transparent"
+                                ? item.isPaylaterTransaction
+                                  ? item.iconBackground
+                                  : "transparent"
                                 : item.iconBackground,
                             },
                           ]}
                         >
-                          {hasMerchantLogo ? (
+                          {item.isPaylaterTransaction ? (
+                            <MerchantLogo
+                              merchant={null}
+                              size={46}
+                              fallbackIcon={{
+                                library: item.iconLibrary,
+                                name: item.iconName,
+                                color: item.iconColor,
+                              }}
+                            />
+                          ) : hasMerchantLogo ? (
                             <MerchantLogo
                               merchant={item.merchant}
                               size={46}

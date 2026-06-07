@@ -82,6 +82,7 @@ const TransactionRow = memo(function TransactionRow({
 }) {
   const hasMerchantLogo = Boolean(getMerchantLogo(item.merchant));
   const usesUploadedCategoryImage =
+    !item.isPaylaterTransaction &&
     item.categoryIconType === "uploaded_image" &&
     Boolean(item.categoryIconImageUri);
 
@@ -93,6 +94,7 @@ const TransactionRow = memo(function TransactionRow({
             styles.recordIconWrap,
             {
               backgroundColor: hasMerchantLogo || usesUploadedCategoryImage
+                && !item.isPaylaterTransaction
                 ? "transparent"
                 : isDark
                   ? item.iconBackgroundDark
@@ -100,7 +102,17 @@ const TransactionRow = memo(function TransactionRow({
             },
           ]}
         >
-          {hasMerchantLogo ? (
+          {item.isPaylaterTransaction ? (
+            <MerchantLogo
+              merchant={null}
+              size={46}
+              fallbackIcon={{
+                library: item.iconLibrary,
+                name: item.iconName,
+                color: item.iconColor,
+              }}
+            />
+          ) : hasMerchantLogo ? (
             <MerchantLogo
               merchant={item.merchant}
               size={46}
