@@ -24,6 +24,7 @@ import {
 } from "../utils/validation";
 import { categoriesService } from "./categoriesService";
 import { accountsService } from "./accountsService";
+import { budgetsService } from "./budgetsService";
 import { transactionsService } from "./transactionsService";
 import {
   emitAccountsChanged,
@@ -656,10 +657,7 @@ export class PaylatersService {
   }
 
   private async resetBudgetCycleIfNeeded(userId: string, anchorDate: string) {
-    const budgetsServiceModule = await import("./budgetsService");
-    await budgetsServiceModule.budgetsService
-      .resetBudgetsIfNeeded(userId, anchorDate)
-      .catch(() => undefined);
+    await budgetsService.resetBudgetsIfNeeded(userId, anchorDate).catch(() => undefined);
   }
 }
 
