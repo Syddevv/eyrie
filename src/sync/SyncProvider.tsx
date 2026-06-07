@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useDatabaseBootstrap } from "@/src/db/DatabaseProvider";
 import { emitAllChanges } from "@/src/lib/dbSync";
 import { needsInitialHydration, refreshSyncCounts, runSync } from "./engine";
+import { logSync, logSyncError } from "./logger";
 import { useSyncStore } from "./store";
 import { accountsService, categoriesService } from "@/src/db/services";
 import { db } from "@/src/db/client";
@@ -39,8 +40,8 @@ async function getNetInfoModule(): Promise<NetInfoModule | null> {
     nativeModules.RNCNetInfo != null || nativeModules.NetInfo != null;
 
   if (!hasNativeNetInfo) {
-    console.warn(
-      `[sync] NetInfo native module is unavailable on ${Platform.OS}; falling back to always-online mode.`,
+    logSyncError(
+      `NetInfo native module is unavailable on ${Platform.OS}; falling back to always-online mode.`,
     );
     return null;
   }
@@ -107,23 +108,23 @@ function useSyncTriggers() {
     let cancelled = false;
 
     void (async () => {
-      console.log(
-        `[sync] Starting for user: ${userId}, reason: ${previousUserId.current ? "launch" : "login"}`,
+      logSync(
+        `Starting for user: ${userId}, reason: ${previousUserId.current ? "launch" : "login"}`,
       );
       setHydrationReady(false);
       const shouldRestore = await needsInitialHydration(userId);
-      console.log(`[sync] Restore needed: ${shouldRestore}`);
+      logSync(`Restore needed: ${shouldRestore}`);
 
       useSyncStore.getState().setRestoring(shouldRestore);
       await refreshSyncCounts(userId);
 
-      console.log(`[sync] Running sync...`);
+      logSync("Running sync...");
       await runSync({
         userId,
         reason: previousUserId.current ? "launch" : "login",
         pullFirst: shouldRestore,
       });
-      console.log(`[sync] Sync complete`);
+      logSync("Sync complete");
 
       if (cancelled) {
         return;
@@ -131,30 +132,30 @@ function useSyncTriggers() {
 
       // Reconcile after sync restores remote data, before hydration is exposed
       // to UI subscribers.
-      console.log(`[sync] Cleaning up duplicate CASH accounts...`);
+      logSync("Cleaning up duplicate CASH accounts...");
       const cleanupResult = await accountsService.cleanupDuplicateCashAccounts();
-      console.log(`[sync] Duplicate CASH cleanup complete`, cleanupResult);
-      console.log(`[sync] Cleaning up duplicate system categories...`);
+      logSync("Duplicate CASH cleanup complete", cleanupResult);
+      logSync("Cleaning up duplicate system categories...");
       const categoryCleanupResult =
         await categoriesService.cleanupDuplicateSystemCategories(userId);
-      console.log(
-        `[sync] Duplicate system category cleanup complete`,
+      logSync(
+        "Duplicate system category cleanup complete",
         categoryCleanupResult,
       );
-      console.log(`[sync] Recomputing budget spending from restored transactions...`);
+      logSync("Recomputing budget spending from restored transactions...");
       await db.transaction(async (tx) => {
         await refreshAllBudgetSpendingForUser(tx, userId);
       });
-      console.log(`[sync] Budget spending recompute complete`);
-      console.log(`[sync] Ensuring default CASH account...`);
+      logSync("Budget spending recompute complete");
+      logSync("Ensuring default CASH account...");
       await accountsService.ensureDefaultCashAccount(userId, null);
-      console.log(`[sync] Default CASH account ensured`);
+      logSync("Default CASH account ensured");
 
       if (cancelled) {
         return;
       }
 
-      console.log(`[sync] Hydration ready, exposing reconciled accounts to UI`);
+      logSync("Hydration ready, exposing reconciled accounts to UI");
       useSyncStore.getState().setRestoring(false);
       setHydrationReady(true);
 
@@ -170,7 +171,7 @@ function useSyncTriggers() {
       // Refresh all UI after restore/sync completes
       if (shouldRestore) {
         setTimeout(() => {
-          console.log(`[sync] Emitting all changes after restore`);
+          logSync("Emitting all changes after restore");
           emitAllChanges();
         }, 100);
       } else {

@@ -24,6 +24,7 @@ import {
   getDueQueueItems,
   lockQueueItem,
   retryQueuedFailures,
+  updateQueueItemPayloadSnapshot,
   unlockQueueItem,
 } from "./queue";
 import { syncRegistry } from "./registry";
@@ -105,9 +106,38 @@ export async function getSyncDiagnostics(userId: string) {
   const migrations = await db.query.syncState.findMany({
     where: eq(syncState.userId, userId),
   });
+  const failedRecords = (
+    await Promise.all(
+      SYNCABLE_TABLES.map(async (tableName) => {
+        const ids = await fetchFailedRecordIds(tableName, userId);
+        return Promise.all(
+          ids.map(async (id) => {
+            const record = await fetchRecordById(tableName, id);
+            return {
+              tableName,
+              recordId: id,
+              syncStatus: (record as { syncStatus?: string } | null)?.syncStatus ?? null,
+              syncError: (record as { syncError?: string | null } | null)?.syncError ?? null,
+              deletedAt: (record as { deletedAt?: string | null } | null)?.deletedAt ?? null,
+            };
+          }),
+        );
+      }),
+    )
+  ).flat();
 
   return {
     queue,
+    queueIssues: queue.map((item) => ({
+      tableName: item.tableName,
+      recordId: item.recordId,
+      operation: item.operation,
+      attemptCount: item.attemptCount,
+      nextRetryAt: item.nextRetryAt,
+      lastError: item.lastError,
+      payloadSnapshot: __DEV__ ? item.payloadSnapshot : null,
+    })),
+    failedRecords,
     syncStateRows: migrations,
     pendingCount: queue.length,
     failedCount: queue.filter((item) => item.lastError).length,
@@ -184,6 +214,7 @@ async function uploadPendingChanges(
 
   for (const item of items) {
     await lockQueueItem(item.id);
+    let payloadSnapshot: string | null = null;
 
     try {
       const record = await fetchRecordById(item.tableName, item.recordId);
@@ -206,6 +237,13 @@ async function uploadPendingChanges(
         continue;
       }
 
+      const remotePayload = registryEntry.toRemote(record as Record<string, unknown>);
+      if (__DEV__) {
+        payloadSnapshot = JSON.stringify(remotePayload);
+        await updateQueueItemPayloadSnapshot(item.id, payloadSnapshot);
+      } else {
+        await updateQueueItemPayloadSnapshot(item.id, null);
+      }
       const remoteExisting = await fetchRemoteRowById(item.tableName, item.userId, item.recordId);
       const localUpdatedAt = String((record as { updatedAt: string }).updatedAt);
 
@@ -221,9 +259,7 @@ async function uploadPendingChanges(
         continue;
       }
 
-      const [remoteRow] = await upsertRemoteRows(item.tableName, [
-        registryEntry.toRemote(record as Record<string, unknown>),
-      ]);
+      const [remoteRow] = await upsertRemoteRows(item.tableName, [remotePayload]);
 
       await markRecordSyncResult(item.tableName, item.recordId, {
         syncStatus: "synced",
@@ -250,7 +286,10 @@ async function uploadPendingChanges(
       logSyncError("upload failed", {
         tableName: item.tableName,
         recordId: item.recordId,
+        operation: item.operation,
+        attemptCount: item.attemptCount + 1,
         message,
+        payloadSnapshot: __DEV__ ? payloadSnapshot : null,
       });
 
       if (isRetryable) {

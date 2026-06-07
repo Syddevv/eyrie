@@ -7,5 +7,10 @@ export function logSync(message: string, payload?: unknown) {
 }
 
 export function logSyncError(message: string, payload?: unknown) {
-  console.warn(PREFIX, message, payload ?? "");
+  if (__DEV__) {
+    console.warn(PREFIX, message, payload ?? "");
+    return;
+  }
+
+  console.warn(PREFIX, message);
 }

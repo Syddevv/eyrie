@@ -63,6 +63,13 @@ export function classifySyncError(error: unknown): SyncErrorKind {
 
   if (
     message.includes("no column named") ||
+    message.includes("column") && message.includes("does not exist") ||
+    message.includes("relation") && message.includes("does not exist") ||
+    message.includes("schema cache") ||
+    message.includes("could not find the") ||
+    message.includes("violates foreign key constraint") ||
+    message.includes("null value in column") ||
+    message.includes("invalid input syntax") ||
     message.includes("prepareSync") ||
     message.includes("sqlite") ||
     message.includes("schema")

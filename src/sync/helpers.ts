@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 
 import { db } from "@/src/db/client";
 import {
@@ -148,63 +148,114 @@ export async function fetchBootstrapRecordIds(tableName: SyncableTable, userId: 
       const rows = await db
         .select({ id: accounts.id })
         .from(accounts)
-        .where(and(eq(accounts.userId, userId), isNull(accounts.deletedAt)));
+        .where(
+          and(
+            eq(accounts.userId, userId),
+            or(isNull(accounts.deletedAt), eq(accounts.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "categories": {
       const rows = await db
         .select({ id: categories.id })
         .from(categories)
-        .where(and(eq(categories.userId, userId), isNull(categories.deletedAt)));
+        .where(
+          and(
+            eq(categories.userId, userId),
+            or(isNull(categories.deletedAt), eq(categories.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "merchants": {
       const rows = await db
         .select({ id: merchants.id })
         .from(merchants)
-        .where(and(eq(merchants.userId, userId), isNull(merchants.deletedAt)));
+        .where(
+          and(
+            eq(merchants.userId, userId),
+            or(isNull(merchants.deletedAt), eq(merchants.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "transactions": {
       const rows = await db
         .select({ id: transactions.id })
         .from(transactions)
-        .where(and(eq(transactions.userId, userId), isNull(transactions.deletedAt)));
+        .where(
+          and(
+            eq(transactions.userId, userId),
+            or(isNull(transactions.deletedAt), eq(transactions.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "paylaters": {
       const rows = await db
         .select({ id: paylaters.id })
         .from(paylaters)
-        .where(and(eq(paylaters.userId, userId), isNull(paylaters.deletedAt)));
+        .where(
+          and(
+            eq(paylaters.userId, userId),
+            or(isNull(paylaters.deletedAt), eq(paylaters.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "paylater_payments": {
       const rows = await db
         .select({ id: paylaterPayments.id })
         .from(paylaterPayments)
-        .where(and(eq(paylaterPayments.userId, userId), isNull(paylaterPayments.deletedAt)));
+        .where(
+          and(
+            eq(paylaterPayments.userId, userId),
+            or(
+              isNull(paylaterPayments.deletedAt),
+              eq(paylaterPayments.syncStatus, "pending"),
+            ),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "budgets": {
       const rows = await db
         .select({ id: budgets.id })
         .from(budgets)
-        .where(and(eq(budgets.userId, userId), isNull(budgets.deletedAt)));
+        .where(
+          and(
+            eq(budgets.userId, userId),
+            or(isNull(budgets.deletedAt), eq(budgets.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "saving_goals": {
       const rows = await db
         .select({ id: goals.id })
         .from(goals)
-        .where(and(eq(goals.userId, userId), isNull(goals.deletedAt)));
+        .where(
+          and(
+            eq(goals.userId, userId),
+            or(isNull(goals.deletedAt), eq(goals.syncStatus, "pending")),
+          ),
+        );
       return rows.map((row) => row.id);
     }
     case "goal_contributions": {
       const rows = await db
         .select({ id: goalContributions.id })
         .from(goalContributions)
-        .where(and(eq(goalContributions.userId, userId), isNull(goalContributions.deletedAt)));
+        .where(
+          and(
+            eq(goalContributions.userId, userId),
+            or(
+              isNull(goalContributions.deletedAt),
+              eq(goalContributions.syncStatus, "pending"),
+            ),
+          ),
+        );
       return rows.map((row) => row.id);
     }
   }
@@ -216,70 +267,70 @@ export async function fetchFailedRecordIds(tableName: SyncableTable, userId: str
       const rows = await db
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.id, userId), eq(users.syncStatus, "failed"), isNull(users.deletedAt)));
+        .where(and(eq(users.id, userId), eq(users.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "accounts": {
       const rows = await db
         .select({ id: accounts.id })
         .from(accounts)
-        .where(and(eq(accounts.userId, userId), eq(accounts.syncStatus, "failed"), isNull(accounts.deletedAt)));
+        .where(and(eq(accounts.userId, userId), eq(accounts.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "categories": {
       const rows = await db
         .select({ id: categories.id })
         .from(categories)
-        .where(and(eq(categories.userId, userId), eq(categories.syncStatus, "failed"), isNull(categories.deletedAt)));
+        .where(and(eq(categories.userId, userId), eq(categories.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "merchants": {
       const rows = await db
         .select({ id: merchants.id })
         .from(merchants)
-        .where(and(eq(merchants.userId, userId), eq(merchants.syncStatus, "failed"), isNull(merchants.deletedAt)));
+        .where(and(eq(merchants.userId, userId), eq(merchants.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "transactions": {
       const rows = await db
         .select({ id: transactions.id })
         .from(transactions)
-        .where(and(eq(transactions.userId, userId), eq(transactions.syncStatus, "failed"), isNull(transactions.deletedAt)));
+        .where(and(eq(transactions.userId, userId), eq(transactions.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "paylaters": {
       const rows = await db
         .select({ id: paylaters.id })
         .from(paylaters)
-        .where(and(eq(paylaters.userId, userId), eq(paylaters.syncStatus, "failed"), isNull(paylaters.deletedAt)));
+        .where(and(eq(paylaters.userId, userId), eq(paylaters.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "paylater_payments": {
       const rows = await db
         .select({ id: paylaterPayments.id })
         .from(paylaterPayments)
-        .where(and(eq(paylaterPayments.userId, userId), eq(paylaterPayments.syncStatus, "failed"), isNull(paylaterPayments.deletedAt)));
+        .where(and(eq(paylaterPayments.userId, userId), eq(paylaterPayments.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "budgets": {
       const rows = await db
         .select({ id: budgets.id })
         .from(budgets)
-        .where(and(eq(budgets.userId, userId), eq(budgets.syncStatus, "failed"), isNull(budgets.deletedAt)));
+        .where(and(eq(budgets.userId, userId), eq(budgets.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "saving_goals": {
       const rows = await db
         .select({ id: goals.id })
         .from(goals)
-        .where(and(eq(goals.userId, userId), eq(goals.syncStatus, "failed"), isNull(goals.deletedAt)));
+        .where(and(eq(goals.userId, userId), eq(goals.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
     case "goal_contributions": {
       const rows = await db
         .select({ id: goalContributions.id })
         .from(goalContributions)
-        .where(and(eq(goalContributions.userId, userId), eq(goalContributions.syncStatus, "failed"), isNull(goalContributions.deletedAt)));
+        .where(and(eq(goalContributions.userId, userId), eq(goalContributions.syncStatus, "failed")));
       return rows.map((row) => row.id);
     }
   }

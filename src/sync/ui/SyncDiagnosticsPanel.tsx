@@ -73,6 +73,53 @@ export function SyncDiagnosticsPanel({
         Migrations: {snapshot?.migrations?.appliedMigrations?.length ?? 0}
       </Text>
 
+      {snapshot?.sync?.queueIssues?.length ? (
+        <View style={styles.issueList}>
+          <Text style={[styles.issueHeading, { color: colors.foreground }]}>
+            Queue Issues
+          </Text>
+          {snapshot.sync.queueIssues.slice(0, 5).map((item: any) => (
+            <View key={`${item.tableName}:${item.recordId}`} style={styles.issueItem}>
+              <Text style={[styles.issueTitle, { color: colors.foreground }]}>
+                {item.tableName} • {item.recordId}
+              </Text>
+              <Text style={[styles.issueMeta, { color: colors.mutedForeground }]}>
+                {item.operation} • attempts {item.attemptCount}
+              </Text>
+              {item.lastError ? (
+                <Text style={[styles.issueError, { color: "#EF4444" }]}>
+                  {item.lastError}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {snapshot?.sync?.failedRecords?.length ? (
+        <View style={styles.issueList}>
+          <Text style={[styles.issueHeading, { color: colors.foreground }]}>
+            Failed Records
+          </Text>
+          {snapshot.sync.failedRecords.slice(0, 5).map((item: any) => (
+            <View key={`${item.tableName}:${item.recordId}:failed`} style={styles.issueItem}>
+              <Text style={[styles.issueTitle, { color: colors.foreground }]}>
+                {item.tableName} • {item.recordId}
+              </Text>
+              <Text style={[styles.issueMeta, { color: colors.mutedForeground }]}>
+                {item.syncStatus ?? "unknown"}
+                {item.deletedAt ? " • soft-deleted" : ""}
+              </Text>
+              {item.syncError ? (
+                <Text style={[styles.issueError, { color: "#EF4444" }]}>
+                  {item.syncError}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.actions}>
         <Pressable
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
@@ -210,6 +257,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
+  },
+  issueList: {
+    marginTop: 12,
+    gap: 8,
+  },
+  issueHeading: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "700",
+  },
+  issueItem: {
+    gap: 2,
+  },
+  issueTitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  issueMeta: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  issueError: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   actionButton: {
     flex: 1,

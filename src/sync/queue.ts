@@ -108,6 +108,19 @@ export async function failQueueItem(id: string, attemptCount: number, lastError:
     .where(eq(syncQueue.id, id));
 }
 
+export async function updateQueueItemPayloadSnapshot(
+  id: string,
+  payloadSnapshot: string | null,
+) {
+  await db
+    .update(syncQueue)
+    .set({
+      payloadSnapshot,
+      updatedAt: nowIso(),
+    })
+    .where(eq(syncQueue.id, id));
+}
+
 export async function unlockQueueItem(id: string) {
   await db.update(syncQueue).set({ lockedAt: null, updatedAt: nowIso() }).where(eq(syncQueue.id, id));
 }

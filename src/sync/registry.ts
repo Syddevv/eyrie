@@ -20,6 +20,7 @@ import {
   PAYLATER_TRANSACTION_SOURCE,
 } from "@/src/db/utils/paylaters";
 import { isValidDateKey } from "@/src/lib/streaks";
+import { logSync } from "./logger";
 import type { SyncableTable } from "./types";
 
 type RegistryEntry = {
@@ -87,7 +88,7 @@ function mergeUserStreakFields(
   const preserveLocal = shouldPreserveLocalStreak(existing, remoteUpdatedAt);
 
   if (preserveLocal && existing) {
-    console.log("[streak:sync] preserving newer local streak", {
+    logSync("preserving newer local streak", {
       userId: existing.id,
       localUpdatedAt: existing.updatedAt,
       remoteUpdatedAt,
@@ -442,6 +443,9 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       merchant_id: row.merchantId ?? null,
       account_id: row.accountId,
       transfer_account_id: row.transferAccountId ?? null,
+      source: row.source ?? null,
+      reference_type: row.referenceType ?? null,
+      reference_id: row.referenceId ?? null,
       merchant_name: row.merchantName ?? null,
       notes: row.notes ?? null,
       transaction_date: row.transactionDate,
