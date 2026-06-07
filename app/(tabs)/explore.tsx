@@ -45,6 +45,7 @@ import {
   formatResetDateLabel,
   formatResetDateLabelFromNextResetDate,
 } from "@/src/db/utils/time";
+import { getPaylaterScheduledDueDate } from "@/src/db/utils/paylaters";
 import {
   formatBudgetBalanceLabel,
   getBudgetProgressRatio,
@@ -209,7 +210,44 @@ function formatPaylaterDueOnLabel(date: Date | null | undefined) {
     return "No due date";
   }
 
-  return `${date.getDate()} of month`;
+  const day = date.getDate();
+  const remainder10 = day % 10;
+  const remainder100 = day % 100;
+  const suffix =
+    remainder10 === 1 && remainder100 !== 11
+      ? "st"
+      : remainder10 === 2 && remainder100 !== 12
+        ? "nd"
+        : remainder10 === 3 && remainder100 !== 13
+          ? "rd"
+          : "th";
+
+  return `Every ${day}${suffix}`;
+}
+
+function getPaylaterCardStatusLabel(input: {
+  status: string;
+  remainingBalance: number;
+  installmentAmount: number;
+  dueDay: string | null;
+  dueDate: string | null;
+}) {
+  if (input.status === "paid") {
+    return "Paid";
+  }
+
+  const scheduledDueDate = getPaylaterScheduledDueDate({
+    remainingBalance: input.remainingBalance,
+    installmentAmount: input.installmentAmount,
+    dueDay: input.dueDay,
+    dueDate: input.dueDate,
+  });
+
+  if (scheduledDueDate && getPaylaterDaysLeftLabel(scheduledDueDate) === "Due today") {
+    return "Due today";
+  }
+
+  return getPaylaterStatusLabel(input.status);
 }
 
 const FLOATING_TAB_BAR_CLEARANCE = 104;
@@ -1325,6 +1363,13 @@ export default function BudgetScreen() {
                     const statusTone = getPaylaterStatusTone(item.status);
                     const isUpcoming = statusTone === "upcoming";
                     const isOverdue = statusTone === "overdue";
+                    const statusLabel = getPaylaterCardStatusLabel({
+                      status: item.status,
+                      remainingBalance: Number(item.remainingBalance ?? 0),
+                      installmentAmount: Number(item.installmentAmount ?? 0),
+                      dueDay: item.dueDay ?? null,
+                      dueDate: item.dueDate ?? null,
+                    });
                     const { progress, installmentsRemaining } =
                       toPaylaterProgressLabel(item);
                     const provider = getPaylaterOption(item.platform);
@@ -1471,7 +1516,7 @@ export default function BudgetScreen() {
                                 { color: activeCardPalette.statusText },
                               ]}
                             >
-                              {getPaylaterStatusLabel(item.status)}
+                              {statusLabel}
                             </Text>
                           </View>
                         </View>

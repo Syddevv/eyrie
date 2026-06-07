@@ -1,7 +1,7 @@
-import { and, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "../client";
-import { budgets, transactions } from "../schema";
+import { budgets, paylaterPayments, paylaters, transactions } from "../schema";
 import { transactionsRepository } from "../repositories/transactionsRepository";
 import { budgetsService } from "./budgetsService";
 import { merchantsService } from "./merchantsService";
@@ -26,6 +26,7 @@ import {
 import {
   emitAccountsChanged,
   emitMerchantsChanged,
+  emitPaylatersChanged,
   emitTransactionsChanged,
 } from "@/src/lib/dbSync";
 import {
@@ -39,6 +40,7 @@ import { usersService } from "./usersService";
 import { categoriesService } from "./categoriesService";
 import {
   buildRepaymentTransactionNotes,
+  getPaylaterStatus,
   PAYLATER_TRANSACTION_REFERENCE_TYPE,
   PAYLATER_TRANSACTION_SOURCE,
 } from "../utils/paylaters";
@@ -446,6 +448,7 @@ export class TransactionsService {
         .update(transactions)
         .set(prepareDeleteForSync())
         .where(eq(transactions.id, id));
+      await this.deleteLinkedPaylaterPaymentForTransaction(tx, existing);
       await refreshBudgetsForTransactionChange(tx, existing, undefined);
       return existing;
     });
@@ -470,6 +473,9 @@ export class TransactionsService {
 
     emitAccountsChanged();
     emitTransactionsChanged();
+    if (deleted) {
+      emitPaylatersChanged();
+    }
     if (deleted) {
       await enqueueSync("transactions", deleted.id, "delete", deleted.userId);
       await this.enqueueTransactionDependencies([deleted]);
@@ -670,6 +676,92 @@ export class TransactionsService {
       .where(eq(transactions.id, existing.id));
     await refreshBudgetsForTransactionChange(tx, existing, undefined);
     return existing;
+  }
+
+  private async deleteLinkedPaylaterPaymentForTransaction(
+    tx: Executor,
+    transaction: {
+      id: string;
+      source?: string | null;
+      referenceType?: string | null;
+      referenceId?: string | null;
+    },
+  ) {
+    const linkedPayment = await tx.query.paylaterPayments.findFirst({
+      where: (table: any, { eq: innerEq }: any) =>
+        and(
+          isNull(table.deletedAt),
+          or(
+            innerEq(table.transactionId, transaction.id),
+            innerEq(
+              table.id,
+              transaction.source === PAYLATER_TRANSACTION_SOURCE &&
+                transaction.referenceType === PAYLATER_TRANSACTION_REFERENCE_TYPE
+                ? (transaction.referenceId ?? "")
+                : "",
+            ),
+          ),
+        ),
+    });
+
+    if (!linkedPayment) {
+      return;
+    }
+
+    const parentPaylater = await tx.query.paylaters.findFirst({
+      where: (table: any, { eq: innerEq }: any) =>
+        innerEq(table.id, linkedPayment.paylaterId),
+    });
+
+    const timestamp = nowIso();
+
+    await tx
+      .update(paylaterPayments)
+      .set(prepareDeleteForSync(timestamp))
+      .where(eq(paylaterPayments.id, linkedPayment.id));
+
+    await enqueueSync(
+      "paylater_payments",
+      linkedPayment.id,
+      "delete",
+      linkedPayment.userId,
+      null,
+      tx,
+    );
+
+    if (!parentPaylater) {
+      return;
+    }
+
+    const nextRemainingBalance = Math.min(
+      Number(parentPaylater.totalAmount ?? 0),
+      Number(parentPaylater.remainingBalance ?? 0) + Number(linkedPayment.amount ?? 0),
+    );
+
+    await tx
+      .update(paylaters)
+      .set(
+        prepareUpdateForSync({
+          remainingBalance: nextRemainingBalance,
+          status: getPaylaterStatus({
+            remainingBalance: nextRemainingBalance,
+            installmentAmount: Number(parentPaylater.installmentAmount ?? 0),
+            dueDay: parentPaylater.dueDay,
+            dueDate: parentPaylater.dueDate,
+          }),
+          updatedAt: timestamp,
+        }),
+      )
+      .where(eq(paylaters.id, parentPaylater.id));
+
+    await enqueueSync(
+      "paylaters",
+      parentPaylater.id,
+      "upsert",
+      parentPaylater.userId,
+      null,
+      tx,
+    );
   }
 
   private async resolveExpenseMerchant(input: {

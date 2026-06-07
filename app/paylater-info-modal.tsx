@@ -40,6 +40,7 @@ import {
   getPaylaterStatusLabel,
   getPaylaterStatusTone,
 } from "@/src/lib/paylaters-presentation";
+import { getPaylaterScheduledDueDate } from "@/src/db/utils/paylaters";
 import { onPaylatersChanged } from "@/src/lib/dbSync";
 import { toPaylaterProgressLabel } from "@/src/db/services/paylatersService";
 import { LoadingActionButton } from "@/components/loading-action-button";
@@ -50,6 +51,19 @@ function getParamValue(value?: string | string[]) {
   }
 
   return value ?? "";
+}
+
+function isDueToday(date: Date | null) {
+  if (!date) {
+    return false;
+  }
+
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
 }
 
 export default function PaylaterInfoModal() {
@@ -115,6 +129,24 @@ export default function PaylaterInfoModal() {
 
   const platform = paylater ? getPaylaterOption(paylater.platform) : null;
   const statusTone = getPaylaterStatusTone(paylater?.status ?? "upcoming");
+  const statusLabel = useMemo(() => {
+    if (!paylater) {
+      return getPaylaterStatusLabel("upcoming");
+    }
+
+    const scheduledDueDate = getPaylaterScheduledDueDate({
+      remainingBalance: Number(paylater.remainingBalance ?? 0),
+      installmentAmount: Number(paylater.installmentAmount ?? 0),
+      dueDay: paylater.dueDay,
+      dueDate: paylater.dueDate,
+    });
+
+    if (statusTone === "upcoming" && isDueToday(scheduledDueDate)) {
+      return "Due today";
+    }
+
+    return getPaylaterStatusLabel(paylater.status);
+  }, [paylater, statusTone]);
   const activePaymentMethod =
     paymentMethods.find((method) => method.id === selectedPaymentMethodId) ??
     paymentMethods[0] ??
@@ -431,7 +463,7 @@ export default function PaylaterInfoModal() {
                 <Text style={styles.summaryProvider}>{platform?.name ?? "PayLater"}</Text>
                 <View style={[styles.statusPill, ui.statusPill]}>
                   <Text style={[styles.statusText, ui.statusText]}>
-                    {getPaylaterStatusLabel(paylater.status)}
+                    {statusLabel}
                   </Text>
                 </View>
               </View>

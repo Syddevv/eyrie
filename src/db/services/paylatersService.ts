@@ -128,6 +128,13 @@ function asDateParts(date: string | Date | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function withEffectiveStatus<T extends Paylater>(paylater: T) {
+  return {
+    ...paylater,
+    status: toEffectiveStatus(paylater),
+  };
+}
+
 export class PaylatersService {
   async create(input: CreatePaylaterInput) {
     assertRequiredText(input.userId ?? "", "userId");
@@ -553,11 +560,13 @@ export class PaylatersService {
   }
 
   async fetch(userId: string) {
-    return paylatersRepository.findAllByUser(userId);
+    const rows = await paylatersRepository.findAllByUser(userId);
+    return rows.map((row) => withEffectiveStatus(row));
   }
 
   async fetchById(id: string) {
-    return paylatersRepository.findById(id);
+    const row = await paylatersRepository.findById(id);
+    return row ? withEffectiveStatus(row) : null;
   }
 
   async fetchPayments(paylaterId: string) {
