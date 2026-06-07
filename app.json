@@ -16,9 +16,7 @@
         "backgroundColor": "#019042"
       },
       "softwareKeyboardLayoutMode": "resize",
-      "permissions": [
-        "READ_MEDIA_IMAGES"
-      ],
+      "permissions": ["READ_MEDIA_IMAGES"],
       "package": "com.sydu.eyrie",
       "versionCode": 3
     },

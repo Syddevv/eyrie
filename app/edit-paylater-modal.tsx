@@ -3,9 +3,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -45,6 +47,26 @@ export default function EditPaylaterModal() {
   const [installmentAmount, setInstallmentAmount] = useState("0");
   const [dueDay, setDueDay] = useState("1");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!paylaterId) {
@@ -167,7 +189,16 @@ export default function EditPaylaterModal() {
       <View style={[styles.overlay, ui.overlay]}>
         <Pressable style={styles.backdrop} onPress={() => router.back()} />
 
-        <View style={[styles.sheet, ui.sheet, shadows.floating]}>
+        <View
+          style={[
+            styles.sheet,
+            ui.sheet,
+            shadows.floating,
+            keyboardHeight > 0 && {
+              marginBottom: Math.max(12, keyboardHeight - 8),
+            },
+          ]}
+        >
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
@@ -180,73 +211,89 @@ export default function EditPaylaterModal() {
             </Pressable>
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.section}>
-              <Text style={[styles.label, ui.label]}>Remaining Balance</Text>
-              <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
-                <Text style={[styles.peso, ui.peso]}>PHP</Text>
-                <TextInput
-                  value={remainingBalance}
-                  onChangeText={(value) => setRemainingBalance(digitsOnly(value))}
-                  placeholder="0"
-                  placeholderTextColor={ui.placeholder.color}
-                  keyboardType="number-pad"
-                  selectionColor="#6DB2EE"
-                  style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
-                />
+          <ScrollView
+            style={styles.formScroll}
+            contentContainerStyle={styles.formScrollInner}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.form}>
+              <View style={styles.section}>
+                <Text style={[styles.label, ui.label]}>Remaining Balance</Text>
+                <View
+                  style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}
+                >
+                  <Text style={[styles.peso, ui.peso]}>PHP</Text>
+                  <TextInput
+                    value={remainingBalance}
+                    onChangeText={(value) => setRemainingBalance(digitsOnly(value))}
+                    placeholder="0"
+                    placeholderTextColor={ui.placeholder.color}
+                    keyboardType="number-pad"
+                    selectionColor="#6DB2EE"
+                    style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={[styles.label, ui.label]}>Installment Amount</Text>
+                <View
+                  style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}
+                >
+                  <Text style={[styles.peso, ui.peso]}>PHP</Text>
+                  <TextInput
+                    value={installmentAmount}
+                    onChangeText={(value) => setInstallmentAmount(digitsOnly(value))}
+                    placeholder="0"
+                    placeholderTextColor={ui.placeholder.color}
+                    keyboardType="number-pad"
+                    selectionColor="#6DB2EE"
+                    style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={[styles.label, ui.label]}>Due Date (Day of Month)</Text>
+                <View style={[styles.fieldSurface, ui.fieldSurface]}>
+                  <TextInput
+                    value={dueDay}
+                    onChangeText={(value) => setDueDay(digitsOnly(value))}
+                    placeholder="1"
+                    placeholderTextColor={ui.placeholder.color}
+                    keyboardType="number-pad"
+                    selectionColor="#6DB2EE"
+                    style={[styles.fieldInput, ui.fieldText]}
+                  />
+                </View>
+              </View>
+
+              <Text style={[styles.helperText, ui.helperText]}>
+                Changes update the paylater record after saving.
+              </Text>
+
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={[styles.actionButton, ui.cancelButton]}
+                  onPress={() => router.back()}
+                >
+                  <Text style={[styles.actionText, ui.cancelText]}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.actionButton, ui.saveButton]}
+                  onPress={handleSave}
+                  disabled={isSubmitting}
+                >
+                  <Feather name="check" size={16} color={ui.saveButtonText.color} />
+                  <Text style={[styles.actionText, ui.saveButtonText]}>
+                    Save Changes
+                  </Text>
+                </Pressable>
               </View>
             </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, ui.label]}>Installment Amount</Text>
-              <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
-                <Text style={[styles.peso, ui.peso]}>PHP</Text>
-                <TextInput
-                  value={installmentAmount}
-                  onChangeText={(value) => setInstallmentAmount(digitsOnly(value))}
-                  placeholder="0"
-                  placeholderTextColor={ui.placeholder.color}
-                  keyboardType="number-pad"
-                  selectionColor="#6DB2EE"
-                  style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.label, ui.label]}>Due Date (Day of Month)</Text>
-              <View style={[styles.fieldSurface, ui.fieldSurface]}>
-                <TextInput
-                  value={dueDay}
-                  onChangeText={(value) => setDueDay(digitsOnly(value))}
-                  placeholder="1"
-                  placeholderTextColor={ui.placeholder.color}
-                  keyboardType="number-pad"
-                  selectionColor="#6DB2EE"
-                  style={[styles.fieldInput, ui.fieldText]}
-                />
-              </View>
-            </View>
-
-            <Text style={[styles.helperText, ui.helperText]}>
-              Changes update the paylater record after saving.
-            </Text>
-
-            <View style={styles.actionRow}>
-              <Pressable style={[styles.actionButton, ui.cancelButton]} onPress={() => router.back()}>
-                <Text style={[styles.actionText, ui.cancelText]}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.actionButton, ui.saveButton]}
-                onPress={handleSave}
-                disabled={isSubmitting}
-              >
-                <Feather name="check" size={16} color={ui.saveButtonText.color} />
-                <Text style={[styles.actionText, ui.saveButtonText]}>Save Changes</Text>
-              </Pressable>
-            </View>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -271,7 +318,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 10,
     paddingBottom: 28,
-    maxHeight: "88%",
+    maxHeight: "90%",
+  },
+  formScroll: {
+    flexGrow: 0,
+  },
+  formScrollInner: {
+    paddingBottom: 8,
   },
   handle: {
     alignSelf: "center",

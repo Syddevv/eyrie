@@ -4,17 +4,26 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 
+import Logo from "@/components/logo";
+import { BANKS } from "@/constants/banks";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import LOGO_MAP from "@/constants/logoMap";
+import { WALLETS } from "@/constants/wallets";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useModalMotion } from "@/hooks/useModalMotion";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import {
   paylatersService,
   type PaylaterListItem,
@@ -52,6 +61,19 @@ export default function PaylaterInfoModal() {
   const paylaterId = getParamValue(params.paylaterId);
   const [paylater, setPaylater] = useState<PaylaterListItem | null>(null);
   const [payments, setPayments] = useState<PaylaterPaymentListItem[]>([]);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
+    string | null
+  >(null);
+  const [isPaymentMethodsOpen, setIsPaymentMethodsOpen] = useState(false);
+  const [isMarkPaidPickerVisible, setIsMarkPaidPickerVisible] = useState(false);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [markPaidError, setMarkPaidError] = useState<string | null>(null);
+  const { methods: paymentMethods } = usePaymentMethods();
+  const { accounts } = useAccounts();
+  const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
+    visible: isMarkPaidPickerVisible,
+    enteringOffset: 18,
+  });
 
   useEffect(() => {
     if (!paylaterId) {
@@ -84,6 +106,22 @@ export default function PaylaterInfoModal() {
 
   const platform = paylater ? getPaylaterOption(paylater.platform) : null;
   const statusTone = getPaylaterStatusTone(paylater?.status ?? "upcoming");
+  const activePaymentMethod =
+    paymentMethods.find((method) => method.id === selectedPaymentMethodId) ??
+    paymentMethods[0] ??
+    null;
+  const activePaymentMethodAccountId =
+    activePaymentMethod && "accountId" in activePaymentMethod
+      ? activePaymentMethod.accountId
+      : undefined;
+  const markPaidAmount = Number(paylater?.remainingBalance ?? 0);
+  const isPaidPaylater =
+    statusTone === "paid" || Number(paylater?.remainingBalance ?? 0) <= 0;
+  const selectedPaymentMethodIsInsufficient =
+    Boolean(activePaymentMethod) &&
+    !activePaymentMethod?.isFallback &&
+    activePaymentMethod?.kind !== "credit" &&
+    markPaidAmount > (activePaymentMethod?.balance ?? 0);
   const { progress, percentagePaid, installmentsRemaining } =
     toPaylaterProgressLabel(
       paylater ?? {
@@ -161,6 +199,25 @@ export default function PaylaterInfoModal() {
       successButtonText: {
         color: "#0F9F4A",
       },
+      pillSurface: {
+        backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#EEF2F7",
+        borderColor: isDark ? "rgba(255,255,255,0.06)" : "#E6EBF2",
+      },
+      valueText: {
+        color: colors.foreground,
+      },
+      dropdownItemBorder: {
+        borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#E6EBF2",
+      },
+      dropdownItemMuted: {
+        color: isDark ? "#8F9CAF" : "#7D8898",
+      },
+      defaultPill: {
+        backgroundColor: isDark ? "rgba(59,130,246,0.16)" : "#DBEAFE",
+      },
+      defaultPillText: {
+        color: isDark ? "#93C5FD" : "#2563EB",
+      },
       dangerButton: {
         backgroundColor: isDark ? "rgba(239,68,68,0.14)" : "#FEE2E2",
       },
@@ -202,6 +259,21 @@ export default function PaylaterInfoModal() {
     [colors, isDark, statusTone],
   );
 
+  useEffect(() => {
+    if (!paymentMethods.length) {
+      setSelectedPaymentMethodId(null);
+      return;
+    }
+
+    setSelectedPaymentMethodId((current) => {
+      if (current && paymentMethods.some((method) => method.id === current)) {
+        return current;
+      }
+
+      return paymentMethods[0]?.id ?? null;
+    });
+  }, [paymentMethods]);
+
   const handleDeletePayment = (paymentId: string) => {
     Alert.alert(
       "Remove payment?",
@@ -231,26 +303,44 @@ export default function PaylaterInfoModal() {
       return;
     }
 
-    Alert.alert(
-      "Mark as paid?",
-      "This will record a final payment for the remaining balance.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Mark Paid",
-          onPress: () => {
-            void paylatersService
-              .markPaylaterAsPaid(paylater.id)
-              .catch((error) =>
-                Alert.alert(
-                  "Unable to mark as paid",
-                  error instanceof Error ? error.message : "Please try again.",
-                ),
-              );
-          },
-        },
-      ],
-    );
+    setMarkPaidError(null);
+    setIsMarkPaidPickerVisible(true);
+    setIsPaymentMethodsOpen(false);
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!paylater) {
+      return;
+    }
+
+    if (!selectedPaymentMethodId) {
+      setMarkPaidError("Please select a payment method.");
+      return;
+    }
+
+    if (selectedPaymentMethodIsInsufficient) {
+      setMarkPaidError("Selected wallet/card cannot cover the full payoff amount.");
+      return;
+    }
+
+    try {
+      setIsMarkingPaid(true);
+      setMarkPaidError(null);
+      await paylatersService.markPaylaterAsPaidWithAccount(
+        paylater.id,
+        activePaymentMethod?.isFallback
+          ? null
+          : (activePaymentMethodAccountId ?? selectedPaymentMethodId),
+      );
+      setIsMarkPaidPickerVisible(false);
+      setIsPaymentMethodsOpen(false);
+    } catch (error) {
+      setMarkPaidError(
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsMarkingPaid(false);
+    }
   };
 
   const handleDeletePaylater = () => {
@@ -400,34 +490,44 @@ export default function PaylaterInfoModal() {
             </Text>
           </View>
 
-          <Pressable
-            style={[styles.primaryButton, ui.primaryButton]}
-            onPress={() =>
-              router.push({
-                pathname: "/paylater-repayment-modal",
-                params: {
-                  paylaterId: paylater.id,
-                },
-              })
-            }
-          >
-            <Feather name="check" size={16} color="#FFFFFF" />
-            <Text style={[styles.primaryButtonText, ui.primaryButtonText]}>
-              Record Payment
-            </Text>
-          </Pressable>
-
-          <View style={styles.secondaryActionsRow}>
+          {isPaidPaylater ? null : (
             <Pressable
-              style={[styles.secondaryButton, ui.neutralButton]}
+              style={[styles.primaryButton, ui.primaryButton]}
               onPress={() =>
                 router.push({
-                  pathname: "/edit-paylater-modal",
+                  pathname: "/paylater-repayment-modal",
                   params: {
                     paylaterId: paylater.id,
                   },
                 })
               }
+            >
+              <Feather name="check" size={16} color="#FFFFFF" />
+              <Text style={[styles.primaryButtonText, ui.primaryButtonText]}>
+                Record Payment
+              </Text>
+            </Pressable>
+          )}
+
+          <View style={styles.secondaryActionsRow}>
+            <Pressable
+              style={[
+                styles.secondaryButton,
+                ui.neutralButton,
+                isPaidPaylater && styles.secondaryButtonDisabled,
+              ]}
+              onPress={
+                isPaidPaylater
+                  ? undefined
+                  : () =>
+                      router.push({
+                        pathname: "/edit-paylater-modal",
+                        params: {
+                          paylaterId: paylater.id,
+                        },
+                      })
+              }
+              disabled={isPaidPaylater}
             >
               <Feather
                 name="edit-2"
@@ -439,19 +539,21 @@ export default function PaylaterInfoModal() {
               </Text>
             </Pressable>
 
-            <Pressable
-              style={[styles.secondaryButton, ui.successButton]}
-              onPress={handleMarkPaid}
-            >
-              <Feather
-                name="award"
-                size={15}
-                color={ui.successButtonText.color}
-              />
-              <Text style={[styles.secondaryButtonText, ui.successButtonText]}>
-                Mark Paid
-              </Text>
-            </Pressable>
+            {isPaidPaylater ? null : (
+              <Pressable
+                style={[styles.secondaryButton, ui.successButton]}
+                onPress={handleMarkPaid}
+              >
+                <Feather
+                  name="award"
+                  size={15}
+                  color={ui.successButtonText.color}
+                />
+                <Text style={[styles.secondaryButtonText, ui.successButtonText]}>
+                  Mark Paid
+                </Text>
+              </Pressable>
+            )}
 
             <Pressable
               style={[styles.iconDangerButton, ui.dangerButton]}
@@ -488,16 +590,18 @@ export default function PaylaterInfoModal() {
                     {formatPaylaterAmount(Number(entry.amount ?? 0))}
                   </Text>
 
-                  <Pressable
-                    style={styles.deleteButton}
-                    onPress={() => handleDeletePayment(entry.id)}
-                  >
-                    <Feather
-                      name="trash-2"
-                      size={16}
-                      color={ui.dangerButtonIcon.color}
-                    />
-                  </Pressable>
+                  {isPaidPaylater ? null : (
+                    <Pressable
+                      style={styles.deleteButton}
+                      onPress={() => handleDeletePayment(entry.id)}
+                    >
+                      <Feather
+                        name="trash-2"
+                        size={16}
+                        color={ui.dangerButtonIcon.color}
+                      />
+                    </Pressable>
+                  )}
                 </View>
               </View>
             ))}
@@ -510,6 +614,327 @@ export default function PaylaterInfoModal() {
           </View>
         </ScrollView>
       </View>
+
+      <Modal
+        animationType="none"
+        onRequestClose={() => {
+          setIsMarkPaidPickerVisible(false);
+          setIsPaymentMethodsOpen(false);
+          setMarkPaidError(null);
+        }}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        transparent
+        visible={isMarkPaidPickerVisible}
+      >
+        <Animated.View
+          style={[
+            styles.markPaidModalOverlay,
+            ui.overlay,
+            animatedBackdropStyle,
+          ]}
+        >
+          <Pressable
+            disabled={isMarkingPaid}
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => {
+              setIsMarkPaidPickerVisible(false);
+              setIsPaymentMethodsOpen(false);
+              setMarkPaidError(null);
+            }}
+          />
+
+          <Animated.View style={[styles.markPaidModalWrap, animatedCardStyle]}>
+            <View style={[styles.markPaidModalCard, ui.sheet, shadows.floating]}>
+              <View style={[styles.handle, ui.handle]} />
+
+              <View style={styles.headerRow}>
+                <Text style={[styles.markPaidTitle, ui.title]}>
+                  Mark Paid With
+                </Text>
+                <Pressable
+                  disabled={isMarkingPaid}
+                  style={[styles.closeButton, ui.closeButton]}
+                  onPress={() => {
+                    setIsMarkPaidPickerVisible(false);
+                    setIsPaymentMethodsOpen(false);
+                    setMarkPaidError(null);
+                  }}
+                >
+                  <Feather name="x" size={20} color={ui.closeIcon.color} />
+                </Pressable>
+              </View>
+
+              <Text style={[styles.markPaidSubtitle, ui.historySubtitle]}>
+                Choose a wallet or card that can cover{" "}
+                {formatPaylaterAmount(markPaidAmount)}.
+              </Text>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.markPaidModalContent}
+              >
+                <Pressable
+                  style={[styles.selectField, ui.pillSurface]}
+                  onPress={() => {
+                    if (paymentMethods.length > 1) {
+                      setIsPaymentMethodsOpen((current) => !current);
+                    }
+                  }}
+                >
+                  <View style={styles.selectFieldContent}>
+                    {(() => {
+                      const account = accounts.find(
+                        (a) => a.id === activePaymentMethodAccountId,
+                      );
+
+                      let logoAsset: any = null;
+
+                      if (account) {
+                        const nameLower = (account.name || "").toLowerCase();
+                        const matchWallet = WALLETS.find(
+                          (w) =>
+                            (w.name && nameLower.includes(w.name.toLowerCase())) ||
+                            (w.shortName &&
+                              nameLower.includes(w.shortName.toLowerCase())) ||
+                            nameLower.includes(w.id),
+                        );
+                        const matchBank = BANKS.find(
+                          (b) =>
+                            (b.name && nameLower.includes(b.name.toLowerCase())) ||
+                            (b.shortName &&
+                              nameLower.includes(b.shortName.toLowerCase())) ||
+                            nameLower.includes(b.id),
+                        );
+
+                        if (matchWallet) {
+                          logoAsset = matchWallet.logo;
+                        } else if (matchBank) {
+                          logoAsset = matchBank.logo;
+                        } else {
+                          const key = account.name
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]/g, "");
+                          logoAsset = LOGO_MAP[key];
+                        }
+                      }
+
+                      if (logoAsset) {
+                        return (
+                          <Logo
+                            logo={logoAsset}
+                            size={24}
+                            backgroundColor={account?.color || colors.secondary}
+                            style={{ marginRight: 10 }}
+                          />
+                        );
+                      }
+
+                      return null;
+                    })()}
+
+                    <View style={styles.selectFieldText}>
+                      <View style={styles.methodTitleRow}>
+                        <Text
+                          style={[styles.selectValue, ui.valueText]}
+                          numberOfLines={1}
+                        >
+                          {activePaymentMethod?.sublabel ??
+                            activePaymentMethod?.label ??
+                            "Select account"}
+                        </Text>
+                        {activePaymentMethod?.isDefault ? (
+                          <View style={[styles.defaultPill, ui.defaultPill]}>
+                            <Text
+                              style={[styles.defaultPillText, ui.defaultPillText]}
+                            >
+                              Default
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                  <Feather name="chevron-down" size={18} color={colors.foreground} />
+                </Pressable>
+
+                {isPaymentMethodsOpen && paymentMethods.length > 1 ? (
+                  <View
+                    style={[styles.methodDropdown, ui.pillSurface, shadows.card]}
+                  >
+                    {paymentMethods.map((method, index) => {
+                      const isSelected = method.id === activePaymentMethod?.id;
+                      const isInsufficient =
+                        !method.isFallback &&
+                        method.kind !== "credit" &&
+                        markPaidAmount > method.balance;
+                      const isLast = index === paymentMethods.length - 1;
+
+                      return (
+                        <Pressable
+                          key={method.id}
+                          style={[
+                            styles.methodItem,
+                            !isLast && styles.methodItemBorder,
+                            !isLast && ui.dropdownItemBorder,
+                            isInsufficient && styles.methodItemDisabled,
+                          ]}
+                          disabled={isInsufficient}
+                          onPress={() => {
+                            setSelectedPaymentMethodId(method.id);
+                            setIsPaymentMethodsOpen(false);
+                          }}
+                        >
+                          <View style={styles.methodItemLeft}>
+                            {(() => {
+                              const methodAccountId =
+                                "accountId" in method ? method.accountId : undefined;
+                              const account = accounts.find(
+                                (a) => a.id === methodAccountId,
+                              );
+
+                              let logoAsset: any = null;
+
+                              if (account) {
+                                const nameLower = (account.name || "").toLowerCase();
+                                const matchWallet = WALLETS.find(
+                                  (w) =>
+                                    (w.name &&
+                                      nameLower.includes(w.name.toLowerCase())) ||
+                                    (w.shortName &&
+                                      nameLower.includes(w.shortName.toLowerCase())) ||
+                                    nameLower.includes(w.id),
+                                );
+                                const matchBank = BANKS.find(
+                                  (b) =>
+                                    (b.name &&
+                                      nameLower.includes(b.name.toLowerCase())) ||
+                                    (b.shortName &&
+                                      nameLower.includes(b.shortName.toLowerCase())) ||
+                                    nameLower.includes(b.id),
+                                );
+
+                                if (matchWallet) {
+                                  logoAsset = matchWallet.logo;
+                                } else if (matchBank) {
+                                  logoAsset = matchBank.logo;
+                                } else {
+                                  const key = account.name
+                                    .toLowerCase()
+                                    .replace(/[^a-z0-9]/g, "");
+                                  logoAsset = LOGO_MAP[key];
+                                }
+                              }
+
+                              if (logoAsset) {
+                                return (
+                                  <Logo
+                                    logo={logoAsset}
+                                    size={24}
+                                    backgroundColor={account?.color || colors.secondary}
+                                  />
+                                );
+                              }
+
+                              return (
+                                <View style={styles.methodBadge}>
+                                  <Text style={styles.methodBadgeText}>
+                                    {method.label.slice(0, 2).toUpperCase()}
+                                  </Text>
+                                </View>
+                              );
+                            })()}
+
+                            <View style={styles.methodTextBlock}>
+                              <View style={styles.methodTitleRow}>
+                                <Text
+                                  style={[styles.methodTitle, ui.valueText]}
+                                  numberOfLines={1}
+                                >
+                                  {method.label}
+                                </Text>
+                                {method.isDefault ? (
+                                  <View style={[styles.defaultPill, ui.defaultPill]}>
+                                    <Text
+                                      style={[
+                                        styles.defaultPillText,
+                                        ui.defaultPillText,
+                                      ]}
+                                    >
+                                      Default
+                                    </Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                              <Text
+                                style={[
+                                  styles.methodBalanceText,
+                                  ui.valueText,
+                                  isInsufficient && styles.methodBalanceTextDanger,
+                                ]}
+                              >
+                                {method.balanceLabel}
+                              </Text>
+                              {isInsufficient ? (
+                                <Text
+                                  style={[
+                                    styles.methodAvailabilityText,
+                                    styles.methodBalanceTextDanger,
+                                  ]}
+                                >
+                                  Balance too low for full payoff
+                                </Text>
+                              ) : null}
+                            </View>
+                          </View>
+                          {isSelected ? (
+                            <Feather name="check" size={16} color={colors.primary} />
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+
+                <View style={styles.markPaidActions}>
+                  <Pressable
+                    style={[styles.markPaidCancelButton, ui.neutralButton]}
+                    onPress={() => {
+                      setIsMarkPaidPickerVisible(false);
+                      setIsPaymentMethodsOpen(false);
+                      setMarkPaidError(null);
+                    }}
+                  >
+                    <Text style={[styles.secondaryButtonText, ui.neutralButtonText]}>
+                      Cancel
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[
+                      styles.markPaidConfirmButton,
+                      ui.successButton,
+                      (isMarkingPaid || selectedPaymentMethodIsInsufficient) && {
+                        opacity: 0.6,
+                      },
+                    ]}
+                    onPress={() => void confirmMarkPaid()}
+                    disabled={isMarkingPaid || selectedPaymentMethodIsInsufficient}
+                  >
+                    <Text style={[styles.secondaryButtonText, ui.successButtonText]}>
+                      {isMarkingPaid ? "Saving..." : "Confirm"}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {markPaidError ? (
+                  <Text style={styles.markPaidError}>{markPaidError}</Text>
+                ) : null}
+              </ScrollView>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </View>
   );
 }
@@ -693,6 +1118,180 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: fontWeights.bold,
   },
+  markPaidPanel: {
+    marginTop: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  markPaidModalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  markPaidModalWrap: {
+    width: "100%",
+  },
+  markPaidModalCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 18,
+    maxHeight: "82%",
+  },
+  markPaidModalContent: {
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  markPaidTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: fontWeights.bold,
+  },
+  markPaidSubtitle: {
+    marginTop: 4,
+  },
+  selectField: {
+    marginTop: 12,
+    minHeight: 42,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectFieldContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectFieldText: {
+    flex: 1,
+  },
+  methodTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  selectValue: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
+  methodDropdown: {
+    marginTop: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  methodItem: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  methodItemBorder: {
+    borderBottomWidth: 1,
+  },
+  methodItemDisabled: {
+    opacity: 0.45,
+  },
+  methodItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  methodTextBlock: {
+    flex: 1,
+    gap: 1,
+  },
+  methodBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#CBD5E1",
+  },
+  methodBadgeText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 12,
+    fontWeight: fontWeights.bold,
+  },
+  methodTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
+  methodBalanceText: {
+    marginTop: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.semibold,
+  },
+  methodAvailabilityText: {
+    marginTop: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+  },
+  methodBalanceTextDanger: {
+    color: "#DC2626",
+  },
+  defaultPill: {
+    height: 20,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  defaultPillText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.semibold,
+  },
+  markPaidActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    gap: 10,
+  },
+  markPaidCancelButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markPaidConfirmButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markPaidError: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+    color: "#EF4444",
+  },
   secondaryActionsRow: {
     marginTop: 14,
     flexDirection: "row",
@@ -706,6 +1305,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.5,
   },
   secondaryButtonText: {
     fontFamily: fontFamilies.sans,

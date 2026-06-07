@@ -427,6 +427,13 @@ export class PaylatersService {
   }
 
   async markPaylaterAsPaid(id: string) {
+    return this.markPaylaterAsPaidWithAccount(id, null);
+  }
+
+  async markPaylaterAsPaidWithAccount(
+    id: string,
+    accountId: string | null,
+  ) {
     const existing = await paylatersRepository.findById(id);
     if (!existing) {
       throw new Error("Paylater not found.");
@@ -439,7 +446,7 @@ export class PaylatersService {
     await this.recordPayment(id, {
       amount: existing.remainingBalance,
       paymentDate: nowIso(),
-      accountId: null,
+      accountId,
       notes: "Marked as paid",
     });
 

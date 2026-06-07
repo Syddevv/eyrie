@@ -154,6 +154,21 @@ function cycleLabel(value: BudgetCycle) {
   return "Monthly";
 }
 
+function formatPaylaterCompletedLabel(value: string | null | undefined) {
+  if (!value) {
+    return "Completed";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Completed";
+  }
+
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `Completed on ${date.getFullYear()}-${month}-${day}`;
+}
+
 const FLOATING_TAB_BAR_CLEARANCE = 104;
 const BUDGET_CYCLE_STORAGE_KEY = "eyrie:budget-cycle-selection";
 
@@ -180,7 +195,17 @@ export default function BudgetScreen() {
   const [isDeletingBudget, setIsDeletingBudget] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const activePaylaterItems = useMemo(
-    () => paylaters.filter((item) => item.status !== "paid"),
+    () =>
+      paylaters.filter(
+        (item) => item.status !== "paid" && Number(item.remainingBalance ?? 0) > 0,
+      ),
+    [paylaters],
+  );
+  const paidPaylaterItems = useMemo(
+    () =>
+      paylaters.filter(
+        (item) => item.status === "paid" || Number(item.remainingBalance ?? 0) <= 0,
+      ),
     [paylaters],
   );
 
@@ -340,6 +365,25 @@ export default function BudgetScreen() {
         backgroundColor: colorScheme === "light" ? "#168CF3" : "#1697FF",
       },
       paylatersSecondaryButton: {
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(22, 140, 243, 0.08)"
+            : "rgba(255,255,255,0.04)",
+      },
+      paidPaylaterCard: {
+        backgroundColor: colorScheme === "light" ? "#F0FDF4" : "#0F1F17",
+        borderColor:
+          colorScheme === "light"
+            ? "rgba(34, 197, 94, 0.24)"
+            : "rgba(74, 222, 128, 0.2)",
+      },
+      paidPaylaterBadge: {
+        backgroundColor:
+          colorScheme === "light"
+            ? "rgba(34, 197, 94, 0.14)"
+            : "rgba(74, 222, 128, 0.16)",
+      },
+      paidPaylaterDetailsButton: {
         backgroundColor:
           colorScheme === "light"
             ? "rgba(22, 140, 243, 0.08)"
@@ -986,7 +1030,7 @@ export default function BudgetScreen() {
               </Pressable>
             </View>
 
-            {activePaylaterItems.length === 0 ? (
+            {activePaylaterItems.length === 0 && paidPaylaterItems.length === 0 ? (
               <View
                 style={[
                   styles.paylatersEmptyCard,
@@ -1108,6 +1152,8 @@ export default function BudgetScreen() {
               </View>
             ) : (
               <>
+                {activePaylaterItems.length > 0 ? (
+                  <>
                 <View
                   style={[
                     styles.paylatersDueCard,
@@ -1383,6 +1429,101 @@ export default function BudgetScreen() {
                     );
                   })}
                 </View>
+                  </>
+                ) : null}
+
+                {paidPaylaterItems.length > 0 ? (
+                  <>
+                    <Text
+                      style={[styles.paylatersActiveLabel, pageStyles.mutedText]}
+                    >
+                      PAID PAYLATERS
+                    </Text>
+
+                    <View style={styles.paylatersList}>
+                      {paidPaylaterItems.map((item) => {
+                        const provider = getPaylaterOption(item.platform);
+
+                        return (
+                          <View
+                            key={item.id}
+                            style={[
+                              styles.paylatersItemCard,
+                              styles.paidPaylaterCard,
+                              pageStyles.paidPaylaterCard,
+                            ]}
+                          >
+                            <View style={styles.paylatersItemTopRow}>
+                              <View style={styles.paylatersItemIdentity}>
+                                <Text
+                                  style={[
+                                    styles.paylatersItemTitle,
+                                    styles.paidPaylaterTitle,
+                                  ]}
+                                >
+                                  {item.itemName}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.paylatersItemProvider,
+                                    styles.paidPaylaterSubtitle,
+                                  ]}
+                                >
+                                  {provider.name}
+                                </Text>
+                                <Text style={styles.paidPaylaterCompletedText}>
+                                  {formatPaylaterCompletedLabel(item.updatedAt)}
+                                </Text>
+                              </View>
+
+                              <View style={styles.paidPaylaterStatusWrap}>
+                                <View
+                                  style={[
+                                    styles.paidPaylaterBadge,
+                                    pageStyles.paidPaylaterBadge,
+                                  ]}
+                                >
+                                  <Feather
+                                    name="check"
+                                    size={14}
+                                    color="#16A34A"
+                                  />
+                                  <Text style={styles.paidPaylaterBadgeText}>
+                                    Paid
+                                  </Text>
+                                </View>
+
+                                <Pressable
+                                  style={[
+                                    styles.paidPaylaterDetailsButton,
+                                    pageStyles.paidPaylaterDetailsButton,
+                                  ]}
+                                  onPress={() =>
+                                    router.push({
+                                      pathname: "/paylater-info-modal",
+                                      params: {
+                                        paylaterId: item.id,
+                                      },
+                                    })
+                                  }
+                                >
+                                  <Text
+                                    style={[
+                                      styles.paidPaylaterDetailsText,
+                                      pageStyles.title,
+                                    ]}
+                                  >
+                                    Details
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
               </>
             )}
           </View>
@@ -2306,6 +2447,55 @@ function createStyles() {
     paylatersStatusText: {
       fontFamily: fontFamilies.sans,
       fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.medium,
+    },
+    paidPaylaterCard: {
+      paddingBottom: 14,
+    },
+    paidPaylaterTitle: {
+      color: "#166534",
+    },
+    paidPaylaterSubtitle: {
+      color: "#22A447",
+    },
+    paidPaylaterCompletedText: {
+      marginTop: 8,
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
+      lineHeight: 18,
+      color: "#15803D",
+    },
+    paidPaylaterStatusWrap: {
+      alignItems: "flex-end",
+      gap: 10,
+    },
+    paidPaylaterBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    paidPaylaterBadgeText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: fontWeights.bold,
+      color: "#16A34A",
+    },
+    paidPaylaterDetailsButton: {
+      minWidth: 96,
+      height: 36,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 16,
+    },
+    paidPaylaterDetailsText: {
+      fontFamily: fontFamilies.sans,
+      fontSize: 14,
       lineHeight: 18,
       fontWeight: fontWeights.medium,
     },

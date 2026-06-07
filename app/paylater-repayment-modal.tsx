@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -26,6 +27,11 @@ import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { paylatersService } from "@/src/db/services";
 import { formatPaylaterAmount } from "@/src/lib/paylaters-presentation";
 import { onPaylatersChanged } from "@/src/lib/dbSync";
+import {
+  formatCurrencyPHP,
+  getCurrentCycleDueDate,
+  getNextUpcomingDueDate,
+} from "@/src/db/utils/paylaters";
 
 const monthNames = [
   "January",
@@ -44,8 +50,16 @@ const monthNames = [
 
 const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
-function digitsOnly(value: string) {
-  return value.replace(/[^\d]/g, "");
+function sanitizeAmountInput(value: string) {
+  const normalized = value.replace(/[^0-9.]/g, "");
+  const [whole = "", ...decimals] = normalized.split(".");
+  const decimalPart = decimals.join("").slice(0, 2);
+
+  if (!normalized.includes(".")) {
+    return whole;
+  }
+
+  return `${whole}.${decimalPart}`;
 }
 
 function getParamValue(value?: string | string[]) {
@@ -64,10 +78,30 @@ function isSameDay(left: Date, right: Date) {
   );
 }
 
+function startOfLocalDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
 function formatDateInput(date: Date) {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${month}/${day}/${date.getFullYear()}`;
+}
+
+function formatLongDate(date: Date) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatAmountInputValue(amount: number) {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return "0";
+  }
+
+  return Number.isInteger(amount) ? `${amount}` : amount.toFixed(2);
 }
 
 function buildCalendarDays(monthDate: Date) {
@@ -133,10 +167,12 @@ export default function PaylaterRepaymentModal() {
     () => new Date(paymentDate.getFullYear(), paymentDate.getMonth(), 1),
   );
   const [showCalendar, setShowCalendar] = useState(false);
-  const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paylaterName, setPaylaterName] = useState(fallbackName);
   const [currentBalance, setCurrentBalance] = useState(fallbackBalance);
+  const [remainingBalanceAmount, setRemainingBalanceAmount] = useState(0);
+  const [installmentAmount, setInstallmentAmount] = useState(0);
+  const [dueDay, setDueDay] = useState<string | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
     string | null
   >(null);
@@ -213,6 +249,9 @@ export default function PaylaterRepaymentModal() {
 
       setPaylaterName(paylater.itemName);
       setCurrentBalance(formatPaylaterAmount(Number(paylater.remainingBalance ?? 0)));
+      setRemainingBalanceAmount(Number(paylater.remainingBalance ?? 0));
+      setInstallmentAmount(Number(paylater.installmentAmount ?? 0));
+      setDueDay(paylater.dueDay ?? null);
     };
 
     void loadPaylater().catch(() => undefined);
@@ -261,6 +300,9 @@ export default function PaylaterRepaymentModal() {
       summaryBalance: {
         color: isDark ? "#A9B6C8" : "#5B6980",
       },
+      summaryHelper: {
+        color: isDark ? "#D7E8FF" : "#29597A",
+      },
       label: {
         color: colors.foreground,
       },
@@ -273,6 +315,16 @@ export default function PaylaterRepaymentModal() {
       },
       placeholder: {
         color: isDark ? "#8F9CAF" : "#8A94A6",
+      },
+      helperText: {
+        color: isDark ? "#8F9CAF" : "#6B7280",
+      },
+      infoBanner: {
+        backgroundColor: isDark ? "rgba(96, 165, 250, 0.12)" : "#E8F3FF",
+        borderColor: isDark ? "rgba(96, 165, 250, 0.22)" : "#BFDBFE",
+      },
+      infoBannerText: {
+        color: isDark ? "#BFDBFE" : "#245A8A",
       },
       peso: {
         color: isDark ? "#A9B6C8" : "#6B7280",
@@ -337,6 +389,52 @@ export default function PaylaterRepaymentModal() {
     [colors, isDark, isSubmitting],
   );
 
+  const scheduledAmountDue = useMemo(
+    () => Math.min(Math.max(installmentAmount, 0), Math.max(remainingBalanceAmount, 0)),
+    [installmentAmount, remainingBalanceAmount],
+  );
+  const currentCycleDueDate = useMemo(
+    () => getCurrentCycleDueDate(dueDay),
+    [dueDay],
+  );
+  const upcomingDueDate = useMemo(
+    () => getNextUpcomingDueDate(dueDay),
+    [dueDay],
+  );
+  const todayStart = useMemo(() => startOfLocalDay(new Date()), []);
+  const currentCycleDueDateStart = currentCycleDueDate
+    ? startOfLocalDay(currentCycleDueDate)
+    : null;
+  const isRepaymentDue = currentCycleDueDateStart
+    ? todayStart.getTime() >= currentCycleDueDateStart.getTime()
+    : false;
+  const dueDate = isRepaymentDue
+    ? currentCycleDueDate
+    : (upcomingDueDate ?? currentCycleDueDate);
+  const isAdvanceRepayment =
+    Boolean(currentCycleDueDateStart) &&
+    todayStart.getTime() < currentCycleDueDateStart.getTime();
+  const headerHelperText =
+    dueDate && scheduledAmountDue > 0
+      ? `Amount due: ${formatCurrencyPHP(scheduledAmountDue)} • Due on ${formatLongDate(dueDate)}`
+      : null;
+  const paymentAmountHelperText = isRepaymentDue
+    ? "This repayment is due, so the required amount is fixed for this period."
+    : isAdvanceRepayment
+      ? "You can enter any amount you want to pay before the due date."
+      : null;
+
+  useEffect(() => {
+    if (!isRepaymentDue || scheduledAmountDue <= 0) {
+      return;
+    }
+
+    setPaymentAmount((current) => {
+      const scheduledValue = formatAmountInputValue(scheduledAmountDue);
+      return current === scheduledValue ? current : scheduledValue;
+    });
+  }, [isRepaymentDue, scheduledAmountDue]);
+
   const handleSave = async () => {
     if (!paylaterId) {
       Alert.alert("Unable to save", "Missing paylater record.");
@@ -360,7 +458,7 @@ export default function PaylaterRepaymentModal() {
         accountId: activePaymentMethod?.isFallback
           ? null
           : (activePaymentMethodAccountId ?? selectedPaymentMethodId),
-        notes: notes.trim() ? notes.trim() : null,
+        notes: null,
       });
       router.back();
     } catch (error) {
@@ -394,63 +492,96 @@ export default function PaylaterRepaymentModal() {
         >
           <View style={[styles.handle, ui.handle]} />
 
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, ui.title]}>Record Payment</Text>
-            <Pressable
-              style={[styles.closeButton, ui.closeButton]}
-              onPress={() => router.back()}
-            >
-              <Feather name="x" size={20} color={ui.closeIcon.color} />
-            </Pressable>
-          </View>
-
-          <View style={[styles.summaryCard, ui.summaryCard]}>
-            <Text style={[styles.summaryLabel, ui.summaryLabel]}>Payment for</Text>
-            <Text style={[styles.summaryTitle, ui.summaryTitle]}>
-              {paylaterName}
-            </Text>
-            <Text style={[styles.summaryBalance, ui.summaryBalance]}>
-              Current Balance: {currentBalance}
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Payment Amount</Text>
-            <View
-              style={[
-                styles.fieldSurface,
-                ui.fieldSurface,
-                styles.currencyField,
-              ]}
-            >
-              <Text style={[styles.peso, ui.peso]}>PHP</Text>
-              <TextInput
-                value={paymentAmount}
-                onChangeText={(value) => setPaymentAmount(digitsOnly(value))}
-                placeholder="0"
-                placeholderTextColor={ui.placeholder.color}
-                keyboardType="number-pad"
-                selectionColor="#6DB2EE"
-                style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
-              />
+          <ScrollView
+            style={styles.contentScroll}
+            contentContainerStyle={styles.contentScrollInner}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.headerRow}>
+              <View style={styles.headerCopy}>
+                <Text style={[styles.title, ui.title]}>Record Payment</Text>
+                {headerHelperText ? (
+                  <Text style={[styles.headerHelperText, ui.summaryHelper]}>
+                    {headerHelperText}
+                  </Text>
+                ) : null}
+              </View>
+              <Pressable
+                style={[styles.closeButton, ui.closeButton]}
+                onPress={() => router.back()}
+              >
+                <Feather name="x" size={20} color={ui.closeIcon.color} />
+              </Pressable>
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Pay With</Text>
-            <Pressable
-              style={[styles.selectField, ui.pillSurface]}
-              onPress={() => {
-                if (paymentMethods.length > 1) {
-                  setIsPaymentMethodsOpen((current) => !current);
-                }
-              }}
-            >
-              <View style={styles.selectFieldContent}>
-                {(() => {
-                  const account = accounts.find(
-                    (a) => a.id === activePaymentMethodAccountId,
-                  );
+            <View style={[styles.summaryCard, ui.summaryCard]}>
+              <Text style={[styles.summaryLabel, ui.summaryLabel]}>Payment for</Text>
+              <Text style={[styles.summaryTitle, ui.summaryTitle]}>
+                {paylaterName}
+              </Text>
+              <Text style={[styles.summaryBalance, ui.summaryBalance]}>
+                Current Balance: {currentBalance}
+              </Text>
+            </View>
+
+            {isAdvanceRepayment ? (
+              <View style={[styles.infoBanner, ui.infoBanner]}>
+                <Text style={[styles.infoBannerText, ui.infoBannerText]}>
+                  You are making an advance repayment.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Payment Amount</Text>
+              <View
+                style={[
+                  styles.fieldSurface,
+                  ui.fieldSurface,
+                  styles.currencyField,
+                  isRepaymentDue && styles.fieldSurfaceDisabled,
+                ]}
+              >
+                <Text style={[styles.peso, ui.peso]}>PHP</Text>
+                <TextInput
+                  value={paymentAmount}
+                  onChangeText={(value) => setPaymentAmount(sanitizeAmountInput(value))}
+                  placeholder={
+                    isRepaymentDue && scheduledAmountDue > 0
+                      ? formatAmountInputValue(scheduledAmountDue)
+                      : "0"
+                  }
+                  placeholderTextColor={ui.placeholder.color}
+                  keyboardType="decimal-pad"
+                  selectionColor="#6DB2EE"
+                  editable={!isRepaymentDue}
+                  showSoftInputOnFocus={!isRepaymentDue}
+                  style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                />
+              </View>
+              {paymentAmountHelperText ? (
+                <Text style={[styles.inputHelperText, ui.helperText]}>
+                  {paymentAmountHelperText}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Pay With</Text>
+              <Pressable
+                style={[styles.selectField, ui.pillSurface]}
+                onPress={() => {
+                  if (paymentMethods.length > 1) {
+                    setIsPaymentMethodsOpen((current) => !current);
+                  }
+                }}
+              >
+                <View style={styles.selectFieldContent}>
+                  {(() => {
+                    const account = accounts.find(
+                      (a) => a.id === activePaymentMethodAccountId,
+                    );
 
                   let logoAsset: any = null;
 
@@ -674,51 +805,36 @@ export default function PaylaterRepaymentModal() {
               </View>
             ) : null}
 
-            {insufficientBalanceMessage ? (
-              <Text
-                style={[
-                  styles.inlineWarningMessage,
-                  { color: "#EF4444" },
-                ]}
-              >
-                {insufficientBalanceMessage}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Payment Date</Text>
-            <Pressable
-              style={[styles.fieldSurface, ui.fieldSurface, styles.dateField]}
-              onPress={() => setShowCalendar(true)}
-            >
-              <Text style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}>
-                {formatDateInput(paymentDate)}
-              </Text>
-              <Feather
-                name="calendar"
-                size={16}
-                color={ui.iconTint.color}
-              />
-            </Pressable>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.label, ui.label]}>Notes (Optional)</Text>
-            <View style={[styles.fieldSurface, ui.fieldSurface, styles.notesField]}>
-              <TextInput
-                value={notes}
-                onChangeText={(value) => setNotes(value.slice(0, 100))}
-                placeholder="e.g., Payment via bank transfer"
-                placeholderTextColor={ui.placeholder.color}
-                selectionColor="#6DB2EE"
-                multiline
-                textAlignVertical="top"
-                style={[styles.fieldInput, styles.notesInput, ui.fieldText]}
-              />
+              {insufficientBalanceMessage ? (
+                <Text
+                  style={[
+                    styles.inlineWarningMessage,
+                    { color: "#EF4444" },
+                  ]}
+                >
+                  {insufficientBalanceMessage}
+                </Text>
+              ) : null}
             </View>
-            <Text style={[styles.countText, ui.countText]}>{`${notes.length}/100`}</Text>
-          </View>
+
+            <View style={styles.section}>
+              <Text style={[styles.label, ui.label]}>Payment Date</Text>
+              <Pressable
+                style={[styles.fieldSurface, ui.fieldSurface, styles.dateField]}
+                onPress={() => setShowCalendar(true)}
+              >
+                <Text style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}>
+                  {formatDateInput(paymentDate)}
+                </Text>
+                <Feather
+                  name="calendar"
+                  size={16}
+                  color={ui.iconTint.color}
+                />
+              </Pressable>
+            </View>
+
+          </ScrollView>
 
           <View style={styles.actionsRow}>
             <Pressable
@@ -880,7 +996,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 22,
-    maxHeight: "84%",
+    maxHeight: "90%",
+  },
+  contentScroll: {
+    flexGrow: 0,
+  },
+  contentScrollInner: {
+    paddingBottom: 8,
   },
   handle: {
     alignSelf: "center",
@@ -894,11 +1016,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerCopy: {
+    flex: 1,
+    paddingRight: 12,
+  },
   title: {
     fontFamily: fontFamilies.sans,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: fontWeights.bold,
+  },
+  headerHelperText: {
+    marginTop: 4,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   closeButton: {
     width: 34,
@@ -935,6 +1068,19 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 20,
   },
+  infoBanner: {
+    marginTop: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  infoBannerText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: fontWeights.medium,
+  },
   label: {
     marginBottom: 10,
     fontFamily: fontFamilies.sans,
@@ -948,6 +1094,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     justifyContent: "center",
+  },
+  fieldSurfaceDisabled: {
+    opacity: 0.72,
   },
   fieldInput: {
     fontFamily: fontFamilies.sans,
@@ -977,19 +1126,12 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "flex-start",
   },
-  notesField: {
-    minHeight: 72,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  notesInput: {
-    minHeight: 48,
-  },
-  countText: {
+  inputHelperText: {
     marginTop: 8,
     fontFamily: fontFamilies.sans,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
   },
   selectField: {
     minHeight: 42,
