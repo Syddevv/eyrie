@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 
+import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import Logo from "@/components/logo";
 import { BANKS } from "@/constants/banks";
 import { themeColors } from "@/constants/colors";
@@ -41,6 +42,7 @@ import {
 } from "@/src/lib/paylaters-presentation";
 import { onPaylatersChanged } from "@/src/lib/dbSync";
 import { toPaylaterProgressLabel } from "@/src/db/services/paylatersService";
+import { LoadingActionButton } from "@/components/loading-action-button";
 
 function getParamValue(value?: string | string[]) {
   if (Array.isArray(value)) {
@@ -68,6 +70,13 @@ export default function PaylaterInfoModal() {
   const [isMarkPaidPickerVisible, setIsMarkPaidPickerVisible] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
   const [markPaidError, setMarkPaidError] = useState<string | null>(null);
+  const [pendingDeletePaymentId, setPendingDeletePaymentId] = useState<
+    string | null
+  >(null);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+  const [showDeletePaylaterConfirm, setShowDeletePaylaterConfirm] =
+    useState(false);
+  const [isDeletingPaylater, setIsDeletingPaylater] = useState(false);
   const { methods: paymentMethods } = usePaymentMethods();
   const { accounts } = useAccounts();
   const { animatedBackdropStyle, animatedCardStyle } = useModalMotion({
@@ -274,28 +283,24 @@ export default function PaylaterInfoModal() {
     });
   }, [paymentMethods]);
 
-  const handleDeletePayment = (paymentId: string) => {
-    Alert.alert(
-      "Remove payment?",
-      "This will remove the selected payment and reverse the linked expense.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            void paylatersService
-              .deletePayment(paymentId)
-              .catch((error) =>
-                Alert.alert(
-                  "Unable to remove payment",
-                  error instanceof Error ? error.message : "Please try again.",
-                ),
-              );
-          },
-        },
-      ],
-    );
+  const handleDeletePayment = async () => {
+    if (!pendingDeletePaymentId || isDeletingPayment) {
+      return;
+    }
+
+    setIsDeletingPayment(true);
+
+    try {
+      await paylatersService.deletePayment(pendingDeletePaymentId);
+      setPendingDeletePaymentId(null);
+    } catch (error) {
+      Alert.alert(
+        "Unable to remove payment",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsDeletingPayment(false);
+    }
   };
 
   const handleMarkPaid = () => {
@@ -343,33 +348,25 @@ export default function PaylaterInfoModal() {
     }
   };
 
-  const handleDeletePaylater = () => {
-    if (!paylater) {
+  const handleDeletePaylater = async () => {
+    if (!paylater || isDeletingPaylater) {
       return;
     }
 
-    Alert.alert(
-      "Delete paylater?",
-      "This will soft-delete the paylater, its payment history, and linked repayment expenses.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void paylatersService
-              .delete(paylater.id)
-              .then(() => router.back())
-              .catch((error) =>
-                Alert.alert(
-                  "Unable to delete paylater",
-                  error instanceof Error ? error.message : "Please try again.",
-                ),
-              );
-          },
-        },
-      ],
-    );
+    setIsDeletingPaylater(true);
+
+    try {
+      await paylatersService.delete(paylater.id);
+      setShowDeletePaylaterConfirm(false);
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "Unable to delete paylater",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsDeletingPaylater(false);
+    }
   };
 
   if (!paylater) {
@@ -557,7 +554,7 @@ export default function PaylaterInfoModal() {
 
             <Pressable
               style={[styles.iconDangerButton, ui.dangerButton]}
-              onPress={handleDeletePaylater}
+              onPress={() => setShowDeletePaylaterConfirm(true)}
             >
               <Feather
                 name="trash-2"
@@ -593,7 +590,7 @@ export default function PaylaterInfoModal() {
                   {isPaidPaylater ? null : (
                     <Pressable
                       style={styles.deleteButton}
-                      onPress={() => handleDeletePayment(entry.id)}
+                      onPress={() => setPendingDeletePaymentId(entry.id)}
                     >
                       <Feather
                         name="trash-2"
@@ -910,7 +907,7 @@ export default function PaylaterInfoModal() {
                     </Text>
                   </Pressable>
 
-                  <Pressable
+                  <LoadingActionButton
                     style={[
                       styles.markPaidConfirmButton,
                       ui.successButton,
@@ -918,13 +915,17 @@ export default function PaylaterInfoModal() {
                         opacity: 0.6,
                       },
                     ]}
-                    onPress={() => void confirmMarkPaid()}
-                    disabled={isMarkingPaid || selectedPaymentMethodIsInsufficient}
-                  >
-                    <Text style={[styles.secondaryButtonText, ui.successButtonText]}>
-                      {isMarkingPaid ? "Saving..." : "Confirm"}
-                    </Text>
-                  </Pressable>
+                    label="Confirm"
+                    loadingLabel="Saving..."
+                    loading={isMarkingPaid}
+                    disabled={selectedPaymentMethodIsInsufficient}
+                    spinnerColor={ui.successButtonText.color}
+                    haptic="default"
+                    textStyle={[styles.secondaryButtonText, ui.successButtonText]}
+                    onPress={() => {
+                      void confirmMarkPaid();
+                    }}
+                  />
                 </View>
 
                 {markPaidError ? (
@@ -935,6 +936,38 @@ export default function PaylaterInfoModal() {
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      <DeleteConfirmationModal
+        visible={showDeletePaylaterConfirm}
+        title="Delete paylater?"
+        message="This will remove the paylater, its payment history, and the linked repayment expenses."
+        isDeleting={isDeletingPaylater}
+        onCancel={() => {
+          if (!isDeletingPaylater) {
+            setShowDeletePaylaterConfirm(false);
+          }
+        }}
+        onConfirm={() => {
+          void handleDeletePaylater();
+        }}
+      />
+
+      <DeleteConfirmationModal
+        visible={pendingDeletePaymentId !== null}
+        title="Remove payment?"
+        message="This will remove the selected payment and reverse the linked expense."
+        isDeleting={isDeletingPayment}
+        confirmLabel="Remove"
+        loadingLabel="Removing..."
+        onCancel={() => {
+          if (!isDeletingPayment) {
+            setPendingDeletePaymentId(null);
+          }
+        }}
+        onConfirm={() => {
+          void handleDeletePayment();
+        }}
+      />
     </View>
   );
 }

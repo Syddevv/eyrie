@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import Logo from "@/components/logo";
 import { BANKS } from "@/constants/banks";
 import { themeColors } from "@/constants/colors";
@@ -844,16 +845,19 @@ export default function PaylaterRepaymentModal() {
               <Text style={[styles.cancelButtonText, ui.cancelText]}>Cancel</Text>
             </Pressable>
 
-            <Pressable
+            <LoadingActionButton
               style={[styles.saveButton, ui.saveButton]}
-              onPress={handleSave}
-              disabled={isSubmitting}
-            >
-              <Feather name="check" size={16} color="#FFFFFF" />
-              <Text style={[styles.saveButtonText, ui.saveButtonText]}>
-                Save Payment
-              </Text>
-            </Pressable>
+              label="Save Payment"
+              loadingLabel="Saving..."
+              loading={isSubmitting}
+              spinnerColor="#FFFFFF"
+              haptic="default"
+              textStyle={[styles.saveButtonText, ui.saveButtonText]}
+              leftAdornment={<Feather name="check" size={16} color="#FFFFFF" />}
+              onPress={() => {
+                void handleSave();
+              }}
+            />
           </View>
 
           {errorMessage ? (

@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 
+import { LoadingActionButton } from "@/components/loading-action-button";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
@@ -31,6 +32,12 @@ function getParamValue(value?: string | string[]) {
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
+}
+
+function waitForNextFrame() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
 }
 
 export default function EditPaylaterModal() {
@@ -164,6 +171,7 @@ export default function EditPaylaterModal() {
 
     try {
       setIsSubmitting(true);
+      await waitForNextFrame();
       await paylatersService.update(paylaterId, {
         remainingBalance: Number(remainingBalance || 0),
         installmentAmount: Number(installmentAmount || 0),
@@ -281,16 +289,27 @@ export default function EditPaylaterModal() {
                   <Text style={[styles.actionText, ui.cancelText]}>Cancel</Text>
                 </Pressable>
 
-                <Pressable
-                  style={[styles.actionButton, ui.saveButton]}
-                  onPress={handleSave}
-                  disabled={isSubmitting}
-                >
-                  <Feather name="check" size={16} color={ui.saveButtonText.color} />
-                  <Text style={[styles.actionText, ui.saveButtonText]}>
-                    Save Changes
-                  </Text>
-                </Pressable>
+                <LoadingActionButton
+                  style={[styles.actionButton, styles.saveActionButton, ui.saveButton]}
+                  label="Save Changes"
+                  loadingLabel="Saving..."
+                  loading={isSubmitting}
+                  spinnerColor={ui.saveButtonText.color}
+                  haptic="default"
+                  textStyle={[styles.actionText, ui.saveButtonText]}
+                  contentStyle={styles.loadingButtonContent}
+                  preserveLabelWidth={false}
+                  leftAdornment={
+                    <Feather
+                      name="check"
+                      size={16}
+                      color={ui.saveButtonText.color}
+                    />
+                  }
+                  onPress={() => {
+                    void handleSave();
+                  }}
+                />
               </View>
             </View>
           </ScrollView>
@@ -415,6 +434,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 18,
+  },
+  saveActionButton: {
+    flex: 1.3,
+  },
+  loadingButtonContent: {
+    minWidth: 0,
   },
   actionText: {
     fontFamily: fontFamilies.sans,
