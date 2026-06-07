@@ -668,6 +668,7 @@ export default function PaylaterInfoModal() {
               </Text>
 
               <ScrollView
+                style={styles.markPaidScroll}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.markPaidModalContent}
               >
@@ -893,45 +894,45 @@ export default function PaylaterInfoModal() {
                   </View>
                 ) : null}
 
-                <View style={styles.markPaidActions}>
-                  <Pressable
-                    style={[styles.markPaidCancelButton, ui.neutralButton]}
-                    onPress={() => {
-                      setIsMarkPaidPickerVisible(false);
-                      setIsPaymentMethodsOpen(false);
-                      setMarkPaidError(null);
-                    }}
-                  >
-                    <Text style={[styles.secondaryButtonText, ui.neutralButtonText]}>
-                      Cancel
-                    </Text>
-                  </Pressable>
-
-                  <LoadingActionButton
-                    style={[
-                      styles.markPaidConfirmButton,
-                      ui.successButton,
-                      (isMarkingPaid || selectedPaymentMethodIsInsufficient) && {
-                        opacity: 0.6,
-                      },
-                    ]}
-                    label="Confirm"
-                    loadingLabel="Saving..."
-                    loading={isMarkingPaid}
-                    disabled={selectedPaymentMethodIsInsufficient}
-                    spinnerColor={ui.successButtonText.color}
-                    haptic="default"
-                    textStyle={[styles.secondaryButtonText, ui.successButtonText]}
-                    onPress={() => {
-                      void confirmMarkPaid();
-                    }}
-                  />
-                </View>
-
                 {markPaidError ? (
                   <Text style={styles.markPaidError}>{markPaidError}</Text>
                 ) : null}
               </ScrollView>
+
+              <View style={styles.markPaidActions}>
+                <Pressable
+                  style={[styles.markPaidCancelButton, ui.neutralButton]}
+                  onPress={() => {
+                    setIsMarkPaidPickerVisible(false);
+                    setIsPaymentMethodsOpen(false);
+                    setMarkPaidError(null);
+                  }}
+                >
+                  <Text style={[styles.secondaryButtonText, ui.neutralButtonText]}>
+                    Cancel
+                  </Text>
+                </Pressable>
+
+                <LoadingActionButton
+                  style={[
+                    styles.markPaidConfirmButton,
+                    ui.successButton,
+                    (isMarkingPaid || selectedPaymentMethodIsInsufficient) && {
+                      opacity: 0.6,
+                    },
+                  ]}
+                  label="Confirm"
+                  loadingLabel="Saving..."
+                  loading={isMarkingPaid}
+                  disabled={selectedPaymentMethodIsInsufficient}
+                  spinnerColor={ui.successButtonText.color}
+                  haptic="default"
+                  textStyle={[styles.secondaryButtonText, ui.successButtonText]}
+                  onPress={() => {
+                    void confirmMarkPaid();
+                  }}
+                />
+              </View>
             </View>
           </Animated.View>
         </Animated.View>
@@ -1172,11 +1173,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 18,
-    maxHeight: "82%",
+    maxHeight: "98%",
+  },
+  markPaidScroll: {
+    flexGrow: 0,
   },
   markPaidModalContent: {
     paddingTop: 10,
-    paddingBottom: 2,
+    paddingBottom: 8,
   },
   markPaidTitle: {
     fontFamily: fontFamilies.sans,

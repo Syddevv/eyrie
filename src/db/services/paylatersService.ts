@@ -15,8 +15,7 @@ import {
   calculateInstallmentsRemaining,
   calculatePaylaterProgress,
   estimateCompletionDate,
-  getCurrentCycleDueDate,
-  getNextUpcomingDueDate,
+  getPaylaterScheduledDueDate,
   getPaylaterStatus,
 } from "../utils/paylaters";
 import {
@@ -58,7 +57,15 @@ type CreatePaylaterInput = Omit<
 };
 
 type UpdatePaylaterInput = Partial<
-  Pick<NewPaylater, "remainingBalance" | "installmentAmount" | "dueDay" | "notes">
+  Pick<
+    NewPaylater,
+    | "itemName"
+    | "totalAmount"
+    | "remainingBalance"
+    | "installmentAmount"
+    | "dueDay"
+    | "notes"
+  >
 >;
 
 type RecordPaymentInput = {
@@ -97,10 +104,17 @@ function toPlatformLabel(platform: string) {
   );
 }
 
-function toEffectiveStatus(paylater: Pick<Paylater, "remainingBalance" | "dueDay" | "status">) {
+function toEffectiveStatus(
+  paylater: Pick<
+    Paylater,
+    "remainingBalance" | "installmentAmount" | "dueDay" | "dueDate" | "status"
+  >,
+) {
   return getPaylaterStatus({
     remainingBalance: Number(paylater.remainingBalance ?? 0),
+    installmentAmount: Number(paylater.installmentAmount ?? 0),
     dueDay: paylater.dueDay,
+    dueDate: paylater.dueDate,
   });
 }
 
@@ -132,7 +146,9 @@ export class PaylatersService {
         startDate: timestamp,
         status: getPaylaterStatus({
           remainingBalance: input.totalAmount,
+          installmentAmount: input.installmentAmount,
           dueDay: input.dueDay,
+          dueDate: input.dueDate,
         }),
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -159,16 +175,20 @@ export class PaylatersService {
       throw new Error("Paylater not found.");
     }
 
+    const nextItemName = input.itemName ?? existing.itemName;
+    const nextTotalAmount = input.totalAmount ?? existing.totalAmount;
     const nextRemainingBalance =
       input.remainingBalance ?? existing.remainingBalance;
     const nextInstallmentAmount =
       input.installmentAmount ?? existing.installmentAmount;
     const nextDueDay = input.dueDay ?? existing.dueDay;
 
+    assertRequiredText(nextItemName, "item name");
+    assertPositiveAmount(nextTotalAmount, "total amount");
     this.assertDueDay(nextDueDay ?? null);
     if (
       nextRemainingBalance < 0 ||
-      nextRemainingBalance > existing.totalAmount
+      nextRemainingBalance > nextTotalAmount
     ) {
       throw new Error("Remaining balance must be between 0 and the total amount.");
     }
@@ -178,12 +198,16 @@ export class PaylatersService {
       id,
       prepareUpdateForSync({
         ...input,
+        itemName: nextItemName,
+        totalAmount: nextTotalAmount,
         remainingBalance: nextRemainingBalance,
         installmentAmount: nextInstallmentAmount,
         dueDay: nextDueDay,
         status: getPaylaterStatus({
           remainingBalance: nextRemainingBalance,
+          installmentAmount: nextInstallmentAmount,
           dueDay: nextDueDay,
+          dueDate: existing.dueDate,
         }),
         updatedAt: nowIso(),
       }),
@@ -267,7 +291,9 @@ export class PaylatersService {
       );
       const nextStatus = getPaylaterStatus({
         remainingBalance: nextRemainingBalance,
+        installmentAmount: existing.installmentAmount,
         dueDay: existing.dueDay,
+        dueDate: existing.dueDate,
       });
 
       await tx.insert(paylaterPayments).values(payment);
@@ -380,7 +406,9 @@ export class PaylatersService {
             remainingBalance: nextRemainingBalance,
             status: getPaylaterStatus({
               remainingBalance: nextRemainingBalance,
+              installmentAmount: existingPaylater.installmentAmount,
               dueDay: existingPaylater.dueDay,
+              dueDate: existingPaylater.dueDate,
             }),
             updatedAt: timestamp,
           }),
@@ -559,10 +587,12 @@ export class PaylatersService {
       .filter((row) => toEffectiveStatus(row) !== "paid")
       .map((row) => {
         const effectiveStatus = toEffectiveStatus(row);
-        const dueDate =
-          effectiveStatus === "overdue"
-            ? getCurrentCycleDueDate(row.dueDay)
-            : getNextUpcomingDueDate(row.dueDay);
+        const dueDate = getPaylaterScheduledDueDate({
+          remainingBalance: Number(row.remainingBalance ?? 0),
+          installmentAmount: Number(row.installmentAmount ?? 0),
+          dueDay: row.dueDay,
+          dueDate: row.dueDate,
+        });
         return {
           row,
           effectiveStatus,

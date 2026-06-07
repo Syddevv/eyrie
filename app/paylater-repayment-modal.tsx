@@ -30,8 +30,7 @@ import { formatPaylaterAmount } from "@/src/lib/paylaters-presentation";
 import { onPaylatersChanged } from "@/src/lib/dbSync";
 import {
   formatCurrencyPHP,
-  getCurrentCycleDueDate,
-  getNextUpcomingDueDate,
+  getPaylaterScheduledDueDate,
 } from "@/src/db/utils/paylaters";
 
 const monthNames = [
@@ -174,6 +173,7 @@ export default function PaylaterRepaymentModal() {
   const [remainingBalanceAmount, setRemainingBalanceAmount] = useState(0);
   const [installmentAmount, setInstallmentAmount] = useState(0);
   const [dueDay, setDueDay] = useState<string | null>(null);
+  const [targetCompletionDate, setTargetCompletionDate] = useState<string | null>(null);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
     string | null
   >(null);
@@ -253,6 +253,7 @@ export default function PaylaterRepaymentModal() {
       setRemainingBalanceAmount(Number(paylater.remainingBalance ?? 0));
       setInstallmentAmount(Number(paylater.installmentAmount ?? 0));
       setDueDay(paylater.dueDay ?? null);
+      setTargetCompletionDate(paylater.dueDate ?? null);
     };
 
     void loadPaylater().catch(() => undefined);
@@ -394,24 +395,24 @@ export default function PaylaterRepaymentModal() {
     () => Math.min(Math.max(installmentAmount, 0), Math.max(remainingBalanceAmount, 0)),
     [installmentAmount, remainingBalanceAmount],
   );
-  const currentCycleDueDate = useMemo(
-    () => getCurrentCycleDueDate(dueDay),
-    [dueDay],
-  );
-  const upcomingDueDate = useMemo(
-    () => getNextUpcomingDueDate(dueDay),
-    [dueDay],
+  const scheduledDueDate = useMemo(
+    () =>
+      getPaylaterScheduledDueDate({
+        remainingBalance: remainingBalanceAmount,
+        installmentAmount,
+        dueDay,
+        dueDate: targetCompletionDate,
+      }),
+    [dueDay, installmentAmount, remainingBalanceAmount, targetCompletionDate],
   );
   const todayStart = useMemo(() => startOfLocalDay(new Date()), []);
-  const currentCycleDueDateStart = currentCycleDueDate
-    ? startOfLocalDay(currentCycleDueDate)
+  const currentCycleDueDateStart = scheduledDueDate
+    ? startOfLocalDay(scheduledDueDate)
     : null;
   const isRepaymentDue = currentCycleDueDateStart
     ? todayStart.getTime() >= currentCycleDueDateStart.getTime()
     : false;
-  const dueDate = isRepaymentDue
-    ? currentCycleDueDate
-    : (upcomingDueDate ?? currentCycleDueDate);
+  const dueDate = scheduledDueDate;
   const isAdvanceRepayment =
     Boolean(currentCycleDueDateStart) &&
     todayStart.getTime() < currentCycleDueDateStart.getTime();

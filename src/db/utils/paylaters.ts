@@ -73,6 +73,15 @@ export function getCurrentCycleDueDate(
   return buildClampedDueDate(today.getFullYear(), today.getMonth(), parsed);
 }
 
+function parseDateInput(value: string | Date | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function getNextUpcomingDueDate(
   dueDay: string | number | null | undefined,
   today = new Date(),
@@ -99,7 +108,9 @@ export function getNextUpcomingDueDate(
 
 export function getPaylaterStatus(input: {
   remainingBalance: number;
+  installmentAmount?: number | null;
   dueDay?: string | number | null;
+  dueDate?: string | Date | null;
   today?: Date;
 }) {
   if (input.remainingBalance <= 0) {
@@ -108,7 +119,13 @@ export function getPaylaterStatus(input: {
 
   const today = input.today ?? new Date();
   const todayStart = startOfLocalDay(today);
-  const currentCycleDueDate = getCurrentCycleDueDate(input.dueDay, todayStart);
+  const currentCycleDueDate = getPaylaterScheduledDueDate({
+    remainingBalance: input.remainingBalance,
+    installmentAmount: input.installmentAmount ?? null,
+    dueDay: input.dueDay,
+    dueDate: input.dueDate ?? null,
+    today: todayStart,
+  });
 
   if (currentCycleDueDate && currentCycleDueDate.getTime() < todayStart.getTime()) {
     return "overdue" as const;
@@ -154,6 +171,60 @@ export function estimateCompletionDate(input: {
   );
 
   return getCurrentCycleDueDate(input.dueDay, finalMonth);
+}
+
+export function getPaylaterScheduledDueDate(input: {
+  remainingBalance: number;
+  installmentAmount?: number | null;
+  dueDay?: string | number | null;
+  dueDate?: string | Date | null;
+  today?: Date;
+}) {
+  const today = startOfLocalDay(input.today ?? new Date());
+  const targetCompletionDate = parseDateInput(input.dueDate ?? null);
+  const installmentAmount = Number(input.installmentAmount ?? 0);
+
+  if (targetCompletionDate && installmentAmount > 0 && input.remainingBalance > 0) {
+    const installmentsRemaining = calculateInstallmentsRemaining(
+      input.remainingBalance,
+      installmentAmount,
+    );
+
+    if (installmentsRemaining > 0) {
+      const finalDueMonth = new Date(
+        targetCompletionDate.getFullYear(),
+        targetCompletionDate.getMonth(),
+        1,
+      );
+      const scheduledMonth = new Date(
+        finalDueMonth.getFullYear(),
+        finalDueMonth.getMonth() - (installmentsRemaining - 1),
+        1,
+      );
+      const parsedDueDay = parseDayOfMonth(input.dueDay);
+
+      if (parsedDueDay) {
+        return buildClampedDueDate(
+          scheduledMonth.getFullYear(),
+          scheduledMonth.getMonth(),
+          parsedDueDay,
+        );
+      }
+
+      return buildClampedDueDate(
+        scheduledMonth.getFullYear(),
+        scheduledMonth.getMonth(),
+        targetCompletionDate.getDate(),
+      );
+    }
+  }
+
+  const currentCycleDueDate = getCurrentCycleDueDate(input.dueDay, today);
+  if (currentCycleDueDate && currentCycleDueDate.getTime() >= today.getTime()) {
+    return currentCycleDueDate;
+  }
+
+  return getNextUpcomingDueDate(input.dueDay, today);
 }
 
 export function buildPaylaterPaymentReferenceToken(paymentId: string) {

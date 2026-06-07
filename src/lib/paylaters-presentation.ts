@@ -6,8 +6,7 @@ import type {
 import {
   calculateDueInDays,
   formatCurrencyPHP,
-  getCurrentCycleDueDate,
-  getNextUpcomingDueDate,
+  getPaylaterScheduledDueDate,
 } from "@/src/db/utils/paylaters";
 import {
   toPaylaterEstimatedCompletionLabel,
@@ -62,22 +61,26 @@ export function getPaylaterProgressCopy(paylater: Pick<
 
 export function getPaylaterNextDueCopy(paylater: Pick<
   PaylaterListItem,
-  "status" | "dueDay"
+  "status" | "remainingBalance" | "installmentAmount" | "dueDay" | "dueDate"
 >) {
-  const currentCycleDueDate = getCurrentCycleDueDate(paylater.dueDay);
+  const scheduledDueDate = getPaylaterScheduledDueDate({
+    remainingBalance: Number(paylater.remainingBalance ?? 0),
+    installmentAmount: Number(paylater.installmentAmount ?? 0),
+    dueDay: paylater.dueDay,
+    dueDate: paylater.dueDate,
+  });
 
-  if (paylater.status === "overdue" && currentCycleDueDate) {
-    const daysOverdue = Math.max(1, Math.abs(calculateDueInDays(currentCycleDueDate)));
+  if (paylater.status === "overdue" && scheduledDueDate) {
+    const daysOverdue = Math.max(1, Math.abs(calculateDueInDays(scheduledDueDate)));
 
     return `Overdue by ${daysOverdue} day${daysOverdue === 1 ? "" : "s"}`;
   }
 
-  const nextUpcomingDueDate = getNextUpcomingDueDate(paylater.dueDay);
-  if (!nextUpcomingDueDate) {
+  if (!scheduledDueDate) {
     return "Due date unavailable";
   }
 
-  const daysUntil = Math.max(0, calculateDueInDays(nextUpcomingDueDate));
+  const daysUntil = Math.max(0, calculateDueInDays(scheduledDueDate));
 
   return `Due in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`;
 }

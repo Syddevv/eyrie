@@ -49,7 +49,8 @@ export default function EditPaylaterModal() {
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
   const paylaterId = getParamValue(params.paylaterId);
-  const [title, setTitle] = useState("Paylater");
+  const [itemName, setItemName] = useState("Paylater");
+  const [totalAmount, setTotalAmount] = useState("0");
   const [remainingBalance, setRemainingBalance] = useState("0");
   const [installmentAmount, setInstallmentAmount] = useState("0");
   const [dueDay, setDueDay] = useState("1");
@@ -86,7 +87,8 @@ export default function EditPaylaterModal() {
         return;
       }
 
-      setTitle(paylater.itemName);
+      setItemName(paylater.itemName);
+      setTotalAmount(String(Number(paylater.totalAmount ?? 0)));
       setRemainingBalance(String(Number(paylater.remainingBalance ?? 0)));
       setInstallmentAmount(String(Number(paylater.installmentAmount ?? 0)));
       setDueDay(paylater.dueDay ?? "1");
@@ -173,6 +175,8 @@ export default function EditPaylaterModal() {
       setIsSubmitting(true);
       await waitForNextFrame();
       await paylatersService.update(paylaterId, {
+        itemName: itemName.trim(),
+        totalAmount: Number(totalAmount || 0),
         remainingBalance: Number(remainingBalance || 0),
         installmentAmount: Number(installmentAmount || 0),
         dueDay: dueDay.trim(),
@@ -210,7 +214,7 @@ export default function EditPaylaterModal() {
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
-            <Text style={[styles.title, ui.title]}>{title}</Text>
+            <Text style={[styles.title, ui.title]}>Edit Paylater</Text>
             <Pressable
               style={[styles.closeButton, ui.closeButton]}
               onPress={() => router.back()}
@@ -226,6 +230,38 @@ export default function EditPaylaterModal() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.form}>
+              <View style={styles.section}>
+                <Text style={[styles.label, ui.label]}>Paylater Name</Text>
+                <View style={[styles.fieldSurface, ui.fieldSurface]}>
+                  <TextInput
+                    value={itemName}
+                    onChangeText={setItemName}
+                    placeholder="Enter paylater name"
+                    placeholderTextColor={ui.placeholder.color}
+                    selectionColor="#6DB2EE"
+                    style={[styles.fieldInput, ui.fieldText]}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={[styles.label, ui.label]}>Total Amount</Text>
+                <View
+                  style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}
+                >
+                  <Text style={[styles.peso, ui.peso]}>PHP</Text>
+                  <TextInput
+                    value={totalAmount}
+                    onChangeText={(value) => setTotalAmount(digitsOnly(value))}
+                    placeholder="0"
+                    placeholderTextColor={ui.placeholder.color}
+                    keyboardType="number-pad"
+                    selectionColor="#6DB2EE"
+                    style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
+                  />
+                </View>
+              </View>
+
               <View style={styles.section}>
                 <Text style={[styles.label, ui.label]}>Remaining Balance</Text>
                 <View
