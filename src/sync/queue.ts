@@ -8,15 +8,18 @@ import { MAX_SYNC_BATCH_SIZE } from "./constants";
 import { nextRetryAt } from "./helpers";
 import type { SyncOperation, SyncableTable } from "./types";
 
+type Executor = any;
+
 export async function enqueueSync(
   table: SyncableTable,
   recordId: string,
   operation: SyncOperation,
   userId: string,
   payloadSnapshot?: string | null,
+  executor: Executor = db,
 ) {
   const timestamp = nowIso();
-  const existing = await db.query.syncQueue.findFirst({
+  const existing = await executor.query.syncQueue.findFirst({
     where: and(
       eq(syncQueue.userId, userId),
       eq(syncQueue.tableName, table),
@@ -25,7 +28,7 @@ export async function enqueueSync(
   });
 
   if (!existing) {
-    await db.insert(syncQueue).values({
+    await executor.insert(syncQueue).values({
       id: createId(),
       userId,
       tableName: table,
@@ -45,7 +48,7 @@ export async function enqueueSync(
   const nextOperation =
     operation === "delete" || existing.operation === "delete" ? "delete" : "upsert";
 
-  await db
+  await executor
     .update(syncQueue)
     .set({
       operation: nextOperation,

@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -19,6 +20,8 @@ import { PAYLATER_OPTIONS } from "@/constants/paylaters";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAuthStore } from "@/store/useAuthStore";
+import { paylatersService } from "@/src/db/services";
 
 function digitsOnly(value: string) {
   return value.replace(/[^\d]/g, "");
@@ -105,6 +108,7 @@ export default function PaylaterDetailsModal() {
     returnTo?: string | string[];
     selectedPaylater?: string | string[];
   }>();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
@@ -125,7 +129,7 @@ export default function PaylaterDetailsModal() {
   const [totalAmount, setTotalAmount] = useState("");
   const [installmentAmount, setInstallmentAmount] = useState("");
   const [installmentCount, setInstallmentCount] = useState("");
-  const [dueDate, setDueDate] = useState("1");
+  const [dueDay, setDueDay] = useState("1");
   const [targetCompletionDate, setTargetCompletionDate] = useState<Date | null>(
     null,
   );
@@ -136,6 +140,7 @@ export default function PaylaterDetailsModal() {
   });
   const [showCalendar, setShowCalendar] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const calendarDays = useMemo(
     () => buildCalendarDays(calendarMonth),
     [calendarMonth],
@@ -243,13 +248,44 @@ export default function PaylaterDetailsModal() {
       },
       button: {
         backgroundColor: "#1565A7",
+        opacity: isSubmitting ? 0.7 : 1,
       },
       buttonText: {
         color: "#FFFFFF",
       },
     }),
-    [colors, isDark],
+    [colors, isDark, isSubmitting],
   );
+
+  const handleCreate = async () => {
+    if (!userId) {
+      Alert.alert("Unable to save", "Missing signed-in user.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await paylatersService.create({
+        userId,
+        platform: selectedPaylater.platform,
+        itemName: itemName.trim(),
+        totalAmount: Number(totalAmount || 0),
+        installmentAmount: Number(installmentAmount || 0),
+        dueDay: dueDay.trim(),
+        dueDate: targetCompletionDate?.toISOString() ?? null,
+        installmentCount: Number(installmentCount || 0),
+        notes: notes.trim() ? notes.trim() : null,
+      });
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "Unable to add paylater",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -353,7 +389,7 @@ export default function PaylaterDetailsModal() {
                   styles.currencyField,
                 ]}
               >
-                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <Text style={[styles.peso, ui.peso]}>PHP</Text>
                 <TextInput
                   value={totalAmount}
                   onChangeText={(value) => setTotalAmount(digitsOnly(value))}
@@ -379,7 +415,7 @@ export default function PaylaterDetailsModal() {
                   styles.currencyField,
                 ]}
               >
-                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <Text style={[styles.peso, ui.peso]}>PHP</Text>
                 <TextInput
                   value={installmentAmount}
                   onChangeText={(value) =>
@@ -426,8 +462,8 @@ export default function PaylaterDetailsModal() {
               </Text>
               <View style={[styles.fieldSurface, ui.fieldSurface]}>
                 <TextInput
-                  value={dueDate}
-                  onChangeText={(value) => setDueDate(digitsOnly(value))}
+                  value={dueDay}
+                  onChangeText={(value) => setDueDay(digitsOnly(value))}
                   placeholder="1"
                   placeholderTextColor={ui.placeholder.color}
                   keyboardType="number-pad"
@@ -482,7 +518,11 @@ export default function PaylaterDetailsModal() {
               </View>
             </View>
 
-            <Pressable style={[styles.addButton, ui.button]}>
+            <Pressable
+              style={[styles.addButton, ui.button]}
+              onPress={handleCreate}
+              disabled={isSubmitting}
+            >
               <Text style={[styles.addButtonText, ui.buttonText]}>
                 Add Paylater
               </Text>

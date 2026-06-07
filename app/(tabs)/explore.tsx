@@ -22,19 +22,24 @@ import {
 } from "react-native-safe-area-context";
 
 import { CategoryAvatar } from "@/components/category-avatar";
-import {
-  PAYLATERS_ITEMS,
-  PAYLATERS_NEXT_DUE,
-  PAYLATERS_SUMMARY,
-} from "@/constants/paylater-records";
 import { DeleteConfirmationModal } from "@/components/delete-confirmation-modal";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { usePaylaters } from "@/hooks/usePaylaters";
 import { formatCurrency } from "@/hooks/use-dashboard";
 import { useBudgets, type BudgetCycle } from "@/hooks/useBudgets";
 import { budgetsService } from "@/src/db/services";
+import {
+  formatPaylaterAmount,
+  getPaylaterNextDueCopy,
+  getPaylaterOption,
+  getPaylaterStatusLabel,
+  getPaylaterStatusTone,
+  getPaylaterSummaryProgressLabel,
+} from "@/src/lib/paylaters-presentation";
+import { toPaylaterProgressLabel } from "@/src/db/services/paylatersService";
 import {
   formatBudgetCycleDateRange,
   formatNextResetDate,
@@ -163,13 +168,21 @@ export default function BudgetScreen() {
     undefined,
     { syncCycle: true },
   );
+  const {
+    paylaters,
+    summary: paylatersSummary,
+    nextPaymentDue,
+  } = usePaylaters();
   const [editingBudget, setEditingBudget] = useState<BudgetCard | null>(null);
   const [draftBudgetValue, setDraftBudgetValue] = useState("");
   const [budgetPendingDelete, setBudgetPendingDelete] =
     useState<BudgetCard | null>(null);
   const [isDeletingBudget, setIsDeletingBudget] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const activePaylaterItems = PAYLATERS_ITEMS;
+  const activePaylaterItems = useMemo(
+    () => paylaters.filter((item) => item.status !== "paid"),
+    [paylaters],
+  );
 
   const pageStyles = useMemo(
     () => ({
@@ -484,7 +497,7 @@ export default function BudgetScreen() {
     totalUsagePercent,
   );
   const totalBalanceLabel = formatBudgetBalanceLabel(totalRemainingRaw);
-  const totalProgressWidth = `${Math.min(Math.max(totalProgress, 0), 1) * 100}%`;
+  const totalProgressWidth = `${Math.min(Math.max(totalProgress, 0), 1) * 100}%` as `${number}%`;
   const totalProgressLabel =
     summary.limit > 0
       ? `${Math.round(totalUsagePercent)}% used`
@@ -742,7 +755,7 @@ export default function BudgetScreen() {
                     ),
                     1,
                   ) * 100
-                }%`;
+                }%` as `${number}%`;
                 const progressColor =
                   visualState === "over"
                     ? "#EF4444"
@@ -1104,7 +1117,7 @@ export default function BudgetScreen() {
                 >
                   <Text style={styles.paylatersEyebrow}>NEXT PAYMENT DUE</Text>
                   <Text style={[styles.paylatersDueTitle, pageStyles.title]}>
-                    {PAYLATERS_NEXT_DUE.title}
+                    {nextPaymentDue?.row.itemName ?? "No upcoming payments"}
                   </Text>
 
                   <View style={styles.paylatersDueRow}>
@@ -1118,7 +1131,9 @@ export default function BudgetScreen() {
                         Due Amount
                       </Text>
                       <Text style={styles.paylatersDueAmount}>
-                        {PAYLATERS_NEXT_DUE.amount}
+                        {formatPaylaterAmount(
+                          Number(nextPaymentDue?.row.installmentAmount ?? 0),
+                        )}
                       </Text>
                     </View>
 
@@ -1129,10 +1144,14 @@ export default function BudgetScreen() {
                           pageStyles.paylatersMutedText,
                         ]}
                       >
-                        Due in
+                        {nextPaymentDue?.effectiveStatus === "overdue"
+                          ? "Status"
+                          : "Due in"}
                       </Text>
                       <Text style={styles.paylatersDueDays}>
-                        {PAYLATERS_NEXT_DUE.dueInLabel}
+                        {nextPaymentDue
+                          ? getPaylaterNextDueCopy(nextPaymentDue.row)
+                          : "No due date"}
                       </Text>
                     </View>
                   </View>
@@ -1150,16 +1169,20 @@ export default function BudgetScreen() {
                         Total Outstanding
                       </Text>
                       <Text style={styles.paylatersSummaryAmount}>
-                        {PAYLATERS_SUMMARY.totalOutstanding}
+                        {formatPaylaterAmount(
+                          Number(paylatersSummary?.totalOutstanding ?? 0),
+                        )}
                       </Text>
                     </View>
 
                     <View style={styles.paylatersSummaryRight}>
                       <Text style={styles.paylatersSummaryLabel}>
-                        {PAYLATERS_SUMMARY.activeCountLabel}
+                        {`${paylatersSummary?.activePaylatersCount ?? 0} Active Paylaters`}
                       </Text>
                       <Text style={styles.paylatersSummaryInstallment}>
-                        {PAYLATERS_SUMMARY.nextInstallment}
+                        {formatPaylaterAmount(
+                          Number(paylatersSummary?.nextInstallmentTotal ?? 0),
+                        )}
                       </Text>
                       <Text style={styles.paylatersSummarySubtext}>
                         Next Installment
@@ -1171,12 +1194,16 @@ export default function BudgetScreen() {
                     <View
                       style={[
                         styles.paylatersSummaryFill,
-                        { width: `${PAYLATERS_SUMMARY.progressRatio * 100}%` },
+                        {
+                          width: `${Number(paylatersSummary?.overallProgress ?? 0) * 100}%`,
+                        },
                       ]}
                     />
                   </View>
                   <Text style={styles.paylatersSummaryProgressLabel}>
-                    {PAYLATERS_SUMMARY.progressLabel}
+                    {getPaylaterSummaryProgressLabel(
+                      Number(paylatersSummary?.overallProgress ?? 0),
+                    )}
                   </Text>
                 </LinearGradient>
 
@@ -1188,7 +1215,11 @@ export default function BudgetScreen() {
 
                 <View style={styles.paylatersList}>
                   {activePaylaterItems.map((item) => {
-                    const isUpcoming = item.statusTone === "upcoming";
+                    const statusTone = getPaylaterStatusTone(item.status);
+                    const isUpcoming = statusTone === "upcoming";
+                    const { progress, installmentsRemaining } =
+                      toPaylaterProgressLabel(item);
+                    const provider = getPaylaterOption(item.platform);
 
                     return (
                       <View
@@ -1207,7 +1238,7 @@ export default function BudgetScreen() {
                                 pageStyles.title,
                               ]}
                             >
-                              {item.title}
+                              {item.itemName}
                             </Text>
                             <Text
                               style={[
@@ -1215,7 +1246,7 @@ export default function BudgetScreen() {
                                 pageStyles.paylatersMutedText,
                               ]}
                             >
-                              {item.provider}
+                              {provider.name}
                             </Text>
                           </View>
 
@@ -1235,7 +1266,7 @@ export default function BudgetScreen() {
                                 },
                               ]}
                             >
-                              {item.status}
+                              {getPaylaterStatusLabel(item.status)}
                             </Text>
                           </View>
                         </View>
@@ -1249,7 +1280,7 @@ export default function BudgetScreen() {
                           <View
                             style={[
                               styles.paylatersItemFill,
-                              { width: `${item.progressRatio * 100}%` },
+                              { width: `${progress * 100}%` },
                             ]}
                           />
                         </View>
@@ -1260,7 +1291,7 @@ export default function BudgetScreen() {
                             pageStyles.paylatersMutedText,
                           ]}
                         >
-                          {item.progressLabel}
+                          {`${Math.round(progress * 100)}% paid • ${installmentsRemaining} installments remaining`}
                         </Text>
 
                         <View style={styles.paylatersAmountsRow}>
@@ -1274,7 +1305,9 @@ export default function BudgetScreen() {
                               Balance
                             </Text>
                             <Text style={styles.paylatersBalanceValue}>
-                              {item.balance}
+                              {formatPaylaterAmount(
+                                Number(item.remainingBalance ?? 0),
+                              )}
                             </Text>
                           </View>
 
@@ -1293,7 +1326,9 @@ export default function BudgetScreen() {
                                 pageStyles.title,
                               ]}
                             >
-                              {item.installment}
+                              {formatPaylaterAmount(
+                                Number(item.installmentAmount ?? 0),
+                              )}
                             </Text>
                           </View>
                         </View>
@@ -1310,8 +1345,7 @@ export default function BudgetScreen() {
                               router.push({
                                 pathname: "/paylater-repayment-modal",
                                 params: {
-                                  paylaterName: item.title,
-                                  currentBalance: item.balance,
+                                  paylaterId: item.id,
                                 },
                               })
                             }

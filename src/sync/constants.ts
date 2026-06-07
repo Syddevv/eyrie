@@ -8,6 +8,8 @@ export const SYNCABLE_TABLES: SyncableTable[] = [
   "budgets",
   "saving_goals",
   "transactions",
+  "paylaters",
+  "paylater_payments",
   "goal_contributions",
 ];
 

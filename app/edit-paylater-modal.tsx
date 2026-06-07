@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,10 +13,11 @@ import {
 } from "react-native";
 
 import { themeColors } from "@/constants/colors";
-import { PAYLATERS_ITEMS } from "@/constants/paylater-records";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { paylatersService } from "@/src/db/services";
+import { onPaylatersChanged } from "@/src/lib/dbSync";
 
 function getParamValue(value?: string | string[]) {
   if (Array.isArray(value)) {
@@ -33,29 +35,41 @@ export default function EditPaylaterModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     paylaterId?: string | string[];
-    paylaterName?: string | string[];
-    currentBalance?: string | string[];
-    installmentAmount?: string | string[];
-    dueDate?: string | string[];
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
+  const paylaterId = getParamValue(params.paylaterId);
+  const [title, setTitle] = useState("Paylater");
+  const [remainingBalance, setRemainingBalance] = useState("0");
+  const [installmentAmount, setInstallmentAmount] = useState("0");
+  const [dueDay, setDueDay] = useState("1");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const paylater = useMemo(() => {
-    const paylaterId = getParamValue(params.paylaterId);
-    return PAYLATERS_ITEMS.find((item) => item.id === paylaterId) ?? PAYLATERS_ITEMS[0];
-  }, [params.paylaterId]);
+  useEffect(() => {
+    if (!paylaterId) {
+      return;
+    }
 
-  const [remainingBalance, setRemainingBalance] = useState(() =>
-    digitsOnly(getParamValue(params.currentBalance) || paylater.balance),
-  );
-  const [installmentAmount, setInstallmentAmount] = useState(() =>
-    digitsOnly(getParamValue(params.installmentAmount) || paylater.installment),
-  );
-  const [dueDate, setDueDate] = useState(() =>
-    digitsOnly(getParamValue(params.dueDate) || paylater.dueDateLabel),
-  );
+    const hydrate = async () => {
+      const paylater = await paylatersService.fetchById(paylaterId);
+      if (!paylater) {
+        return;
+      }
+
+      setTitle(paylater.itemName);
+      setRemainingBalance(String(Number(paylater.remainingBalance ?? 0)));
+      setInstallmentAmount(String(Number(paylater.installmentAmount ?? 0)));
+      setDueDay(paylater.dueDay ?? "1");
+    };
+
+    void hydrate().catch(() => undefined);
+    const off = onPaylatersChanged(() => {
+      void hydrate().catch(() => undefined);
+    });
+
+    return () => off();
+  }, [paylaterId]);
 
   const ui = useMemo(
     () => ({
@@ -108,6 +122,7 @@ export default function EditPaylaterModal() {
       },
       saveButton: {
         backgroundColor: "#168CF3",
+        opacity: isSubmitting ? 0.7 : 1,
       },
       saveButtonText: {
         color: "#FFFFFF",
@@ -116,8 +131,32 @@ export default function EditPaylaterModal() {
         color: isDark ? "#A9B6C8" : "#6B7280",
       },
     }),
-    [colors, isDark],
+    [colors, isDark, isSubmitting],
   );
+
+  const handleSave = async () => {
+    if (!paylaterId) {
+      Alert.alert("Unable to save", "Missing paylater record.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await paylatersService.update(paylaterId, {
+        remainingBalance: Number(remainingBalance || 0),
+        installmentAmount: Number(installmentAmount || 0),
+        dueDay: dueDay.trim(),
+      });
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "Unable to save changes",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -132,7 +171,7 @@ export default function EditPaylaterModal() {
           <View style={[styles.handle, ui.handle]} />
 
           <View style={styles.headerRow}>
-            <Text style={[styles.title, ui.title]}>{getParamValue(params.paylaterName) || paylater.title}</Text>
+            <Text style={[styles.title, ui.title]}>{title}</Text>
             <Pressable
               style={[styles.closeButton, ui.closeButton]}
               onPress={() => router.back()}
@@ -145,7 +184,7 @@ export default function EditPaylaterModal() {
             <View style={styles.section}>
               <Text style={[styles.label, ui.label]}>Remaining Balance</Text>
               <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
-                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <Text style={[styles.peso, ui.peso]}>PHP</Text>
                 <TextInput
                   value={remainingBalance}
                   onChangeText={(value) => setRemainingBalance(digitsOnly(value))}
@@ -161,7 +200,7 @@ export default function EditPaylaterModal() {
             <View style={styles.section}>
               <Text style={[styles.label, ui.label]}>Installment Amount</Text>
               <View style={[styles.fieldSurface, ui.fieldSurface, styles.currencyField]}>
-                <Text style={[styles.peso, ui.peso]}>₱</Text>
+                <Text style={[styles.peso, ui.peso]}>PHP</Text>
                 <TextInput
                   value={installmentAmount}
                   onChangeText={(value) => setInstallmentAmount(digitsOnly(value))}
@@ -178,8 +217,8 @@ export default function EditPaylaterModal() {
               <Text style={[styles.label, ui.label]}>Due Date (Day of Month)</Text>
               <View style={[styles.fieldSurface, ui.fieldSurface]}>
                 <TextInput
-                  value={dueDate}
-                  onChangeText={(value) => setDueDate(digitsOnly(value))}
+                  value={dueDay}
+                  onChangeText={(value) => setDueDay(digitsOnly(value))}
                   placeholder="1"
                   placeholderTextColor={ui.placeholder.color}
                   keyboardType="number-pad"
@@ -198,7 +237,11 @@ export default function EditPaylaterModal() {
                 <Text style={[styles.actionText, ui.cancelText]}>Cancel</Text>
               </Pressable>
 
-              <Pressable style={[styles.actionButton, ui.saveButton]} onPress={() => router.back()}>
+              <Pressable
+                style={[styles.actionButton, ui.saveButton]}
+                onPress={handleSave}
+                disabled={isSubmitting}
+              >
                 <Feather name="check" size={16} color={ui.saveButtonText.color} />
                 <Text style={[styles.actionText, ui.saveButtonText]}>Save Changes</Text>
               </Pressable>

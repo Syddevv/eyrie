@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -12,10 +12,34 @@ import {
 } from "react-native";
 
 import { themeColors } from "@/constants/colors";
-import { PAYLATERS_ITEMS } from "@/constants/paylater-records";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  paylatersService,
+  type PaylaterListItem,
+  type PaylaterPaymentListItem,
+} from "@/src/db/services/paylatersService";
+import {
+  formatPaylaterAmount,
+  formatPaylaterDueDayLabel,
+  formatPaylaterEstimatedCompletion,
+  formatPaylaterPaymentDate,
+  getPaylaterOption,
+  getPaylaterPaymentTitle,
+  getPaylaterStatusLabel,
+  getPaylaterStatusTone,
+} from "@/src/lib/paylaters-presentation";
+import { onPaylatersChanged } from "@/src/lib/dbSync";
+import { toPaylaterProgressLabel } from "@/src/db/services/paylatersService";
+
+function getParamValue(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
 
 export default function PaylaterInfoModal() {
   const router = useRouter();
@@ -25,15 +49,49 @@ export default function PaylaterInfoModal() {
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
-  const paylaterId = Array.isArray(params.paylaterId)
-    ? params.paylaterId[0]
-    : params.paylaterId;
-  const paylater = useMemo(
-    () =>
-      PAYLATERS_ITEMS.find((item) => item.id === paylaterId) ??
-      PAYLATERS_ITEMS[0],
-    [paylaterId],
-  );
+  const paylaterId = getParamValue(params.paylaterId);
+  const [paylater, setPaylater] = useState<PaylaterListItem | null>(null);
+  const [payments, setPayments] = useState<PaylaterPaymentListItem[]>([]);
+
+  useEffect(() => {
+    if (!paylaterId) {
+      return;
+    }
+
+    const hydrate = async () => {
+      const [nextPaylater, nextPayments] = await Promise.all([
+        paylatersService.fetchById(paylaterId),
+        paylatersService.fetchPayments(paylaterId),
+      ]);
+
+      setPaylater(nextPaylater ?? null);
+      setPayments(
+        [...nextPayments].sort(
+          (left, right) =>
+            new Date(right.paymentDate).getTime() -
+            new Date(left.paymentDate).getTime(),
+        ),
+      );
+    };
+
+    void hydrate().catch(() => undefined);
+    const off = onPaylatersChanged(() => {
+      void hydrate().catch(() => undefined);
+    });
+
+    return () => off();
+  }, [paylaterId]);
+
+  const platform = paylater ? getPaylaterOption(paylater.platform) : null;
+  const statusTone = getPaylaterStatusTone(paylater?.status ?? "upcoming");
+  const { progress, percentagePaid, installmentsRemaining } =
+    toPaylaterProgressLabel(
+      paylater ?? {
+        totalAmount: 0,
+        remainingBalance: 0,
+        installmentAmount: 0,
+      },
+    );
 
   const ui = useMemo(
     () => ({
@@ -126,16 +184,126 @@ export default function PaylaterInfoModal() {
       },
       statusPill: {
         backgroundColor:
-          paylater.statusTone === "upcoming"
+          statusTone === "upcoming"
             ? "rgba(34,197,94,0.18)"
-            : "rgba(239,68,68,0.18)",
+            : statusTone === "paid"
+              ? "rgba(59,130,246,0.18)"
+              : "rgba(239,68,68,0.18)",
       },
       statusText: {
-        color: paylater.statusTone === "upcoming" ? "#86EFAC" : "#FCA5A5",
+        color:
+          statusTone === "upcoming"
+            ? "#86EFAC"
+            : statusTone === "paid"
+              ? "#93C5FD"
+              : "#FCA5A5",
       },
     }),
-    [colors, isDark, paylater.statusTone],
+    [colors, isDark, statusTone],
   );
+
+  const handleDeletePayment = (paymentId: string) => {
+    Alert.alert(
+      "Remove payment?",
+      "This will remove the selected payment and reverse the linked expense.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            void paylatersService
+              .deletePayment(paymentId)
+              .catch((error) =>
+                Alert.alert(
+                  "Unable to remove payment",
+                  error instanceof Error ? error.message : "Please try again.",
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleMarkPaid = () => {
+    if (!paylater) {
+      return;
+    }
+
+    Alert.alert(
+      "Mark as paid?",
+      "This will record a final payment for the remaining balance.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Mark Paid",
+          onPress: () => {
+            void paylatersService
+              .markPaylaterAsPaid(paylater.id)
+              .catch((error) =>
+                Alert.alert(
+                  "Unable to mark as paid",
+                  error instanceof Error ? error.message : "Please try again.",
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeletePaylater = () => {
+    if (!paylater) {
+      return;
+    }
+
+    Alert.alert(
+      "Delete paylater?",
+      "This will soft-delete the paylater, its payment history, and linked repayment expenses.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            void paylatersService
+              .delete(paylater.id)
+              .then(() => router.back())
+              .catch((error) =>
+                Alert.alert(
+                  "Unable to delete paylater",
+                  error instanceof Error ? error.message : "Please try again.",
+                ),
+              );
+          },
+        },
+      ],
+    );
+  };
+
+  if (!paylater) {
+    return (
+      <View style={[styles.overlay, ui.overlay]}>
+        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <View style={[styles.sheet, ui.sheet, shadows.floating]}>
+          <View style={[styles.handle, ui.handle]} />
+          <View style={styles.headerRow}>
+            <Text style={[styles.title, ui.title]}>Paylater Details</Text>
+            <Pressable
+              style={[styles.closeButton, ui.closeButton]}
+              onPress={() => router.back()}
+            >
+              <Feather name="x" size={20} color={ui.closeIcon.color} />
+            </Pressable>
+          </View>
+          <Text style={[styles.historySubtitle, ui.historySubtitle, { marginTop: 20 }]}>
+            Paylater record not found.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.overlay, ui.overlay]}>
@@ -145,7 +313,7 @@ export default function PaylaterInfoModal() {
         <View style={[styles.handle, ui.handle]} />
 
         <View style={styles.headerRow}>
-          <Text style={[styles.title, ui.title]}>{paylater.title}</Text>
+          <Text style={[styles.title, ui.title]}>{paylater.itemName}</Text>
           <Pressable
             style={[styles.closeButton, ui.closeButton]}
             onPress={() => router.back()}
@@ -167,14 +335,16 @@ export default function PaylaterInfoModal() {
             <View style={styles.summaryTopRow}>
               <View>
                 <Text style={styles.summaryLabel}>Outstanding Balance</Text>
-                <Text style={styles.summaryAmount}>{paylater.balance}</Text>
+                <Text style={styles.summaryAmount}>
+                  {formatPaylaterAmount(Number(paylater.remainingBalance ?? 0))}
+                </Text>
               </View>
 
               <View style={styles.summaryRight}>
-                <Text style={styles.summaryProvider}>{paylater.provider}</Text>
+                <Text style={styles.summaryProvider}>{platform?.name ?? "PayLater"}</Text>
                 <View style={[styles.statusPill, ui.statusPill]}>
                   <Text style={[styles.statusText, ui.statusText]}>
-                    {paylater.status}
+                    {getPaylaterStatusLabel(paylater.status)}
                   </Text>
                 </View>
               </View>
@@ -184,11 +354,11 @@ export default function PaylaterInfoModal() {
               <View
                 style={[
                   styles.summaryFill,
-                  { width: `${paylater.progressRatio * 100}%` },
+                  { width: `${progress * 100}%` },
                 ]}
               />
             </View>
-            <Text style={styles.summaryProgress}>50% paid</Text>
+            <Text style={styles.summaryProgress}>{`${percentagePaid}% paid`}</Text>
           </LinearGradient>
 
           <View style={styles.detailsList}>
@@ -197,14 +367,14 @@ export default function PaylaterInfoModal() {
                 Installment Amount
               </Text>
               <Text style={[styles.detailValue, ui.detailValue]}>
-                {paylater.installment}
+                {formatPaylaterAmount(Number(paylater.installmentAmount ?? 0))}
               </Text>
             </View>
 
             <View style={[styles.detailCard, ui.detailCard]}>
               <Text style={[styles.detailLabel, ui.detailLabel]}>Due Date</Text>
               <Text style={[styles.detailValue, ui.detailValue]}>
-                {paylater.dueDateLabel}
+                {formatPaylaterDueDayLabel(paylater.dueDay)}
               </Text>
             </View>
 
@@ -213,7 +383,7 @@ export default function PaylaterInfoModal() {
                 Total Amount
               </Text>
               <Text style={[styles.detailValue, ui.detailValue]}>
-                {paylater.totalAmount}
+                {formatPaylaterAmount(Number(paylater.totalAmount ?? 0))}
               </Text>
             </View>
           </View>
@@ -223,10 +393,10 @@ export default function PaylaterInfoModal() {
               Repayment Estimate
             </Text>
             <Text style={[styles.estimateValue, ui.estimateValue]}>
-              {paylater.remainingInstallmentsLabel}
+              {`${installmentsRemaining} installments remaining`}
             </Text>
             <Text style={[styles.estimateSubtext, ui.estimateSubtext]}>
-              {paylater.estimatedCompletionLabel}
+              {formatPaylaterEstimatedCompletion(paylater)}
             </Text>
           </View>
 
@@ -236,8 +406,7 @@ export default function PaylaterInfoModal() {
               router.push({
                 pathname: "/paylater-repayment-modal",
                 params: {
-                  paylaterName: paylater.title,
-                  currentBalance: paylater.balance,
+                  paylaterId: paylater.id,
                 },
               })
             }
@@ -256,12 +425,6 @@ export default function PaylaterInfoModal() {
                   pathname: "/edit-paylater-modal",
                   params: {
                     paylaterId: paylater.id,
-                    paylaterName: paylater.title,
-                    currentBalance: paylater.balance,
-                    installmentAmount: paylater.installment,
-                    dueDate: paylater.dueDateLabel
-                      .replace(/^Day\s*/i, "")
-                      .replace(/\s*of month$/i, ""),
                   },
                 })
               }
@@ -276,7 +439,10 @@ export default function PaylaterInfoModal() {
               </Text>
             </Pressable>
 
-            <Pressable style={[styles.secondaryButton, ui.successButton]}>
+            <Pressable
+              style={[styles.secondaryButton, ui.successButton]}
+              onPress={handleMarkPaid}
+            >
               <Feather
                 name="award"
                 size={15}
@@ -287,7 +453,10 @@ export default function PaylaterInfoModal() {
               </Text>
             </Pressable>
 
-            <Pressable style={[styles.iconDangerButton, ui.dangerButton]}>
+            <Pressable
+              style={[styles.iconDangerButton, ui.dangerButton]}
+              onPress={handleDeletePaylater}
+            >
               <Feather
                 name="trash-2"
                 size={16}
@@ -303,50 +472,41 @@ export default function PaylaterInfoModal() {
           </Text>
 
           <View style={styles.historyList}>
-            {paylater.paymentHistory.map((entry) => (
+            {payments.map((entry, index) => (
               <View key={entry.id} style={styles.historyItem}>
                 <View>
                   <Text style={[styles.historyDate, ui.historyDate]}>
-                    {entry.dateLabel}
+                    {formatPaylaterPaymentDate(entry.paymentDate)}
                   </Text>
                   <Text style={[styles.historySubtitle, ui.historySubtitle]}>
-                    {entry.title}
+                    {getPaylaterPaymentTitle(entry, index)}
                   </Text>
                 </View>
 
                 <View style={styles.historyRight}>
-                  <Text
-                    style={[
-                      styles.historyAmount,
-                      ui.historyAmount,
-                      entry.amountFontSize
-                        ? { fontSize: entry.amountFontSize }
-                        : null,
-                    ]}
-                  >
-                    {entry.amount}
+                  <Text style={[styles.historyAmount, ui.historyAmount]}>
+                    {formatPaylaterAmount(Number(entry.amount ?? 0))}
                   </Text>
 
-                  {entry.deletable ? (
-                    <Pressable
-                      style={styles.deleteButton}
-                      onPress={() =>
-                        Alert.alert(
-                          "Remove payment?",
-                          "This will remove the selected payment (not implemented).",
-                        )
-                      }
-                    >
-                      <Feather
-                        name="trash-2"
-                        size={16}
-                        color={ui.dangerButtonIcon.color}
-                      />
-                    </Pressable>
-                  ) : null}
+                  <Pressable
+                    style={styles.deleteButton}
+                    onPress={() => handleDeletePayment(entry.id)}
+                  >
+                    <Feather
+                      name="trash-2"
+                      size={16}
+                      color={ui.dangerButtonIcon.color}
+                    />
+                  </Pressable>
                 </View>
               </View>
             ))}
+
+            {payments.length === 0 ? (
+              <Text style={[styles.historySubtitle, ui.historySubtitle]}>
+                No payment history yet.
+              </Text>
+            ) : null}
           </View>
         </ScrollView>
       </View>

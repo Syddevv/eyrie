@@ -28,6 +28,9 @@ export const transactions = sqliteTable(
     transferAccountId: text("transfer_account_id").references(() => accounts.id, {
       onDelete: "set null",
     }),
+    source: text("source"),
+    referenceType: text("reference_type"),
+    referenceId: text("reference_id"),
     merchantName: text("merchant_name"),
     notes: text("notes"),
     transactionDate: text("transaction_date").notNull(),
@@ -46,5 +49,10 @@ export const transactions = sqliteTable(
     merchantIdx: index("transactions_merchant_idx").on(table.merchantId),
     dateIdx: index("transactions_date_idx").on(table.transactionDate),
     typeIdx: index("transactions_type_idx").on(table.type),
+    referenceIdx: index("transactions_reference_idx").on(
+      table.source,
+      table.referenceType,
+      table.referenceId,
+    ),
   })
 );

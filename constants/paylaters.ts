@@ -1,6 +1,7 @@
 export const PAYLATER_OPTIONS = [
   {
     id: "shopee-paylater",
+    platform: "shopee",
     name: "Shopee PayLater",
     description: "Track Shopee PayLater purchases",
     subtitle: "PayLater purchases",
@@ -9,6 +10,7 @@ export const PAYLATER_OPTIONS = [
   },
   {
     id: "tiktok-paylater",
+    platform: "tiktok",
     name: "TikTok PayLater",
     description: "Track TikTok Shop PayLater",
     subtitle: "PayLater purchases",
@@ -17,6 +19,7 @@ export const PAYLATER_OPTIONS = [
   },
   {
     id: "lazada-paylater",
+    platform: "lazada",
     name: "Lazada PayLater",
     description: "Track Lazada PayLater purchases",
     subtitle: "PayLater purchases",
@@ -25,6 +28,7 @@ export const PAYLATER_OPTIONS = [
   },
   {
     id: "other-paylater",
+    platform: "other",
     name: "Other PayLater",
     description: "Custom paylater service",
     subtitle: "Custom paylater service",

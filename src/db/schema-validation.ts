@@ -123,6 +123,26 @@ const SCHEMA_SPECS: TableSpec[] = [
       },
     ],
   },
+  {
+    table: "transactions",
+    columns: [
+      {
+        name: "source",
+        sql: "ALTER TABLE transactions ADD COLUMN source TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "reference_type",
+        sql: "ALTER TABLE transactions ADD COLUMN reference_type TEXT;",
+        recoverable: true,
+      },
+      {
+        name: "reference_id",
+        sql: "ALTER TABLE transactions ADD COLUMN reference_id TEXT;",
+        recoverable: true,
+      },
+    ],
+  },
 ];
 
 async function getTableColumns(table: string) {
@@ -138,6 +158,12 @@ async function tableExists(table: string) {
     [table],
   )) as Array<{ name: string }>;
   return rows.length > 0;
+}
+
+async function ensureTransactionsReferenceIndex() {
+  await expoDb.execAsync(
+    "CREATE INDEX IF NOT EXISTS transactions_reference_idx ON transactions (source, reference_type, reference_id);",
+  );
 }
 
 export async function getMigrationVersionSnapshot() {
@@ -242,10 +268,6 @@ export async function validateAndRepairLocalSchema() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        console.error(
-          `[db:schema] ✗ Failed to add column ${spec.table}.${column.name}:`,
-          errorMessage,
-        );
 
         // Check if this is a column-already-exists error (can happen if concurrent operations)
         if (
@@ -260,6 +282,11 @@ export async function validateAndRepairLocalSchema() {
           continue;
         }
 
+        console.error(
+          `[db:schema] ✗ Failed to add column ${spec.table}.${column.name}:`,
+          errorMessage,
+        );
+
         // Other errors are unrecoverable
         errors.push({
           table: spec.table,
@@ -271,6 +298,17 @@ export async function validateAndRepairLocalSchema() {
         unrecoverable.push(
           `Failed to add column ${spec.table}.${column.name}: ${errorMessage}`,
         );
+      }
+    }
+
+    if (spec.table === "transactions") {
+      const updatedColumns = await getTableColumns(spec.table);
+      if (
+        updatedColumns.has("source") &&
+        updatedColumns.has("reference_type") &&
+        updatedColumns.has("reference_id")
+      ) {
+        await ensureTransactionsReferenceIndex();
       }
     }
   }

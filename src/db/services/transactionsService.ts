@@ -37,6 +37,11 @@ import { enqueueSync } from "@/src/sync/queue";
 import { showSuccessToast } from "@/store/useToastStore";
 import { usersService } from "./usersService";
 import { categoriesService } from "./categoriesService";
+import {
+  buildRepaymentTransactionNotes,
+  PAYLATER_TRANSACTION_REFERENCE_TYPE,
+  PAYLATER_TRANSACTION_SOURCE,
+} from "../utils/paylaters";
 
 export type CreateTransactionInput = Omit<
   NewTransaction,
@@ -51,6 +56,26 @@ export type CreateTransactionInput = Omit<
   id?: string;
   merchantDefaultCategoryId?: string | null;
 };
+
+type TransactionMutationOptions = {
+  notifySuccess?: boolean;
+};
+
+type RepaymentTransactionInput = {
+  paymentId: string;
+  userId: string;
+  amount: number;
+  paymentDate: string;
+  accountId: string;
+  currencyCode: string;
+  categoryId: string | null;
+  itemName: string;
+  platformLabel: string;
+  userNotes?: string | null;
+  transactionId?: string | null;
+};
+
+type Executor = any;
 
 export class TransactionsService {
   private async enqueueTransactionDependencies(
@@ -112,7 +137,10 @@ export class TransactionsService {
     }
   }
 
-  async create(input: CreateTransactionInput) {
+  async create(
+    input: CreateTransactionInput,
+    options: TransactionMutationOptions = {},
+  ) {
     assertRequiredText(input.userId ?? "", "userId");
     assertRequiredText(input.accountId ?? "", "accountId");
     assertRequiredText(input.currencyCode ?? "", "currencyCode");
@@ -229,21 +257,27 @@ export class TransactionsService {
     await usersService.markUserActive(created.userId).catch(() => undefined);
     await enqueueSync("transactions", created.id, "upsert", created.userId);
     await this.enqueueTransactionDependencies([created]);
-    showSuccessToast({
-      title:
-        created.type === "income"
-          ? "Income added"
-          : created.type === "transfer"
-            ? "Transfer added"
-            : "Expense added",
-      message: "Transaction saved successfully.",
-      dedupeKey: `transaction:create:${created.id}`,
-      source: "transactions-service",
-    });
+    if (options.notifySuccess ?? true) {
+      showSuccessToast({
+        title:
+          created.type === "income"
+            ? "Income added"
+            : created.type === "transfer"
+              ? "Transfer added"
+              : "Expense added",
+        message: "Transaction saved successfully.",
+        dedupeKey: `transaction:create:${created.id}`,
+        source: "transactions-service",
+      });
+    }
     return created;
   }
 
-  async update(id: string, input: Partial<NewTransaction>) {
+  async update(
+    id: string,
+    input: Partial<NewTransaction>,
+    options: TransactionMutationOptions = {},
+  ) {
     const existing = await db.query.transactions.findFirst({
       where: (table, { eq: innerEq }) => innerEq(table.id, id),
     });
@@ -386,16 +420,18 @@ export class TransactionsService {
     emitTransactionsChanged();
     await enqueueSync("transactions", updated.id, "upsert", updated.userId);
     await this.enqueueTransactionDependencies([existing, updated]);
-    showSuccessToast({
-      title: "Transaction updated",
-      message: "Your changes were saved successfully.",
-      dedupeKey: `transaction:update:${updated.id}:${updated.updatedAt}`,
-      source: "transactions-service",
-    });
+    if (options.notifySuccess ?? true) {
+      showSuccessToast({
+        title: "Transaction updated",
+        message: "Your changes were saved successfully.",
+        dedupeKey: `transaction:update:${updated.id}:${updated.updatedAt}`,
+        source: "transactions-service",
+      });
+    }
     return updated;
   }
 
-  async delete(id: string) {
+  async delete(id: string, options: TransactionMutationOptions = {}) {
     const deleted = await db.transaction(async (tx) => {
       const existing = await tx.query.transactions.findFirst({
         where: (table, { eq: innerEq }) => innerEq(table.id, id),
@@ -437,12 +473,14 @@ export class TransactionsService {
     if (deleted) {
       await enqueueSync("transactions", deleted.id, "delete", deleted.userId);
       await this.enqueueTransactionDependencies([deleted]);
-      showSuccessToast({
-        title: "Transaction deleted",
-        message: "The transaction was removed successfully.",
-        dedupeKey: `transaction:delete:${deleted.id}`,
-        source: "transactions-service",
-      });
+      if (options.notifySuccess ?? true) {
+        showSuccessToast({
+          title: "Transaction deleted",
+          message: "The transaction was removed successfully.",
+          dedupeKey: `transaction:delete:${deleted.id}`,
+          source: "transactions-service",
+        });
+      }
     }
   }
 
@@ -452,6 +490,186 @@ export class TransactionsService {
 
   async fetchById(id: string) {
     return transactionsRepository.findById(id);
+  }
+
+  async findRepaymentByPaymentId(paymentId: string, includeDeleted = true) {
+    return transactionsRepository.findByReference(
+      PAYLATER_TRANSACTION_SOURCE,
+      PAYLATER_TRANSACTION_REFERENCE_TYPE,
+      paymentId,
+      includeDeleted,
+    );
+  }
+
+  async upsertLinkedPaylaterRepaymentInTransaction(
+    tx: Executor,
+    input: RepaymentTransactionInput,
+  ) {
+    const existing = input.transactionId
+      ? await tx.query.transactions.findFirst({
+          where: (table: any, { eq: innerEq }: any) =>
+            innerEq(table.id, input.transactionId!),
+        })
+      : await tx.query.transactions.findFirst({
+          where: (
+            table: any,
+            { and: innerAnd, eq: innerEq, like: innerLike, or: innerOr }: any,
+          ) =>
+            innerAnd(
+              innerEq(table.type, "expense"),
+              innerOr(
+                innerAnd(
+                  innerEq(table.source, PAYLATER_TRANSACTION_SOURCE),
+                  innerEq(
+                    table.referenceType,
+                    PAYLATER_TRANSACTION_REFERENCE_TYPE,
+                  ),
+                  innerEq(table.referenceId, input.paymentId),
+                ),
+                innerLike(table.notes, `%#paylater_payment:${input.paymentId}%`),
+              ),
+            ),
+        });
+
+    const timestamp = nowIso();
+    const nextNotes = buildRepaymentTransactionNotes({
+      paymentId: input.paymentId,
+      itemName: input.itemName,
+      platformLabel: input.platformLabel,
+      userNotes: input.userNotes ?? null,
+    });
+
+    if (!existing) {
+      const transactionId = input.transactionId ?? createId("txn");
+      await tx.insert(transactions).values({
+        ...prepareCreateForSync({
+          id: transactionId,
+          userId: input.userId,
+          type: "expense",
+          amount: input.amount,
+          currencyCode: input.currencyCode,
+          categoryId: input.categoryId,
+          merchantId: null,
+          accountId: input.accountId,
+          transferAccountId: null,
+          source: PAYLATER_TRANSACTION_SOURCE,
+          referenceType: PAYLATER_TRANSACTION_REFERENCE_TYPE,
+          referenceId: input.paymentId,
+          merchantName: input.itemName,
+          notes: nextNotes,
+          transactionDate: input.paymentDate,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }),
+      });
+
+      const created = await tx.query.transactions.findFirst({
+        where: (table: any, { eq: innerEq }: any) =>
+          innerEq(table.id, transactionId),
+      });
+
+      if (!created) {
+        throw new Error("Unable to create repayment transaction.");
+      }
+
+      await applyTransactionEffects(tx, created);
+      await refreshBudgetsForTransactionChange(tx, undefined, created);
+      return created;
+    }
+
+    const next = {
+      ...existing,
+      ...prepareUpdateForSync({
+        userId: input.userId,
+        type: "expense",
+        amount: input.amount,
+        currencyCode: input.currencyCode,
+        categoryId: input.categoryId,
+        merchantId: null,
+        accountId: input.accountId,
+        transferAccountId: null,
+        source: PAYLATER_TRANSACTION_SOURCE,
+        referenceType: PAYLATER_TRANSACTION_REFERENCE_TYPE,
+        referenceId: input.paymentId,
+        merchantName: input.itemName,
+        notes: nextNotes,
+        transactionDate: input.paymentDate,
+        deletedAt: null,
+        updatedAt: timestamp,
+      }),
+    };
+
+    if (!existing.deletedAt) {
+      await reverseTransactionEffects(tx, existing);
+    }
+
+    await tx.update(transactions).set(next).where(eq(transactions.id, existing.id));
+
+    const updated = await tx.query.transactions.findFirst({
+      where: (table: any, { eq: innerEq }: any) =>
+        innerEq(table.id, existing.id),
+    });
+
+    if (!updated) {
+      throw new Error("Unable to update repayment transaction.");
+    }
+
+    await applyTransactionEffects(tx, updated);
+    await refreshBudgetsForTransactionChange(
+      tx,
+      existing.deletedAt ? undefined : existing,
+      updated,
+    );
+    return updated;
+  }
+
+  async softDeleteLinkedPaylaterRepaymentInTransaction(
+    tx: Executor,
+    input: { paymentId?: string | null; transactionId?: string | null },
+  ) {
+    const existing = input.transactionId
+      ? await tx.query.transactions.findFirst({
+          where: (table: any, { eq: innerEq }: any) =>
+            innerEq(table.id, input.transactionId!),
+        })
+      : input.paymentId
+        ? await tx.query.transactions.findFirst({
+            where: (
+              table: any,
+              { and: innerAnd, eq: innerEq, like: innerLike, or: innerOr }: any,
+            ) =>
+              innerAnd(
+                innerEq(table.type, "expense"),
+                innerOr(
+                  innerAnd(
+                    innerEq(table.source, PAYLATER_TRANSACTION_SOURCE),
+                    innerEq(
+                      table.referenceType,
+                      PAYLATER_TRANSACTION_REFERENCE_TYPE,
+                    ),
+                    innerEq(table.referenceId, input.paymentId),
+                  ),
+                  innerLike(table.notes, `%#paylater_payment:${input.paymentId}%`),
+                ),
+              ),
+          })
+        : null;
+
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.deletedAt) {
+      return existing;
+    }
+
+    await reverseTransactionEffects(tx, existing);
+    await tx
+      .update(transactions)
+      .set(prepareDeleteForSync())
+      .where(eq(transactions.id, existing.id));
+    await refreshBudgetsForTransactionChange(tx, existing, undefined);
+    return existing;
   }
 
   private async resolveExpenseMerchant(input: {

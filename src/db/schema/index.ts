@@ -6,6 +6,7 @@ export * from "./goals";
 export * from "./insights";
 export * from "./merchants";
 export * from "./notifications";
+export * from "./paylaters";
 export * from "./relations";
 export * from "./transactions";
 export * from "./users";

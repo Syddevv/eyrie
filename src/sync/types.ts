@@ -13,6 +13,8 @@ export type SyncableTable =
   | "categories"
   | "merchants"
   | "transactions"
+  | "paylaters"
+  | "paylater_payments"
   | "budgets"
   | "saving_goals"
   | "goal_contributions";

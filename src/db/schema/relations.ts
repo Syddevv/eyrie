@@ -8,6 +8,7 @@ import { goalContributions, goals } from "./goals";
 import { insights } from "./insights";
 import { merchantCategoryHistory, merchants } from "./merchants";
 import { notifications } from "./notifications";
+import { paylaterPayments, paylaters } from "./paylaters";
 import { transactions } from "./transactions";
 import { users } from "./users";
 
@@ -20,6 +21,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   insights: many(insights),
   notifications: many(notifications),
   merchants: many(merchants),
+  paylaters: many(paylaters),
+  paylaterPayments: many(paylaterPayments),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -68,7 +71,7 @@ export const merchantCategoryHistoryRelations = relations(merchantCategoryHistor
   }),
 }));
 
-export const transactionsRelations = relations(transactions, ({ one }) => ({
+export const transactionsRelations = relations(transactions, ({ one, many }) => ({
   user: one(users, {
     fields: [transactions.userId],
     references: [users.id],
@@ -91,6 +94,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.merchantId],
     references: [merchants.id],
   }),
+  paylaterPayments: many(paylaterPayments),
 }));
 
 export const budgetsRelations = relations(budgets, ({ one }) => ({
@@ -115,6 +119,32 @@ export const goalsRelations = relations(goals, ({ one, many }) => ({
   }),
   contributions: many(goalContributions),
 }));
+
+export const paylatersRelations = relations(paylaters, ({ one, many }) => ({
+  user: one(users, {
+    fields: [paylaters.userId],
+    references: [users.id],
+  }),
+  payments: many(paylaterPayments),
+}));
+
+export const paylaterPaymentsRelations = relations(
+  paylaterPayments,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [paylaterPayments.userId],
+      references: [users.id],
+    }),
+    paylater: one(paylaters, {
+      fields: [paylaterPayments.paylaterId],
+      references: [paylaters.id],
+    }),
+    transaction: one(transactions, {
+      fields: [paylaterPayments.transactionId],
+      references: [transactions.id],
+    }),
+  }),
+);
 
 export const goalContributionsRelations = relations(goalContributions, ({ one }) => ({
   goal: one(goals, {

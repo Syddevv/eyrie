@@ -8,6 +8,8 @@ import {
   goalContributions,
   goals,
   merchants,
+  paylaterPayments,
+  paylaters,
   transactions,
   users,
 } from "@/src/db/schema";
@@ -21,6 +23,8 @@ const TABLES = {
   categories,
   merchants,
   transactions,
+  paylaters,
+  paylater_payments: paylaterPayments,
   budgets,
   saving_goals: goals,
   goal_contributions: goalContributions,
@@ -32,6 +36,9 @@ const QUERY_HANDLERS = {
   categories: (id: string) => db.query.categories.findFirst({ where: eq(categories.id, id) }),
   merchants: (id: string) => db.query.merchants.findFirst({ where: eq(merchants.id, id) }),
   transactions: (id: string) => db.query.transactions.findFirst({ where: eq(transactions.id, id) }),
+  paylaters: (id: string) => db.query.paylaters.findFirst({ where: eq(paylaters.id, id) }),
+  paylater_payments: (id: string) =>
+    db.query.paylaterPayments.findFirst({ where: eq(paylaterPayments.id, id) }),
   budgets: (id: string) => db.query.budgets.findFirst({ where: eq(budgets.id, id) }),
   saving_goals: (id: string) => db.query.goals.findFirst({ where: eq(goals.id, id) }),
   goal_contributions: (id: string) =>
@@ -50,6 +57,14 @@ const ACTIVE_QUERY_HANDLERS = {
   transactions: (id: string) =>
     db.query.transactions.findFirst({
       where: and(eq(transactions.id, id), isNull(transactions.deletedAt)),
+    }),
+  paylaters: (id: string) =>
+    db.query.paylaters.findFirst({
+      where: and(eq(paylaters.id, id), isNull(paylaters.deletedAt)),
+    }),
+  paylater_payments: (id: string) =>
+    db.query.paylaterPayments.findFirst({
+      where: and(eq(paylaterPayments.id, id), isNull(paylaterPayments.deletedAt)),
     }),
   budgets: (id: string) =>
     db.query.budgets.findFirst({ where: and(eq(budgets.id, id), isNull(budgets.deletedAt)) }),
@@ -157,6 +172,20 @@ export async function fetchBootstrapRecordIds(tableName: SyncableTable, userId: 
         .where(and(eq(transactions.userId, userId), isNull(transactions.deletedAt)));
       return rows.map((row) => row.id);
     }
+    case "paylaters": {
+      const rows = await db
+        .select({ id: paylaters.id })
+        .from(paylaters)
+        .where(and(eq(paylaters.userId, userId), isNull(paylaters.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "paylater_payments": {
+      const rows = await db
+        .select({ id: paylaterPayments.id })
+        .from(paylaterPayments)
+        .where(and(eq(paylaterPayments.userId, userId), isNull(paylaterPayments.deletedAt)));
+      return rows.map((row) => row.id);
+    }
     case "budgets": {
       const rows = await db
         .select({ id: budgets.id })
@@ -216,6 +245,20 @@ export async function fetchFailedRecordIds(tableName: SyncableTable, userId: str
         .select({ id: transactions.id })
         .from(transactions)
         .where(and(eq(transactions.userId, userId), eq(transactions.syncStatus, "failed"), isNull(transactions.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "paylaters": {
+      const rows = await db
+        .select({ id: paylaters.id })
+        .from(paylaters)
+        .where(and(eq(paylaters.userId, userId), eq(paylaters.syncStatus, "failed"), isNull(paylaters.deletedAt)));
+      return rows.map((row) => row.id);
+    }
+    case "paylater_payments": {
+      const rows = await db
+        .select({ id: paylaterPayments.id })
+        .from(paylaterPayments)
+        .where(and(eq(paylaterPayments.userId, userId), eq(paylaterPayments.syncStatus, "failed"), isNull(paylaterPayments.deletedAt)));
       return rows.map((row) => row.id);
     }
     case "budgets": {

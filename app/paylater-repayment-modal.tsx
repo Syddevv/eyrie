@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -12,10 +13,19 @@ import {
   View,
 } from "react-native";
 
+import Logo from "@/components/logo";
+import { BANKS } from "@/constants/banks";
 import { themeColors } from "@/constants/colors";
 import { radius, shadows } from "@/constants/theme";
 import { fontFamilies, fontWeights } from "@/constants/typography";
+import LOGO_MAP from "@/constants/logoMap";
+import { WALLETS } from "@/constants/wallets";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { paylatersService } from "@/src/db/services";
+import { formatPaylaterAmount } from "@/src/lib/paylaters-presentation";
+import { onPaylatersChanged } from "@/src/lib/dbSync";
 
 const monthNames = [
   "January",
@@ -36,6 +46,14 @@ const weekdayLabels = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
 function digitsOnly(value: string) {
   return value.replace(/[^\d]/g, "");
+}
+
+function getParamValue(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }
 
 function isSameDay(left: Date, right: Date) {
@@ -98,18 +116,16 @@ function buildCalendarDays(monthDate: Date) {
 export default function PaylaterRepaymentModal() {
   const router = useRouter();
   const params = useLocalSearchParams<{
+    paylaterId?: string | string[];
     paylaterName?: string | string[];
     currentBalance?: string | string[];
   }>();
   const colorScheme = useColorScheme() ?? "light";
   const colors = themeColors[colorScheme];
   const isDark = colorScheme === "dark";
-  const paylaterName = Array.isArray(params.paylaterName)
-    ? params.paylaterName[0]
-    : params.paylaterName || "Wireless Earbuds";
-  const currentBalance = Array.isArray(params.currentBalance)
-    ? params.currentBalance[0]
-    : params.currentBalance || "₱2,250";
+  const paylaterId = getParamValue(params.paylaterId);
+  const fallbackName = getParamValue(params.paylaterName) || "PayLater";
+  const fallbackBalance = getParamValue(params.currentBalance) || "PHP 0.00";
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => new Date());
@@ -118,10 +134,37 @@ export default function PaylaterRepaymentModal() {
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paylaterName, setPaylaterName] = useState(fallbackName);
+  const [currentBalance, setCurrentBalance] = useState(fallbackBalance);
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
+    string | null
+  >(null);
+  const [isPaymentMethodsOpen, setIsPaymentMethodsOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { methods: paymentMethods } = usePaymentMethods();
+  const { accounts } = useAccounts();
   const calendarDays = useMemo(
     () => buildCalendarDays(calendarMonth),
     [calendarMonth],
   );
+  const selectedAmount = Number(paymentAmount) || 0;
+  const activePaymentMethod =
+    paymentMethods.find((method) => method.id === selectedPaymentMethodId) ??
+    paymentMethods[0] ??
+    null;
+  const selectedPaymentMethodIsInsufficient =
+    Boolean(activePaymentMethod) &&
+    !activePaymentMethod?.isFallback &&
+    activePaymentMethod?.kind !== "credit" &&
+    selectedAmount > (activePaymentMethod?.balance ?? 0);
+  const insufficientBalanceMessage = selectedPaymentMethodIsInsufficient
+    ? "Selected account does not have enough balance for this repayment."
+    : null;
+  const activePaymentMethodAccountId =
+    activePaymentMethod && "accountId" in activePaymentMethod
+      ? activePaymentMethod.accountId
+      : undefined;
 
   useEffect(() => {
     const showEvent =
@@ -141,6 +184,44 @@ export default function PaylaterRepaymentModal() {
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!paymentMethods.length) {
+      setSelectedPaymentMethodId(null);
+      return;
+    }
+
+    setSelectedPaymentMethodId((current) => {
+      if (current && paymentMethods.some((method) => method.id === current)) {
+        return current;
+      }
+
+      return paymentMethods[0]?.id ?? null;
+    });
+  }, [paymentMethods]);
+
+  useEffect(() => {
+    if (!paylaterId) {
+      return;
+    }
+
+    const loadPaylater = async () => {
+      const paylater = await paylatersService.fetchById(paylaterId);
+      if (!paylater) {
+        return;
+      }
+
+      setPaylaterName(paylater.itemName);
+      setCurrentBalance(formatPaylaterAmount(Number(paylater.remainingBalance ?? 0)));
+    };
+
+    void loadPaylater().catch(() => undefined);
+    const off = onPaylatersChanged(() => {
+      void loadPaylater().catch(() => undefined);
+    });
+
+    return () => off();
+  }, [paylaterId]);
 
   const ui = useMemo(
     () => ({
@@ -207,6 +288,7 @@ export default function PaylaterRepaymentModal() {
       },
       saveButton: {
         backgroundColor: "#70B6F2",
+        opacity: isSubmitting ? 0.7 : 1,
       },
       saveButtonText: {
         color: "#FFFFFF",
@@ -233,9 +315,63 @@ export default function PaylaterRepaymentModal() {
       todayRing: {
         borderColor: colors.primary,
       },
+      valueText: {
+        color: colors.foreground,
+      },
+      placeholderText: {
+        color: isDark ? "#8F9CAF" : "#8A94A6",
+      },
+      dropdownItemBorder: {
+        borderBottomColor: isDark ? "rgba(255,255,255,0.05)" : "#E6EBF2",
+      },
+      dropdownItemMuted: {
+        color: isDark ? "#8F9CAF" : "#7D8898",
+      },
+      defaultPill: {
+        backgroundColor: isDark ? "rgba(59,130,246,0.16)" : "#DBEAFE",
+      },
+      defaultPillText: {
+        color: isDark ? "#93C5FD" : "#2563EB",
+      },
     }),
-    [colors, isDark],
+    [colors, isDark, isSubmitting],
   );
+
+  const handleSave = async () => {
+    if (!paylaterId) {
+      Alert.alert("Unable to save", "Missing paylater record.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      if (!selectedPaymentMethodId) {
+        setErrorMessage("Please select a wallet or card.");
+        return;
+      }
+      if (selectedPaymentMethodIsInsufficient) {
+        setErrorMessage("Selected account does not have enough balance.");
+        return;
+      }
+      await paylatersService.recordPayment(paylaterId, {
+        amount: Number(paymentAmount || 0),
+        paymentDate: paymentDate.toISOString(),
+        accountId: activePaymentMethod?.isFallback
+          ? null
+          : (activePaymentMethodAccountId ?? selectedPaymentMethodId),
+        notes: notes.trim() ? notes.trim() : null,
+      });
+      router.back();
+    } catch (error) {
+      Alert.alert(
+        "Unable to save payment",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -287,7 +423,7 @@ export default function PaylaterRepaymentModal() {
                 styles.currencyField,
               ]}
             >
-              <Text style={[styles.peso, ui.peso]}>₱</Text>
+              <Text style={[styles.peso, ui.peso]}>PHP</Text>
               <TextInput
                 value={paymentAmount}
                 onChangeText={(value) => setPaymentAmount(digitsOnly(value))}
@@ -298,6 +434,256 @@ export default function PaylaterRepaymentModal() {
                 style={[styles.fieldInput, styles.flexFieldInput, ui.fieldText]}
               />
             </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={[styles.label, ui.label]}>Pay With</Text>
+            <Pressable
+              style={[styles.selectField, ui.pillSurface]}
+              onPress={() => {
+                if (paymentMethods.length > 1) {
+                  setIsPaymentMethodsOpen((current) => !current);
+                }
+              }}
+            >
+              <View style={styles.selectFieldContent}>
+                {(() => {
+                  const account = accounts.find(
+                    (a) => a.id === activePaymentMethodAccountId,
+                  );
+
+                  let logoAsset: any = null;
+
+                  if (account) {
+                    const nameLower = (account.name || "").toLowerCase();
+
+                    const matchWallet = WALLETS.find(
+                      (w) =>
+                        (w.name && nameLower.includes(w.name.toLowerCase())) ||
+                        (w.shortName &&
+                          nameLower.includes(w.shortName.toLowerCase())) ||
+                        nameLower.includes(w.id),
+                    );
+
+                    const matchBank = BANKS.find(
+                      (b) =>
+                        (b.name && nameLower.includes(b.name.toLowerCase())) ||
+                        (b.shortName &&
+                          nameLower.includes(b.shortName.toLowerCase())) ||
+                        nameLower.includes(b.id),
+                    );
+
+                    if (matchWallet) {
+                      logoAsset = matchWallet.logo;
+                    } else if (matchBank) {
+                      logoAsset = matchBank.logo;
+                    } else {
+                      const key = account.name
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]/g, "");
+                      logoAsset = LOGO_MAP[key];
+                    }
+                  }
+
+                  if (logoAsset) {
+                    return (
+                      <Logo
+                        logo={logoAsset}
+                        size={24}
+                        backgroundColor={account?.color || colors.secondary}
+                        style={{ marginRight: 10 }}
+                      />
+                    );
+                  }
+
+                  return null;
+                })()}
+                <View style={styles.selectFieldText}>
+                  <View style={styles.methodTitleRow}>
+                    <Text
+                      style={[styles.selectValue, ui.valueText]}
+                      numberOfLines={1}
+                    >
+                      {activePaymentMethod?.sublabel ??
+                        activePaymentMethod?.label ??
+                        "Select account"}
+                    </Text>
+                    {activePaymentMethod?.isDefault ? (
+                      <View style={[styles.defaultPill, ui.defaultPill]}>
+                        <Text
+                          style={[styles.defaultPillText, ui.defaultPillText]}
+                        >
+                          Default
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+              <Feather name="chevron-down" size={18} color={ui.iconTint.color} />
+            </Pressable>
+
+            {isPaymentMethodsOpen && paymentMethods.length > 1 ? (
+              <View style={[styles.methodDropdown, ui.pillSurface, shadows.card]}>
+                {paymentMethods.map((method, index) => {
+                  const isSelected = method.id === activePaymentMethod?.id;
+                  const isInsufficient =
+                    !method.isFallback &&
+                    method.kind !== "credit" &&
+                    selectedAmount > method.balance;
+                  const isLast = index === paymentMethods.length - 1;
+
+                  return (
+                    <Pressable
+                      key={method.id}
+                      style={[
+                        styles.methodItem,
+                        !isLast && styles.methodItemBorder,
+                        !isLast && ui.dropdownItemBorder,
+                        isInsufficient && styles.methodItemDisabled,
+                      ]}
+                      disabled={isInsufficient}
+                      onPress={() => {
+                        setSelectedPaymentMethodId(method.id);
+                        setIsPaymentMethodsOpen(false);
+                      }}
+                    >
+                      <View style={styles.methodItemLeft}>
+                        {(() => {
+                          const methodAccountId =
+                            "accountId" in method ? method.accountId : undefined;
+                          const account = accounts.find(
+                            (a) => a.id === methodAccountId,
+                          );
+
+                          let logoAsset: any = null;
+
+                          if (account) {
+                            const nameLower = (account.name || "").toLowerCase();
+
+                            const matchWallet = WALLETS.find(
+                              (w) =>
+                                (w.name &&
+                                  nameLower.includes(w.name.toLowerCase())) ||
+                                (w.shortName &&
+                                  nameLower.includes(
+                                    w.shortName.toLowerCase(),
+                                  )) ||
+                                nameLower.includes(w.id),
+                            );
+
+                            const matchBank = BANKS.find(
+                              (b) =>
+                                (b.name &&
+                                  nameLower.includes(b.name.toLowerCase())) ||
+                                (b.shortName &&
+                                  nameLower.includes(
+                                    b.shortName.toLowerCase(),
+                                  )) ||
+                                nameLower.includes(b.id),
+                            );
+
+                            if (matchWallet) {
+                              logoAsset = matchWallet.logo;
+                            } else if (matchBank) {
+                              logoAsset = matchBank.logo;
+                            } else {
+                              const key = account.name
+                                .toLowerCase()
+                                .replace(/[^a-z0-9]/g, "");
+                              logoAsset = LOGO_MAP[key];
+                            }
+                          }
+
+                          if (logoAsset) {
+                            return (
+                              <Logo
+                                logo={logoAsset}
+                                size={24}
+                                backgroundColor={account?.color || colors.secondary}
+                              />
+                            );
+                          }
+
+                          return (
+                            <View style={styles.methodBadge}>
+                              <Text style={styles.methodBadgeText}>
+                                {method.label.slice(0, 2).toUpperCase()}
+                              </Text>
+                            </View>
+                          );
+                        })()}
+
+                        <View style={styles.methodTextBlock}>
+                          <View style={styles.methodTitleRow}>
+                            <Text
+                              style={[styles.methodTitle, ui.valueText]}
+                              numberOfLines={1}
+                            >
+                              {method.label}
+                            </Text>
+                            {method.isDefault ? (
+                              <View style={[styles.defaultPill, ui.defaultPill]}>
+                                <Text
+                                  style={[
+                                    styles.defaultPillText,
+                                    ui.defaultPillText,
+                                  ]}
+                                >
+                                  Default
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          <Text
+                            style={[styles.methodBalanceText, ui.valueText]}
+                          >
+                            {method.balanceLabel}
+                          </Text>
+                          {isInsufficient ? (
+                            <Text
+                              style={[
+                                styles.methodAvailabilityText,
+                                styles.methodBalanceTextDanger,
+                              ]}
+                            >
+                              Insufficient balance
+                            </Text>
+                          ) : method.isFallback ? (
+                            <Text
+                              style={[
+                                styles.methodAvailabilityText,
+                                ui.dropdownItemMuted,
+                              ]}
+                            >
+                              Cash will be created automatically
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      {isSelected ? (
+                        <Feather
+                          name="check"
+                          size={16}
+                          color={colors.primary}
+                        />
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {insufficientBalanceMessage ? (
+              <Text
+                style={[
+                  styles.inlineWarningMessage,
+                  { color: "#EF4444" },
+                ]}
+              >
+                {insufficientBalanceMessage}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.section}>
@@ -344,7 +730,8 @@ export default function PaylaterRepaymentModal() {
 
             <Pressable
               style={[styles.saveButton, ui.saveButton]}
-              onPress={() => router.back()}
+              onPress={handleSave}
+              disabled={isSubmitting}
             >
               <Feather name="check" size={16} color="#FFFFFF" />
               <Text style={[styles.saveButtonText, ui.saveButtonText]}>
@@ -352,6 +739,10 @@ export default function PaylaterRepaymentModal() {
               </Text>
             </Pressable>
           </View>
+
+          {errorMessage ? (
+            <Text style={styles.errorMessage}>{errorMessage}</Text>
+          ) : null}
 
           {showCalendar ? (
             <View style={styles.calendarOverlay}>
@@ -600,6 +991,116 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
   },
+  selectField: {
+    minHeight: 42,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  selectFieldContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectFieldText: {
+    flex: 1,
+  },
+  methodTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  selectValue: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
+  methodDropdown: {
+    marginTop: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  methodItem: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  methodItemBorder: {
+    borderBottomWidth: 1,
+  },
+  methodItemDisabled: {
+    opacity: 0.45,
+  },
+  methodItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  methodTextBlock: {
+    flex: 1,
+    gap: 1,
+  },
+  methodBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#CBD5E1",
+  },
+  methodBadgeText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 12,
+    fontWeight: fontWeights.bold,
+  },
+  methodTitle: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: fontWeights.semibold,
+  },
+  methodBalanceText: {
+    marginTop: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.semibold,
+  },
+  methodAvailabilityText: {
+    marginTop: 1,
+    fontFamily: fontFamilies.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: fontWeights.medium,
+  },
+  methodBalanceTextDanger: {
+    color: "#DC2626",
+  },
+  defaultPill: {
+    height: 20,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  defaultPillText: {
+    fontFamily: fontFamilies.sans,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: fontWeights.semibold,
+  },
   actionsRow: {
     marginTop: 22,
     flexDirection: "row",
@@ -705,5 +1206,21 @@ const styles = StyleSheet.create({
   },
   dayLabelSelected: {
     color: "#FFFFFF",
+  },
+  inlineWarningMessage: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+  },
+  errorMessage: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: fontWeights.medium,
+    textAlign: "center",
+    color: "#EF4444",
   },
 });

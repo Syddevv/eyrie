@@ -1,8 +1,9 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or } from "drizzle-orm";
 
 import { db } from "../client";
 import { transactions } from "../schema";
 import type { NewTransaction } from "../types";
+import { buildPaylaterPaymentReferenceToken } from "../utils/paylaters";
 
 export class TransactionsRepository {
   async create(input: NewTransaction) {
@@ -39,6 +40,63 @@ export class TransactionsRepository {
   async findById(id: string) {
     return db.query.transactions.findFirst({
       where: and(eq(transactions.id, id), isNull(transactions.deletedAt)),
+      with: {
+        category: true,
+        merchant: {
+          with: {
+            defaultCategory: true,
+          },
+        },
+        account: true,
+        transferAccount: true,
+      },
+    });
+  }
+
+  async findAnyById(id: string) {
+    return db.query.transactions.findFirst({
+      where: eq(transactions.id, id),
+      with: {
+        category: true,
+        merchant: {
+          with: {
+            defaultCategory: true,
+          },
+        },
+        account: true,
+        transferAccount: true,
+      },
+    });
+  }
+
+  async findByReference(
+    source: string,
+    referenceType: string,
+    referenceId: string,
+    includeDeleted = true,
+  ) {
+    const referenceToken = buildPaylaterPaymentReferenceToken(referenceId);
+    return db.query.transactions.findFirst({
+      where: includeDeleted
+        ? or(
+            and(
+              eq(transactions.source, source),
+              eq(transactions.referenceType, referenceType),
+              eq(transactions.referenceId, referenceId),
+            ),
+            like(transactions.notes, `%${referenceToken}%`),
+          )
+        : and(
+            isNull(transactions.deletedAt),
+            or(
+              and(
+                eq(transactions.source, source),
+                eq(transactions.referenceType, referenceType),
+                eq(transactions.referenceId, referenceId),
+              ),
+              like(transactions.notes, `%${referenceToken}%`),
+            ),
+          ),
       with: {
         category: true,
         merchant: {

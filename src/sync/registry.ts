@@ -8,10 +8,17 @@ import {
   goalContributions,
   goals,
   merchants,
+  paylaterPayments,
+  paylaters,
   transactions,
   users,
 } from "@/src/db/schema";
 import { SYSTEM_CATEGORY_USER_ID } from "@/src/db/utils/constants";
+import {
+  extractPaylaterPaymentReferenceToken,
+  PAYLATER_TRANSACTION_REFERENCE_TYPE,
+  PAYLATER_TRANSACTION_SOURCE,
+} from "@/src/db/utils/paylaters";
 import { isValidDateKey } from "@/src/lib/streaks";
 import type { SyncableTable } from "./types";
 
@@ -127,6 +134,25 @@ async function categoryExists(id: string | null | undefined) {
   });
 
   return Boolean(existing);
+}
+
+async function findLinkedRepaymentTransactionId(paymentId: string) {
+  const existing = await db.query.transactions.findFirst({
+    where: (table, { and, eq, like, or }) =>
+      and(
+        eq(table.type, "expense"),
+        or(
+          and(
+            eq(table.source, PAYLATER_TRANSACTION_SOURCE),
+            eq(table.referenceType, PAYLATER_TRANSACTION_REFERENCE_TYPE),
+            eq(table.referenceId, paymentId),
+          ),
+          like(table.notes, `%#paylater_payment:${paymentId}%`),
+        ),
+      ),
+  });
+
+  return existing?.id ?? null;
 }
 
 async function ensurePlaceholderCategory(input: {
@@ -421,6 +447,17 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
       transaction_date: row.transactionDate,
     }),
     upsertLocal: async (row) => {
+      const noteReferenceId = extractPaylaterPaymentReferenceToken(
+        (row.notes as string | null) ?? null,
+      );
+      const source = noteReferenceId
+        ? PAYLATER_TRANSACTION_SOURCE
+        : ((row.source as string | null) ?? null);
+      const referenceType = noteReferenceId
+        ? PAYLATER_TRANSACTION_REFERENCE_TYPE
+        : ((row.reference_type as string | null) ?? null);
+      const referenceId =
+        noteReferenceId ?? ((row.reference_id as string | null) ?? null);
       const categoryId = (row.category_id as string | null) ?? null;
       const merchantId = (row.merchant_id as string | null) ?? null;
       const transferAccountId = (row.transfer_account_id as string | null) ?? null;
@@ -442,6 +479,9 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
         merchantId: safeMerchantId,
         accountId: String(row.account_id),
         transferAccountId: safeTransferAccountId,
+        source,
+        referenceType,
+        referenceId,
         merchantName: (row.merchant_name as string | null) ?? null,
         notes: (row.notes as string | null) ?? null,
         transactionDate: String(row.transaction_date),
@@ -462,9 +502,124 @@ export const syncRegistry: Record<SyncableTable, RegistryEntry> = {
           merchantId: safeMerchantId,
           accountId: String(row.account_id),
           transferAccountId: safeTransferAccountId,
+          source,
+          referenceType,
+          referenceId,
           merchantName: (row.merchant_name as string | null) ?? null,
           notes: (row.notes as string | null) ?? null,
           transactionDate: String(row.transaction_date),
+          updatedAt: String(row.updated_at),
+          deletedAt: (row.deleted_at as string | null) ?? null,
+          lastSyncedAt: (row.last_synced_at as string | null) ?? null,
+          syncStatus: "synced",
+          syncError: null,
+        },
+      });
+    },
+  },
+  paylaters: {
+    tableName: "paylaters",
+    shouldSyncRecord: () => true,
+    toRemote: (row) => ({
+      ...commonRemoteFields(row),
+      user_id: row.userId,
+      platform: row.platform,
+      item_name: row.itemName,
+      total_amount: row.totalAmount,
+      remaining_balance: row.remainingBalance,
+      installment_amount: row.installmentAmount,
+      due_day: row.dueDay ?? null,
+      due_date: row.dueDate ?? null,
+      installment_count: row.installmentCount ?? null,
+      start_date: row.startDate,
+      status: row.status,
+      notes: row.notes ?? null,
+    }),
+    upsertLocal: async (row) => {
+      await db.insert(paylaters).values({
+        id: String(row.id),
+        userId: String(row.user_id),
+        platform: String(row.platform),
+        itemName: String(row.item_name),
+        totalAmount: Number(row.total_amount ?? 0),
+        remainingBalance: Number(row.remaining_balance ?? 0),
+        installmentAmount: Number(row.installment_amount ?? 0),
+        dueDay: (row.due_day as string | null) ?? null,
+        dueDate: (row.due_date as string | null) ?? null,
+        installmentCount:
+          row.installment_count == null ? null : Number(row.installment_count ?? 0),
+        startDate: String(row.start_date),
+        status: String(row.status),
+        notes: (row.notes as string | null) ?? null,
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at),
+        deletedAt: (row.deleted_at as string | null) ?? null,
+        lastSyncedAt: (row.last_synced_at as string | null) ?? null,
+        syncStatus: "synced",
+        syncError: null,
+      }).onConflictDoUpdate({
+        target: paylaters.id,
+        set: {
+          userId: String(row.user_id),
+          platform: String(row.platform),
+          itemName: String(row.item_name),
+          totalAmount: Number(row.total_amount ?? 0),
+          remainingBalance: Number(row.remaining_balance ?? 0),
+          installmentAmount: Number(row.installment_amount ?? 0),
+          dueDay: (row.due_day as string | null) ?? null,
+          dueDate: (row.due_date as string | null) ?? null,
+          installmentCount:
+            row.installment_count == null ? null : Number(row.installment_count ?? 0),
+          startDate: String(row.start_date),
+          status: String(row.status),
+          notes: (row.notes as string | null) ?? null,
+          updatedAt: String(row.updated_at),
+          deletedAt: (row.deleted_at as string | null) ?? null,
+          lastSyncedAt: (row.last_synced_at as string | null) ?? null,
+          syncStatus: "synced",
+          syncError: null,
+        },
+      });
+    },
+  },
+  paylater_payments: {
+    tableName: "paylater_payments",
+    shouldSyncRecord: () => true,
+    toRemote: (row) => ({
+      ...commonRemoteFields(row),
+      paylater_id: row.paylaterId,
+      user_id: row.userId,
+      amount: row.amount,
+      payment_date: row.paymentDate,
+      notes: row.notes ?? null,
+    }),
+    upsertLocal: async (row) => {
+      const paymentId = String(row.id);
+      const existingTransactionId = await findLinkedRepaymentTransactionId(paymentId);
+
+      await db.insert(paylaterPayments).values({
+        id: paymentId,
+        paylaterId: String(row.paylater_id),
+        userId: String(row.user_id),
+        transactionId: existingTransactionId,
+        amount: Number(row.amount ?? 0),
+        paymentDate: String(row.payment_date),
+        notes: (row.notes as string | null) ?? null,
+        createdAt: String(row.created_at),
+        updatedAt: String(row.updated_at),
+        deletedAt: (row.deleted_at as string | null) ?? null,
+        lastSyncedAt: (row.last_synced_at as string | null) ?? null,
+        syncStatus: "synced",
+        syncError: null,
+      }).onConflictDoUpdate({
+        target: paylaterPayments.id,
+        set: {
+          paylaterId: String(row.paylater_id),
+          userId: String(row.user_id),
+          transactionId: existingTransactionId,
+          amount: Number(row.amount ?? 0),
+          paymentDate: String(row.payment_date),
+          notes: (row.notes as string | null) ?? null,
           updatedAt: String(row.updated_at),
           deletedAt: (row.deleted_at as string | null) ?? null,
           lastSyncedAt: (row.last_synced_at as string | null) ?? null,
@@ -661,6 +816,8 @@ export async function markLocalRecordDeleted(tableName: SyncableTable, id: strin
     categories,
     merchants,
     transactions,
+    paylaters,
+    paylater_payments: paylaterPayments,
     budgets,
     saving_goals: goals,
     goal_contributions: goalContributions,

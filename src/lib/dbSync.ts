@@ -6,6 +6,7 @@ const notificationListeners = new Set<Callback>();
 const categoryListeners = new Set<Callback>();
 const goalListeners = new Set<Callback>();
 const merchantListeners = new Set<Callback>();
+const paylaterListeners = new Set<Callback>();
 const transactionListeners = new Set<Callback>();
 const userListeners = new Set<Callback>();
 
@@ -108,6 +109,23 @@ export function emitMerchantsChanged() {
   }
 }
 
+export function onPaylatersChanged(cb: Callback) {
+  paylaterListeners.add(cb);
+  return () => {
+    paylaterListeners.delete(cb);
+  };
+}
+
+export function emitPaylatersChanged() {
+  for (const cb of Array.from(paylaterListeners)) {
+    try {
+      cb();
+    } catch {
+      // swallow
+    }
+  }
+}
+
 export function onTransactionsChanged(cb: Callback) {
   transactionListeners.add(cb);
   return () => {
@@ -156,6 +174,7 @@ export function emitAllChanges() {
   emitCategoriesChanged();
   emitGoalsChanged();
   emitMerchantsChanged();
+  emitPaylatersChanged();
   emitTransactionsChanged();
 }
 
@@ -174,6 +193,8 @@ export default {
   emitUsersChanged,
   onMerchantsChanged,
   emitMerchantsChanged,
+  onPaylatersChanged,
+  emitPaylatersChanged,
   onTransactionsChanged,
   emitTransactionsChanged,
   emitAllChanges,

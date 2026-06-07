@@ -12,6 +12,8 @@ import {
   merchantCategoryHistory,
   merchants,
   notifications,
+  paylaterPayments,
+  paylaters,
   syncLocks,
   syncQueue,
   syncState,
@@ -41,6 +43,10 @@ export type MerchantCategoryHistory = InferSelectModel<typeof merchantCategoryHi
 export type NewMerchantCategoryHistory = InferInsertModel<typeof merchantCategoryHistory>;
 export type Notification = InferSelectModel<typeof notifications>;
 export type NewNotification = InferInsertModel<typeof notifications>;
+export type Paylater = InferSelectModel<typeof paylaters>;
+export type NewPaylater = InferInsertModel<typeof paylaters>;
+export type PaylaterPayment = InferSelectModel<typeof paylaterPayments>;
+export type NewPaylaterPayment = InferInsertModel<typeof paylaterPayments>;
 export type Currency = InferSelectModel<typeof currencies>;
 export type NewCurrency = InferInsertModel<typeof currencies>;
 export type ExchangeRate = InferSelectModel<typeof exchangeRates>;
